@@ -1,0 +1,448 @@
+ - 00   4  NOP
+ - 01  12  LD BC, yyxx
+ - 02   8  LD (BC), A
+ - 03   8  INC BC
+ - 04   4  INC B
+ - 05   4  DEC B
+ - 06   8  LD B, xx
+ - 07   4  RLCA
+ * 08  ??  LD (yyxx), SP  (?)
+ - 09   8  ADD HL, BC
+ - 0a   8  LD A, (BC)
+ - 0b   8  DEC BC
+ - 0c   4  INC C
+ - 0d   4  DEC C
+ - 0e   8  LD C, xx
+ - 0f   4  RRCA
+ * 10  ??  STOP
+ - 11  12  LD DE, yyxx
+ - 12   8  LD (DE), A
+ - 13   8  INC DE
+ - 14   4  INC D
+ - 15   4  DEC D
+ - 16   8  LD D, xx
+ - 17   4  RLA
+ - 18  12  JR xx
+ - 19   8  ADD HL, DE
+ - 1a   8  LD A,(DE)
+ - 1b   8  DEC DE
+ - 1c   4  INC E
+ - 1d   4  DEC E
+ - 1e   8  LD E, xx
+ - 1f   4  RRA
+ - 20  ??  JR NZ, xx
+ - 21  12  LD HL, yyxx
+ * 22   8  LDI (HL),A
+ - 23   8  INC HL
+ - 24   4  INC H
+ - 25   4  DEC H
+ - 26   8  LD H, xx
+ - 27   4  DAA
+ - 28  ??  JR Z, xx
+ - 29   8  ADD HL, HL
+ * 2a   8  LDI A, (HL)
+ - 2b   8  DEC HL
+ - 2c   4  INC L
+ - 2d   4  DEC L
+ - 2e   8  LD L, xx
+ - 2f   4  CPL
+ - 30  ??  JR NC, xx
+ - 31  12  LD SP, yyxx
+ * 32   8  LDD (HL), A
+ - 33   8  INC SP
+ - 34  12  INC (HL)
+ - 35  12  DEC (HL)
+ - 36  12  LD (HL), xx
+ - 37   4  SCF
+ - 38  ??  JR C, xx
+ - 39   8  ADD HL, SP
+ * 3a   8  LDD A, (HL)
+ - 3b   8  DEC SP
+ - 3c   4  INC A
+ - 3d   4  DEC A
+ - 3e   8  LD A, xx
+ - 3f   4  CCF
+ - 40   4  LD B, B
+ - 41   4  LD B, C
+ - 42   4  LD B, D
+ - 43   4  LD B, E
+ - 44   4  LD B, H
+ - 45   4  LD B, L
+ - 46   8  LD B, (HL)
+ - 47   4  LD B, A
+ - 48   4  LD C, B
+ - 49   4  LD C, C
+ - 4a   4  LD C, D
+ - 4b   4  LD C, E
+ - 4c   4  LD C, H
+ - 4d   4  LD C, L
+ - 4e   8  LD C, (HL)
+ - 4f   4  LD C, A
+ - 50   4  LD D, B
+ - 51   4  LD D, C
+ - 52   4  LD D, D
+ - 53   4  LD D, E
+ - 54   4  LD D, H
+ - 55   4  LD D, L
+ - 56   8  LD D, (HL)
+ - 57   4  LD D, A
+ - 58   4  LD E, B
+ - 59   4  LD E, C
+ - 5a   4  LD E, D
+ - 5b   4  LD E, E
+ - 5c   4  LD E, H
+ - 5d   4  LD E, L
+ - 5e   8  LD E, (HL)
+ - 5f   4  LD E, A
+ - 60   4  LD H, B
+ - 61   4  LD H, C
+ - 62   4  LD H, D
+ - 63   4  LD H, E
+ - 64   4  LD H, H
+ - 65   4  LD H, L
+ - 66   8  LD H, (HL)
+ - 67   4  LD H, A
+ - 68   4  LD L, B
+ - 69   4  LD L, C
+ - 6a   4  LD L, D
+ - 6b   4  LD L, E
+ - 6c   4  LD L, H
+ - 6d   4  LD L, L
+ - 6e   8  LD L, (HL)
+ - 6F   4  LD L, A
+ - 70   8  LD (HL), B
+ - 71   8  LD (HL), C
+ - 72   8  LD (HL), D
+ - 73   8  LD (HL), E
+ - 74   8  LD (HL), H
+ - 75   8  LD (HL), L
+ - 76   *  HALT
+ - 77   8  LD (HL), A
+ - 78   4  LD A, B
+ - 79   4  LD A, C
+ - 7a   4  LD A, D
+ - 7b   4  LD A, E
+ - 7c   4  LD A, H
+ - 7d   4  LD A, L
+ - 7e   8  LD A, (HL)
+ - 7f   4  LD A, A
+ - 80   4  ADD A, B
+ - 81   4  ADD A, C
+ - 82   4  ADD A, D
+ - 83   4  ADD A, E
+ - 84   4  ADD A, H
+ - 85   4  ADD A, L
+ - 86   8  ADD A, (HL)
+ - 87   4  ADD A, A
+ - 88   4  ADC A, B
+ - 89   4  ADC A, C
+ - 8a   4  ADC A, D
+ - 8b   4  ADC A, E
+ - 8c   4  ADC A, H
+ - 8d   4  ADC A, L
+ - 8e   8  ADC A, (HL)
+ - 8f   4  ADC A, A
+ - 90   4  SUB B
+ - 91   4  SUB C
+ - 92   4  SUB D
+ - 93   4  SUB E
+ - 94   4  SUB H
+ - 95   4  SUB L
+ - 96   8  SUB (HL)
+ - 97   4  SUB A
+ - 98   4  SBC A, B
+ - 99   4  SBC A, C
+ - 9a   4  SBC A, D
+ - 9b   4  SBC A, E
+ - 9c   4  SBC A, H
+ - 9d   4  SBC A, L
+ - 9e   8  SBC A, (HL)
+ - 9f   4  SBC A, A
+ - a0   4  AND B
+ - a1   4  AND C
+ - a2   4  AND D
+ - a3   4  AND E
+ - a4   4  AND H
+ - a5   4  AND L
+ - a6   8  AND (HL)
+ - a7   4  AND A
+ - a8   4  XOR B
+ - a9   4  XOR C
+ - aa   4  XOR D
+ - ab   4  XOR E
+ - ac   4  XOR H
+ - ad   4  XOR L
+ - ae   8  XOR (HL)
+ - af   4  XOR A
+ - b0   4  OR B
+ - b1   4  OR C
+ - b2   4  OR D
+ - b3   4  OR E
+ - b4   4  OR H
+ - b5   4  OR L
+ - b6   8  OR (HL)
+ - b7   4  OR A
+ - b8   4  CP B
+ - b9   4  CP C
+ - ba   4  CP D
+ - bb   4  CP E
+ - bc   4  CP H
+ - bd   4  CP L
+ - be   8  CP (HL)
+ - bf   4  CP A
+ - c0  ??  RET NC
+ - c1  12  POP BC
+ - c2  ??  JP NZ yyxx
+ - c3  16  JP yyxx
+ - c4  ??  CALL NZ yyxx
+ - c5  16  PUSH BC
+ - c6   8  ADD A, xx
+ - c7  16  RST 00h
+ - c8  ??  CALL Z yyxx
+ - c9  16  RET
+ - ca  ??  JP Z yyxx
+ - cb
+ - - 40   8  BIT 0, B
+ - - 41   8  BIT 0, C
+ - - 42   8  BIT 0, D
+ - - 43   8  BIT 0, E
+ - - 44   8  BIT 0, H
+ - - 45   8  BIT 0, L
+ - - 46  12  BIT 0, (HL)
+ - - 47   8  BIT 0, A
+ - - 48   8  BIT 1, B
+ - - 49   8  BIT 1, C
+ - - 4a   8  BIT 1, D
+ - - 4b   8  BIT 1, E
+ - - 4c   8  BIT 1, H
+ - - 4d   8  BIT 1, L
+ - - 4e  12  BIT 1, (HL)
+ - - 4f   8  BIT 1, A
+ - - 50   8  BIT 2, B
+ - - 51   8  BIT 2, C
+ - - 52   8  BIT 2, D
+ - - 53   8  BIT 2, E
+ - - 54   8  BIT 2, H
+ - - 55   8  BIT 2, L
+ - - 56  12  BIT 2, (HL)
+ - - 57   8  BIT 2, A
+ - - 58   8  BIT 3, B
+ - - 59   8  BIT 3, C
+ - - 5a   8  BIT 3, D
+ - - 5b   8  BIT 3, E
+ - - 5c   8  BIT 3, H
+ - - 5d   8  BIT 3, L
+ - - 5e  12  BIT 3, (HL)
+ - - 5f   8  BIT 3, A
+ - - 60   8  BIT 4, B
+ - - 61   8  BIT 4, C
+ - - 62   8  BIT 4, D
+ - - 63   8  BIT 4, E
+ - - 64   8  BIT 4, H
+ - - 65   8  BIT 4, L
+ - - 66  12  BIT 4, (HL)
+ - - 67   8  BIT 4, A
+ - - 68   8  BIT 5, B
+ - - 69   8  BIT 5, C
+ - - 6a   8  BIT 5, D
+ - - 6b   8  BIT 5, E
+ - - 6c   8  BIT 5, H
+ - - 6d   8  BIT 5, L
+ - - 6e  12  BIT 5, (HL)
+ - - 6f   8  BIT 5, A
+ - - 70   8  BIT 6, B
+ - - 71   8  BIT 6, C
+ - - 72   8  BIT 6, D
+ - - 73   8  BIT 6, E
+ - - 74   8  BIT 6, H
+ - - 75   8  BIT 6, L
+ - - 76  12  BIT 6, (HL)
+ - - 77   8  BIT 6, A
+ - - 78   8  BIT 7, B
+ - - 79   8  BIT 7, C
+ - - 7a   8  BIT 7, D
+ - - 7b   8  BIT 7, E
+ - - 7c   8  BIT 7, H
+ - - 7d   8  BIT 7, L
+ - - 7e  12  BIT 7, (HL)
+ - - 7f   8  BIT 7, A
+ - - 80   8  RES 0, B
+ - - 81   8  RES 0, C
+ - - 82   8  RES 0, D
+ - - 83   8  RES 0, E
+ - - 84   8  RES 0, H
+ - - 85   8  RES 0, L
+ - - 86  16  RES 0, (HL)
+ - - 87   8  RES 0, A
+ - - 88   8  RES 1, B
+ - - 89   8  RES 1, C
+ - - 8a   8  RES 1, D
+ - - 8b   8  RES 1, E
+ - - 8c   8  RES 1, H
+ - - 8d   8  RES 1, L
+ - - 8e  16  RES 1, (HL)
+ - - 8f   8  RES 1, A
+ - - 90   8  RES 2, B
+ - - 91   8  RES 2, C
+ - - 92   8  RES 2, D
+ - - 93   8  RES 2, E
+ - - 94   8  RES 2, H
+ - - 95   8  RES 2, L
+ - - 96  16  RES 2, (HL)
+ - - 97   8  RES 2, A
+ - - 98   8  RES 3, B
+ - - 99   8  RES 3, C
+ - - 9a   8  RES 3, D
+ - - 9b   8  RES 3, E
+ - - 9c   8  RES 3, H
+ - - 9d   8  RES 3, L
+ - - 9e  16  RES 3, (HL)
+ - - 9f   8  RES 3, A
+ - - a0   8  RES 4, B
+ - - a1   8  RES 4, C
+ - - a2   8  RES 4, D
+ - - a3   8  RES 4, E
+ - - a4   8  RES 4, H
+ - - a5   8  RES 4, L
+ - - a6  16  RES 4, (HL)
+ - - a7   8  RES 4, A
+ - - a8   8  RES 5, B
+ - - a9   8  RES 5, C
+ - - aa   8  RES 5, D
+ - - ab   8  RES 5, E
+ - - ac   8  RES 5, H
+ - - ad   8  RES 5, L
+ - - ae  16  RES 5, (HL)
+ - - af   8  RES 5, A
+ - - b0   8  RES 6, B
+ - - b1   8  RES 6, C
+ - - b2   8  RES 6, D
+ - - b3   8  RES 6, E
+ - - b4   8  RES 6, H
+ - - b5   8  RES 6, L
+ - - b6  16  RES 6, (HL)
+ - - b7   8  RES 6, A
+ - - b8   8  RES 7, B
+ - - b9   8  RES 7, C
+ - - ba   8  RES 7, D
+ - - bb   8  RES 7, E
+ - - bc   8  RES 7, H
+ - - bd   8  RES 7, L
+ - - be  16  RES 7, (HL)
+ - - bf   8  RES 7, A
+ - - c0   8  SET 0, B
+ - - c1   8  SET 0, C
+ - - c2   8  SET 0, D
+ - - c3   8  SET 0, E
+ - - c4   8  SET 0, H
+ - - c5   8  SET 0, L
+ - - c6  16  SET 0, (HL)
+ - - c7   8  SET 0, A
+ - - c8   8  SET 1, B
+ - - c9   8  SET 1, C
+ - - ca   8  SET 1, D
+ - - cb   8  SET 1, E
+ - - cc   8  SET 1, H
+ - - cd   8  SET 1, L
+ - - ce  16  SET 1, (HL)
+ - - cf   8  SET 1, A
+ - - d0   8  SET 2, B
+ - - d1   8  SET 2, C
+ - - d2   8  SET 2, D
+ - - d3   8  SET 2, E
+ - - d4   8  SET 2, H
+ - - d5   8  SET 2, L
+ - - d6  16  SET 2, (HL)
+ - - d7   8  SET 2, A
+ - - d8   8  SET 3, B
+ - - d9   8  SET 3, C
+ - - da   8  SET 3, D
+ - - db   8  SET 3, E
+ - - dc   8  SET 3, H
+ - - dd   8  SET 3, L
+ - - de  16  SET 3, (HL)
+ - - df   8  SET 3, A
+ - - e0   8  SET 4, B
+ - - e1   8  SET 4, C
+ - - e2   8  SET 4, D
+ - - e3   8  SET 4, E
+ - - e4   8  SET 4, H
+ - - e5   8  SET 4, L
+ - - e6  16  SET 4, (HL)
+ - - e7   8  SET 4, A
+ - - e8   8  SET 5, B
+ - - e9   8  SET 5, C
+ - - ea   8  SET 5, D
+ - - eb   8  SET 5, E
+ - - ec   8  SET 5, H
+ - - ed   8  SET 5, L
+ - - ee  16  SET 5, (HL)
+ - - ef   8  SET 5, A
+ - - f0   8  SET 6, B
+ - - f1   8  SET 6, C
+ - - f2   8  SET 6, D
+ - - f3   8  SET 6, E
+ - - f4   8  SET 6, H
+ - - f5   8  SET 6, L
+ - - f6  16  SET 6, (HL)
+ - - f7   8  SET 6, A
+ - - f8   8  SET 7, B
+ - - f9   8  SET 7, C
+ - - fa   8  SET 7, D
+ - - fb   8  SET 7, E
+ - - fc   8  SET 7, H
+ - - fd   8  SET 7, L
+ - - fe  16  SET 7, (HL)
+ - - ff   8  SET 7, A
+ - cc  ??  CALL Z, yyxx
+ - cd  24  CALL yyxx
+ - ce   8  ADC A, xx
+ - cf  16  RST 08h
+ - d0  ??  CALL NC, yyxx
+ - d1  12  POP DE
+ - d2  ??  JP NC, yyxx
+ * d3  --  ----
+ - d4  ??  CALL NC yyxx
+ - d5  12  PUSH DE
+ - d6   8  SUB xx
+ - d7  16  RST 10h
+ - d8  ??  CALL C yyxx
+ * d9  16  RETI
+ - da  ??  JP C yyxx
+ * db  --  ----
+ - dc  ??  CALL C yyxx
+ * dd  --  ----
+ - de   8  SBC A, xx
+ - df  16  RST 18h
+ * e0  12  LD ($FF00 + xx), A
+ - e1  12  POP HL
+ * e2   8  LD ($FF00 + C), A
+ * e3  --  ----
+ * e4  --  ----
+ - e5  16  PUSH HL
+ - e6   8  AND xx
+ - e7  16  RST 20h
+ * e8   8  ADD  SP, xx
+ - e9   4  JP (HL)
+ * ea  16  LD (yyxx), A
+ * eb  --  ----
+ * ec  --  ----
+ * ed  --  ----
+ - ee   8  XOR xx
+ - ef  16  RST 28h
+ * f0  12  LD A, ($FF00 + xx)
+ - f1  12  POP AF
+ * f2   8  LD A, (FF00 + C)
+ - f3   4  DI
+ * f4  --  ----
+ - f5  16  PUSH AF
+ - f6   8  OR xx
+ - f7  16  RST 30h
+ * f8  12  LD HL, SP + xx
+ - f9   8  LD SP, HL
+ * fa  16  LD A, (xx)
+ - fb   4  EI
+ * fc  --  ----
+ * fd  --  ----
+ - fe   8  CP xx
+ - ff  16  RST 38h
