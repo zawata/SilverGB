@@ -1,0 +1,9 @@
+
+# ide files
+.vscode/
+
+# output of the makefile
+out/
+
+# my test files
+test_files/
