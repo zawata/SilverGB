@@ -17,10 +17,10 @@ ROOT_DIR := .
 
 SRC_DIRS := $(ROOT_DIR)/src
 BLD_DIRS := $(ROOT_DIR)/out
-INC_DIRS := $(ROOT_DIR)/inc
+INC_DIRS := $(ROOT_DIR)/src
 LIB_DIRS := $(ROOT_DIR)/lib
 
-LIBS := SDL2 SDL2_ttf
+LIBS := dl SDL2 SDL2_ttf
 
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp' -or -name '*.c')
 OBJS := $(SRCS:%=$(BLD_DIRS)/%.o)
