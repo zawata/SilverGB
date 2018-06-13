@@ -190,7 +190,7 @@
  - bd   4  CP L
  - be   8  CP (HL)
  - bf   4  CP A
- - c0  ??  RET NC
+ - c0  ??  RET NZ
  - c1  12  POP BC
  - c2  ??  JP NZ yyxx
  - c3  16  JP yyxx
@@ -198,7 +198,7 @@
  - c5  16  PUSH BC
  - c6   8  ADD A, xx
  - c7  16  RST 00h
- - c8  ??  CALL Z yyxx
+ - c8  ??  RET Z
  - c9  16  RET
  - ca  ??  JP Z yyxx
  - cb
@@ -398,7 +398,7 @@
  - cd  24  CALL yyxx
  - ce   8  ADC A, xx
  - cf  16  RST 08h
- - d0  ??  CALL NC, yyxx
+ - d0  ??  RET NC
  - d1  12  POP DE
  - d2  ??  JP NC, yyxx
  * d3  --  ----
@@ -406,7 +406,7 @@
  - d5  12  PUSH DE
  - d6   8  SUB xx
  - d7  16  RST 10h
- - d8  ??  CALL C yyxx
+ - d8  ??  RET C
  * d9  16  RETI
  - da  ??  JP C yyxx
  * db  --  ----
