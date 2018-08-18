@@ -6,14 +6,14 @@
 
 #ifndef INTS_DEF
 #define INTS_DEF
- #define s8    signed char
- #define s16   signed short
- #define s32   signed long
- #define s64   signed long long
- #define u8  unsigned char
- #define u16 unsigned short
- #define u32 unsigned long
- #define u64 unsigned long long
+typedef   signed char      s8 ;
+typedef   signed short     s16;
+typedef   signed long      s32;
+typedef   signed long long s64;
+typedef unsigned char      u8 ;
+typedef unsigned short     u16;
+typedef unsigned long      u32;
+typedef unsigned long long u64;
 #endif
 
 class Utility_Functions {

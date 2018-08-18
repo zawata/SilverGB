@@ -14,7 +14,7 @@ int main(int, char**)
     if(code == GUI::loop_return_code_t::LOOP_FINISH) {
         std::cout << "Exiting" << std::endl;
         return 0;
-    } else if (code == GUI::loop_return_code_t::LOOP_FINISH) {
+    } else if (code == GUI::loop_return_code_t::LOOP_ERROR) {
         std::cerr << "There was an Error. TODO: find someway to figure out what the error is" << std::endl;
         return -1;
     } else {

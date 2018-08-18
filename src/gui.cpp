@@ -3,9 +3,20 @@
 GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
 window(w),
 gl_context(g),
-io(io) {}
+io(io),
+screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
+
+    glGenTextures(1, &screen_texture);
+    glBindTexture(GL_TEXTURE_2D, screen_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
 
 GUI::~GUI() {
+    //delete custom textures
+    glDeleteTextures(1, &screen_texture);
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
@@ -13,6 +24,8 @@ GUI::~GUI() {
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    free(screen_buffer);
 }
 
 bool GUI::preInitialize() {
@@ -36,7 +49,7 @@ bool GUI::preInitialize() {
 GUI *GUI::createGUI() {
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window *window = SDL_CreateWindow("ImGui SDL2+OpenGL3 example", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 1280, 720, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+    SDL_Window *window = SDL_CreateWindow("SilverBoy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H + MENUBAR_HEIGHT, SDL_WINDOW_OPENGL);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
     gl3wInit();
@@ -73,14 +86,27 @@ GUI::loop_return_code_t GUI::mainLoop() {
     ImGui_ImplSDL2_NewFrame(window);
     ImGui::NewFrame();
     buildUI();
+    //ImGui::ShowMetricsWindow();
 
     if(state_flags.opening_file) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
-            printf("%s\n", file);
+            printf("%s\n", file); //TODO: heres the file. do something with it
             free(file);
         }
         state_flags.opening_file = false;
+    }
+
+    if(state_flags.set_debug_mode && !state_flags.debug_mode) {
+        //set debug mode
+        SDL_SetWindowSize(this->window, 640,480);
+        SDL_SetWindowResizable(this->window, SDL_TRUE);
+        state_flags.debug_mode = true;
+    } else if(!state_flags.set_debug_mode && state_flags.debug_mode) {
+        //unset debug mode
+        SDL_SetWindowSize(this->window, GB_S_W, GB_S_H + MENUBAR_HEIGHT);
+        SDL_SetWindowResizable(this->window, SDL_FALSE);
+        state_flags.debug_mode = false;
     }
 
     // Rendering
@@ -106,33 +132,97 @@ void GUI::buildUI() {
 
     static struct {
         bool register_window = false;
+        bool disassemble_window = false;
+        bool render_window = true;
     } window_flags;
 
     if(BeginMainMenuBar()) {
         if(BeginMenu("File")) {
             MenuItem("Open File", NULL, &state_flags.opening_file);
+            MenuItem("Enable Debug", NULL, &state_flags.set_debug_mode);
             MenuItem("Exit", NULL, &state_flags.done);
             EndMenu();
         }
 
-        if(BeginMenu("Debug")) {
-            if(window_flags.register_window) {
-                if(MenuItem("Hide Register Window")) {
-                    window_flags.register_window = false;
+        if(state_flags.debug_mode) {
+            if(BeginMenu("Debug")) {
+                if(window_flags.register_window) {
+                    if(MenuItem("Hide Register Window")) window_flags.register_window = false;
+                } else {
+                    if(MenuItem("Show Register Window")) window_flags.register_window = true;
                 }
-            } else {
-                if(MenuItem("Show Register Window")) {
-                    window_flags.register_window = true;
+
+                if(window_flags.disassemble_window) {
+                    if(MenuItem("Hide Disassembly Window")) window_flags.disassemble_window = false;
+                } else {
+                    if(MenuItem("Show Disassembly Window")) window_flags.disassemble_window = true;
                 }
+
+                EndMenu();
             }
-            MenuItem("Exit", NULL, &state_flags.done);
-            EndMenu();
         }
         EndMainMenuBar();
     }
 
-    if(window_flags.register_window) {
-        buildRegisterUI();
+    if(window_flags.register_window) buildRegisterUI();
+    if(window_flags.disassemble_window) buildDisassemblyUI();
+    if(window_flags.render_window) buildRenderUI();
+}
+
+void GUI::buildRenderUI() {
+    using namespace ImGui;
+
+    if(!state_flags.debug_mode) {
+        SetNextWindowSize({GB_S_W, GB_S_H});
+        SetNextWindowPos({0, MENUBAR_HEIGHT});
+
+        PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
+        PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+        Begin("Game", nullptr,
+                ImGuiWindowFlags_NoTitleBar        |
+                ImGuiWindowFlags_NoResize          |
+                ImGuiWindowFlags_NoMove            |
+                ImGuiWindowFlags_NoScrollbar       |
+                ImGuiWindowFlags_NoScrollWithMouse |
+                ImGuiWindowFlags_NoCollapse);
+    } else {
+        SetNextWindowSize({0,0});
+        PushStyleVar(ImGuiStyleVar_WindowPadding, {8,0});
+        Begin("Game", nullptr,
+                ImGuiWindowFlags_NoCollapse  |
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoScrollWithMouse);
+    }
+
+    //TODO: update screen_buffer with pixel data from VPU
+    memset(screen_buffer, 00, GB_S_P_SZ);
+    for(int i = 0; i < GB_S_P_SZ; i+=3) {
+        //for now just draw red.
+        screen_buffer[i] = 0xFF;
+        screen_buffer[i+1] = 0x00;
+        screen_buffer[i+2] = 0x00;
+    }
+    glBindTexture(GL_TEXTURE_2D, screen_texture);
+    glTexImage2D(
+            GL_TEXTURE_2D,          //target
+            0,                      //level
+            GL_RGB8,                //base_format
+            GB_S_W,                 //width
+            GB_S_H,                 //height
+            0,                      //border
+            GL_RGB,                 //color_format
+            GL_UNSIGNED_BYTE,       //data_format
+            (void *)screen_buffer); //pixel_buffer
+    glBindTexture(GL_TEXTURE_2D, 0);
+    ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
+    End();
+
+    if(!state_flags.debug_mode) {
+        PopStyleVar(4);
+    } else {
+        PopStyleVar(1);
     }
 }
 
@@ -147,6 +237,7 @@ void GUI::buildRegisterUI() {
         bool HL;
     } reg_flags;
 
+    //The Indentation on this window is very sensitive...
     SetNextWindowSize({120,0});
     Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
     Unindent(10.0);
@@ -251,5 +342,13 @@ void GUI::buildRegisterUI() {
 
     Text("0x0000");
     Text("0x0000");
+    End();
+}
+
+void GUI::buildDisassemblyUI() {
+    using namespace ImGui;
+
+    SetNextWindowSize({120,0});
+    Begin("Disassembly", nullptr, ImGuiWindowFlags_NoResize);
     End();
 }
