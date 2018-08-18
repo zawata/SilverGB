@@ -1,13 +1,13 @@
 #include "cart.hpp"
 #include "util.hpp"
 
-#ifndef MEM_HPP
-#define MEM_HPP
+#ifndef IO_HPP
+#define IO_HPP
 
-class Memory_Map {
+class IO_Bus {
 public:
-    Memory_Map(Cartridge *c);
-    ~Memory_Map();
+    IO_Bus(Cartridge *c);
+    ~IO_Bus();
 
     u8   read(u16 offset);
     void write(u16 offset, u8 data);

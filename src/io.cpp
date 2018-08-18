@@ -1,17 +1,17 @@
-#include "mem.hpp"
+#include "io.hpp"
 
-Memory_Map::Memory_Map(Cartridge *c) :
+IO_Bus::IO_Bus(Cartridge *c) :
 cart(c) {}
 
-u8 Memory_Map::read(u16 offset) {
+u8 IO_Bus::read(u16 offset) {
     if(offset <= 0x3FFF) {        // 16KB ROM bank 00
-        cart->readFromCart(offset);
+        return cart->readFromCart(offset);
     } else if(offset <= 0x7FFF) { // 16KB ROM Bank 01~NN
-        cart->readFromCart(offset);
+        return cart->readFromCart(offset);
     } else if(offset <= 0x9FFF) { // 8KB Video RAM (VRAM)
 
     } else if(offset <= 0xBFFF) { // 8KB External RAM
-
+        //return cart->readFromCart(offset);
     } else if(offset <= 0xCFFF) { // 4KB Work RAM (WRAM) bank 0
 
     } else if(offset <= 0xDFFF) { // 4KB Work RAM (WRAM) bank 1~N
@@ -31,7 +31,7 @@ u8 Memory_Map::read(u16 offset) {
     }
 }
 
-void Memory_Map::write(u16 offset, u8 data) {
+void IO_Bus::write(u16 offset, u8 data) {
     if(offset <= 0x3FFF) {        // 16KB ROM bank 00
 
     } else if(offset <= 0x7FFF) { // 16KB ROM Bank 01~NN
