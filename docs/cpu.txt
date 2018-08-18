@@ -1,0 +1,33 @@
+The CPU
+
+The CPU is slightly customized Intel 8080 with some nifty features from the zilog z80.
+
+The 8080 was the precursor to the 8086 which was the precursor to the 8086,
+    the starting point of the x86 CPU architecture
+
+The zilog z80 is still in use today, the most common application I see for it is
+    the Texas Instrument's Graphic Calculators. All of them (Ti-81+) use the z80 as 
+    their CPU
+
+
+Execution is as follows:
+ - each Instruction Execution is dubbed an I-Cycle
+    Execution of instructions is completely linear
+ - each I-cycle consists of a number of M-Cycles depending on the complexity of the instruction
+    There are between 1 and 5 M-Cycles per I-Cycle
+ - each M-Cycle consists of a number of T-Cycles(z80) or states(8080) (herein referred to as T-Cycles for consistency and simplicity)
+    A T-Cycle is simply the pulse of a clock
+    There are between 3 and 5 T-cycles per M-Cycle depending on the complexity of the M-Cycle
+
+
+ - T-Cycle may not be neccessary to emulate as no additional execution may happen
+    to the level of a T-Cycle.
+
+
+The M-Cycles
+    1. FETCH
+        The first and most obvious of the M-Cycles, FETCH, is the retrieval and
+        decoding the OpCode.
+        This is always the first M-Cycle and will execute for every instruction
+    2. MEMORY READ
+    3. MEMORY WRITE
