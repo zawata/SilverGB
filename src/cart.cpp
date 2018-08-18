@@ -9,37 +9,37 @@ const u8 Cartridge_Constants::MAGIC_NUM[Cartridge_Constants::MAGIC_NUM_LENGTH] =
         0xDD,0xDC,0x99,0x9F,0xBB,0xB9,0x33,0x3E };
 
 Cartridge::Cartridge(File_Interface *f) :
-file(f),
-cart_type(Cartridge_Constants::cart_type_t::determineCartType(file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {}
+rom_file(f),
+cart_type(Cartridge_Constants::cart_type_t::determineCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {}
 
 Cartridge::~Cartridge() {}
 
 u16 Cartridge::getCodeOffset() {
     return
-            file->getByte(Cartridge_Constants::START_CODE_HI_OFFSET) << 8 |
-            file->getByte(Cartridge_Constants::START_CODE_LO_OFFSET);
+            rom_file->getByte(Cartridge_Constants::START_CODE_HI_OFFSET) << 8 |
+            rom_file->getByte(Cartridge_Constants::START_CODE_LO_OFFSET);
 }
 
 bool Cartridge::checkMagicNumber() {
     u8 buf[Cartridge_Constants::MAGIC_NUM_LENGTH];
-    file->getBuffer(Cartridge_Constants::MAGIC_NUM_OFFSET, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
+    rom_file->getBuffer(Cartridge_Constants::MAGIC_NUM_OFFSET, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
     return Utility_Functions::byteCompare(Cartridge_Constants::MAGIC_NUM, buf, 48);
 }
 
 std::string Cartridge::getCartTitle() {
     if(isCGBCart()) {
         u8 buf[Cartridge_Constants::CGB_TITLE_LENGTH];
-        file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::CGB_TITLE_LENGTH);
+        rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::CGB_TITLE_LENGTH);
         return std::string((char *)buf);
     } else {
         u8 buf[Cartridge_Constants::GB_TITLE_LENGTH];
-        file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::GB_TITLE_LENGTH);
+        rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::GB_TITLE_LENGTH);
         return std::string((char *)buf);
     }
 }
 
 u8 Cartridge::getCartVersion() {
-    return file->getByte(Cartridge_Constants::VERSION_NUMBER);
+    return rom_file->getByte(Cartridge_Constants::VERSION_NUMBER);
 }
 
 Cartridge_Constants::cart_type_t Cartridge::getCartType() {
@@ -47,7 +47,7 @@ Cartridge_Constants::cart_type_t Cartridge::getCartType() {
 }
 
 u32 Cartridge::getROMSize() {
-    u8 rom_size_byte = file->getByte(Cartridge_Constants::ROM_SIZE_OFFSET);
+    u8 rom_size_byte = rom_file->getByte(Cartridge_Constants::ROM_SIZE_OFFSET);
     switch(rom_size_byte) {
     case 0x00:
         return 32768;
@@ -78,7 +78,7 @@ u32 Cartridge::getROMSize() {
 }
 
 u32 Cartridge::getRAMSize() {
-    u8 rom_size_byte = file->getByte(Cartridge_Constants::RAM_SIZE_OFFSET);
+    u8 rom_size_byte = rom_file->getByte(Cartridge_Constants::RAM_SIZE_OFFSET);
     switch(rom_size_byte) {
     case 0x00:
         return 0;
@@ -98,37 +98,42 @@ u32 Cartridge::getRAMSize() {
 }
 
 bool Cartridge::isCGBCart() {
-    return file->getByte(Cartridge_Constants::CGB_FLAG) & 0x80;
+    return rom_file->getByte(Cartridge_Constants::CGB_FLAG) & 0x80;
 }
 
 bool Cartridge::isCGBOnlyCart() {
-    return file->getByte(Cartridge_Constants::CGB_FLAG) == 0xC0;
+    return rom_file->getByte(Cartridge_Constants::CGB_FLAG) == 0xC0;
 }
 
 bool Cartridge::cartSupportsSGB() {
-    return file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03;
+    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03;
 }
 
 
 bool Cartridge::checkHeaderChecksum() {
     u16 x = 0;
     for(u16 i = 0x134; i <= 0x14C; i++){
-        x = x - file->getByte(i) - 1;
+        x = x - rom_file->getByte(i) - 1;
     }
 
-    return (x & 0x00FF) == file->getByte(Cartridge_Constants::HEADER_CHECKSUM_OFFSET);
+    return (x & 0x00FF) == rom_file->getByte(Cartridge_Constants::HEADER_CHECKSUM_OFFSET);
 }
 
 bool Cartridge::checkGlobalChecksum() {
     //return false until i care enough to figure out how this is calculated.
     // real gameboy hardware doesn't even use this.
     return false;
-
 }
 
 u8 Cartridge::readFromCart(u16 offset) {
     if(cart_type.ROM) {
-        return file->getByte(offset);
+        if(offset <= 0x7FFF) {
+            return rom_file->getByte(offset);
+        } else if(cart_type.RAM && offset >= 0xA000 && offset <= 0xBFFF) {
+            return ram_file->getByte(offset - 0xA000);
+        } else {
+            std::cout << "read out of bounds" << std::endl;
+        }
     } else {
         // cart not supported yet
     }

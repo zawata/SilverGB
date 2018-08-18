@@ -192,7 +192,8 @@ public:
     void writeToCart(u16 offset, u8 data);
 
 private:
-    File_Interface *file;
+    File_Interface *rom_file;
+    File_Interface *ram_file;
 
     Cartridge_Constants::cart_type_t cart_type;
 };
