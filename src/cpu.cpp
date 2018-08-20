@@ -1,958 +1,1486 @@
 #include "cpu.hpp"
 
-CPU::CPU(Memory_Map *m) :
-mem(m),
+#define C_FLAG (this->AF.b_AF.b_F.c)
+#define H_FLAG (this->AF.b_AF.b_F.h)
+#define N_FLAG (this->AF.b_AF.b_F.n)
+#define Z_FLAG (this->AF.b_AF.b_F.z)
+
+#define C_COND (this->AF.b_AF.b_F.c == 1)
+#define NC_COND (!C_COND)
+
+#define Z_COND (this->AF.b_AF.b_F.z == 1)
+#define NZ_COND (!Z_COND)
+
+#define A_REG  this->AF.b_AF.A
+#define F_REG  this->AF.b_AF.i_F
+#define B_REG  this->BC.b_BC.B
+#define C_REG  this->BC.b_BC.C
+#define D_REG  this->DE.b_DE.D
+#define E_REG  this->DE.b_DE.E
+#define H_REG  this->HL.b_HL.H
+#define L_REG  this->HL.b_HL.L
+#define AF_REG this->AF.i_AF
+#define BC_REG this->BC.i_BC
+#define DE_REG this->DE.i_DE
+#define HL_REG this->HL.i_HL
+#define SP_REG this->SP
+
+inline bool check_half_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x10; }
+inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
+inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
+inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
+
+inline bool bounded(u8 x, u8 y, u8 z) { return (x >= y) && (x <= z); }
+
+CPU::CPU(IO_Bus *m) :
+io(m),
 PC(0x100) {}
 
-void CPU::cycle() {
-    std::cout << std::hex << PC << " ";
-    switch(fetch_8()) {
-        case 0x00: //  4  NOP
-            std::cout <<" NOP";
-            break;
-        case 0x01: // 12  LD BC, yyxx
-            break;
-        case 0x02: //  8  LD (BC), A
-            break;
-        case 0x03: //  8  INC BC
-            std::cout <<" INC BC ";
-            BC.i_BC++;
-            break;
-        case 0x04: //  4  INC B
-            std::cout <<" INC B ";
-            BC.b_BC.B++;
-            break;
-        case 0x05: //  4  DEC B
-            std::cout <<" DEC B ";
-            BC.b_BC.B--;
-            break;
-        case 0x06: //  8  LD B, xx
-            std::cout <<" LD B, ";
-            load_8(&BC.b_BC.C, fetch_8());
-            break;
-        case 0x07: //  4  RLCA
-            break;
-        case 0x08: // ??  LD (yyxx), SP  (?)
-            break;
-        case 0x09: //  8  ADD HL, BC
-            break;
-        case 0x0a: //  8  LD A, (BC)
-            break;
-        case 0x0b: //  8  DEC BC
-            std::cout <<" DEC BC ";
-            BC.i_BC--;
-            break;
-        case 0x0c: //  4  INC C
-            break;
-        case 0x0d: //  4  DEC C
-            break;
-        case 0x0e: //  8  LD C, xx
-            std::cout <<" LD C, ";
-            load_8(&BC.b_BC.C, fetch_8());
-            break;
-        case 0x0f: //  4  RRCA
-            break;
-        case 0x10: // ??  STOP
-            break;
-        case 0x11: // 12  LD DE, yyxx
-            break;
-        case 0x12: //  8  LD (DE), A
-            break;
-        case 0x13: //  8  INC DE
-            break;
-        case 0x14: //  4  INC D
-            break;
-        case 0x15: //  4  DEC D
-            break;
-        case 0x16: //  8  LD D, xx
-            break;
-        case 0x17: //  4  RLA
-            break;
-        case 0x18: // 12  JR xx
-            break;
-        case 0x19: //  8  ADD HL, DE
-            break;
-        case 0x1a: //  8  LD A,(DE)
-            break;
-        case 0x1b: //  8  DEC DE
-            break;
-        case 0x1c: //  4  INC E
-            break;
-        case 0x1d: //  4  DEC E
-            break;
-        case 0x1e: //  8  LD E, xx
-            break;
-        case 0x1f: //  4  RRA
-            break;
-        case 0x20: // ??  JR NZ, xx
-            break;
-        case 0x21: // 12  LD HL, yyxx
-            std::cout <<" LD HL, ";
-            load_16(&HL.i_HL, fetch_16());
-            break;
-        case 0x22: //  8  LDI (HL),A
-            break;
-        case 0x23: //  8  INC HL
-            break;
-        case 0x24: //  4  INC H
-            break;
-        case 0x25: //  4  DEC H
-            break;
-        case 0x26: //  8  LD H, xx
-            break;
-        case 0x27: //  4  DAA
-            break;
-        case 0x28: // ??  JR Z, xx
-            break;
-        case 0x29: //  8  ADD HL, HL
-            break;
-        case 0x2a: //  8  LDI A, (HL)
-            break;
-        case 0x2b: //  8  DEC HL
-            break;
-        case 0x2c: //  4  INC L
-            break;
-        case 0x2d: //  4  DEC L
-            break;
-        case 0x2e: //  8  LD L, xx
-            break;
-        case 0x2f: //  4  CPL
-            break;
-        case 0x30: // ??  JR NC, xx
-            break;
-        case 0x31: // 12  LD SP, yyxx
-            break;
-        case 0x32: //  8  LDD (HL), A
-            std::cout <<" LDD (HL), A";
-            store(HL.i_HL--, AF.b_AF.A);
-            break;
-        case 0x33: //  8  INC SP
-            std::cout <<" INC SP";
-            SP++;
-            break;
-        case 0x34: // 12  INC (HL)
-            fetch_8();
-            break;
-        case 0x35: // 12  DEC (HL)
-            break;
-        case 0x36: // 12  LD (HL), xx
-            break;
-        case 0x37: //  4  SCF
-            break;
-        case 0x38: // ??  JR C, xx
-            break;
-        case 0x39: //  8  ADD HL, SP
-            break;
-        case 0x3a: //  8  LDD A, (HL)
-            break;
-        case 0x3b: //  8  DEC SP
-            break;
-        case 0x3c: //  4  INC A
-            break;
-        case 0x3d: //  4  DEC A
-            break;
-        case 0x3e: //  8  LD A, xx
-            break;
-        case 0x3f: //  4  CCF
-            break;
-        case 0x40: //  4  LD B, B
-            break;
-        case 0x41: //  4  LD B, C
-            break;
-        case 0x42: //  4  LD B, D
-            break;
-        case 0x43: //  4  LD B, E
-            break;
-        case 0x44: //  4  LD B, H
-            break;
-        case 0x45: //  4  LD B, L
-            break;
-        case 0x46: //  8  LD B, (HL)
-            break;
-        case 0x47: //  4  LD B, A
-            break;
-        case 0x48: //  4  LD C, B
-            break;
-        case 0x49: //  4  LD C, C
-            break;
-        case 0x4a: //  4  LD C, D
-            break;
-        case 0x4b: //  4  LD C, E
-            break;
-        case 0x4c: //  4  LD C, H
-            break;
-        case 0x4d: //  4  LD C, L
-            break;
-        case 0x4e: //  8  LD C, (HL)
-            break;
-        case 0x4f: //  4  LD C, A
-            break;
-        case 0x50: //  4  LD D, B
-            break;
-        case 0x51: //  4  LD D, C
-            break;
-        case 0x52: //  4  LD D, D
-            break;
-        case 0x53: //  4  LD D, E
-            break;
-        case 0x54: //  4  LD D, H
-            break;
-        case 0x55: //  4  LD D, L
-            break;
-        case 0x56: //  8  LD D, (HL)
-            break;
-        case 0x57: //  4  LD D, A
-            break;
-        case 0x58: //  4  LD E, B
-            break;
-        case 0x59: //  4  LD E, C
-            break;
-        case 0x5a: //  4  LD E, D
-            break;
-        case 0x5b: //  4  LD E, E
-            break;
-        case 0x5c: //  4  LD E, H
-            break;
-        case 0x5d: //  4  LD E, L
-            break;
-        case 0x5e: //  8  LD E, (HL)
-            break;
-        case 0x5f: //  4  LD E, A
-            break;
-        case 0x60: //  4  LD H, B
-            break;
-        case 0x61: //  4  LD H, C
-            break;
-        case 0x62: //  4  LD H, D
-            break;
-        case 0x63: //  4  LD H, E
-            break;
-        case 0x64: //  4  LD H, H
-            break;
-        case 0x65: //  4  LD H, L
-            break;
-        case 0x66: //  8  LD H, (HL)
-            break;
-        case 0x67: //  4  LD H, A
-            break;
-        case 0x68: //  4  LD L, B
-            break;
-        case 0x69: //  4  LD L, C
-            break;
-        case 0x6a: //  4  LD L, D
-            break;
-        case 0x6b: //  4  LD L, E
-            break;
-        case 0x6c: //  4  LD L, H
-            break;
-        case 0x6d: //  4  LD L, L
-            break;
-        case 0x6e: //  8  LD L, (HL)
-            break;
-        case 0x6F: //  4  LD L, A
-            break;
-        case 0x70: //  8  LD (HL), B
-            break;
-        case 0x71: //  8  LD (HL), C
-            break;
-        case 0x72: //  8  LD (HL), D
-            break;
-        case 0x73: //  8  LD (HL), E
-            break;
-        case 0x74: //  8  LD (HL), H
-            break;
-        case 0x75: //  8  LD (HL), L
-            break;
-        case 0x76: //  *  HALT
-            break;
-        case 0x77: //  8  LD (HL), A
-            break;
-        case 0x78: //  4  LD A, B
-            break;
-        case 0x79: //  4  LD A, C
-            break;
-        case 0x7a: //  4  LD A, D
-            break;
-        case 0x7b: //  4  LD A, E
-            break;
-        case 0x7c: //  4  LD A, H
-            break;
-        case 0x7d: //  4  LD A, L
-            break;
-        case 0x7e: //  8  LD A, (HL)
-            break;
-        case 0x7f: //  4  LD A, A
-            break;
-        case 0x80: //  4  ADD A, B
-            break;
-        case 0x81: //  4  ADD A, C
-            break;
-        case 0x82: //  4  ADD A, D
-            break;
-        case 0x83: //  4  ADD A, E
-            break;
-        case 0x84: //  4  ADD A, H
-            break;
-        case 0x85: //  4  ADD A, L
-            break;
-        case 0x86: //  8  ADD A, (HL)
-            break;
-        case 0x87: //  4  ADD A, A
-            break;
-        case 0x88: //  4  ADC A, B
-            break;
-        case 0x89: //  4  ADC A, C
-            break;
-        case 0x8a: //  4  ADC A, D
-            break;
-        case 0x8b: //  4  ADC A, E
-            break;
-        case 0x8c: //  4  ADC A, H
-            break;
-        case 0x8d: //  4  ADC A, L
-            break;
-        case 0x8e: //  8  ADC A, (HL)
-            break;
-        case 0x8f: //  4  ADC A, A
-            break;
-        case 0x90: //  4  SUB B
-            break;
-        case 0x91: //  4  SUB C
-            break;
-        case 0x92: //  4  SUB D
-            break;
-        case 0x93: //  4  SUB E
-            break;
-        case 0x94: //  4  SUB H
-            break;
-        case 0x95: //  4  SUB L
-            break;
-        case 0x96: //  8  SUB (HL)
-            break;
-        case 0x97: //  4  SUB A
-            break;
-        case 0x98: //  4  SBC A, B
-            break;
-        case 0x99: //  4  SBC A, C
-            break;
-        case 0x9a: //  4  SBC A, D
-            break;
-        case 0x9b: //  4  SBC A, E
-            break;
-        case 0x9c: //  4  SBC A, H
-            break;
-        case 0x9d: //  4  SBC A, L
-            break;
-        case 0x9e: //  8  SBC A, (HL)
-            break;
-        case 0x9f: //  4  SBC A, A
-            break;
-        case 0xa0: //  4  AND B
-            break;
-        case 0xa1: //  4  AND C
-            break;
-        case 0xa2: //  4  AND D
-            break;
-        case 0xa3: //  4  AND E
-            break;
-        case 0xa4: //  4  AND H
-            break;
-        case 0xa5: //  4  AND L
-            break;
-        case 0xa6: //  8  AND (HL)
-            break;
-        case 0xa7: //  4  AND A
-            break;
-        case 0xa8: //  4  XOR B
-            break;
-        case 0xa9: //  4  XOR C
-            break;
-        case 0xaa: //  4  XOR D
-            break;
-        case 0xab: //  4  XOR E
-            break;
-        case 0xac: //  4  XOR H
-            break;
-        case 0xad: //  4  XOR L
-            break;
-        case 0xae: //  8  XOR (HL)
-            break;
-        case 0xaf: //  4  XOR A
-            std::cout <<" XOR A";
-            ex_or(AF.b_AF.A);
-            break;
-        case 0xb0: //  4  OR B
-            break;
-        case 0xb1: //  4  OR C
-            break;
-        case 0xb2: //  4  OR D
-            break;
-        case 0xb3: //  4  OR E
-            break;
-        case 0xb4: //  4  OR H
-            break;
-        case 0xb5: //  4  OR L
-            break;
-        case 0xb6: //  8  OR (HL)
-            break;
-        case 0xb7: //  4  OR A
-            break;
-        case 0xb8: //  4  CP B
-            break;
-        case 0xb9: //  4  CP C
-            break;
-        case 0xba: //  4  CP D
-            break;
-        case 0xbb: //  4  CP E
-            break;
-        case 0xbc: //  4  CP H
-            break;
-        case 0xbd: //  4  CP L
-            break;
-        case 0xbe: //  8  CP (HL)
-            break;
-        case 0xbf: //  4  CP A
-            break;
-        case 0xc0: // ??  RET NC
-            break;
-        case 0xc1: // 12  POP BC
-            break;
-        case 0xc2: // ??  JP NZ yyxx
-            break;
-        case 0xc3: // 16  JP yyxx
-            std::cout <<" JP ";
-            jump(fetch_16());
-            break;
-        case 0xc4: // ??  CALL NZ yyxx
-            break;
-        case 0xc5: // 16  PUSH BC
-            break;
-        case 0xc6: //  8  ADD A, xx
-            break;
-        case 0xc7: // 16  RST 00h
-            break;
-        case 0xc8: // ??  CALL Z yyxx
-            break;
-        case 0xc9: // 16  RET
-            break;
-        case 0xca: // ??  JP Z yyxx
-            break;
-        case 0xcb:
-            switch (fetch_8()){
-            case 0x40: //  8  BIT 0, B
-                break;
-            case 0x41: //  8  BIT 0, C
-                break;
-            case 0x42: //  8  BIT 0, D
-                break;
-            case 0x43: //  8  BIT 0, E
-                break;
-            case 0x44: //  8  BIT 0, H
-                break;
-            case 0x45: //  8  BIT 0, L
-                break;
-            case 0x46: // 12  BIT 0, (HL)
-                break;
-            case 0x47: //  8  BIT 0, A
-                break;
-            case 0x48: //  8  BIT 1, B
-                break;
-            case 0x49: //  8  BIT 1, C
-                break;
-            case 0x4a: //  8  BIT 1, D
-                break;
-            case 0x4b: //  8  BIT 1, E
-                break;
-            case 0x4c: //  8  BIT 1, H
-                break;
-            case 0x4d: //  8  BIT 1, L
-                break;
-            case 0x4e: // 12  BIT 1, (HL)
-                break;
-            case 0x4f: //  8  BIT 1, A
-                break;
-            case 0x50: //  8  BIT 2, B
-                break;
-            case 0x51: //  8  BIT 2, C
-                break;
-            case 0x52: //  8  BIT 2, D
-                break;
-            case 0x53: //  8  BIT 2, E
-                break;
-            case 0x54: //  8  BIT 2, H
-                break;
-            case 0x55: //  8  BIT 2, L
-                break;
-            case 0x56: // 12  BIT 2, (HL)
-                break;
-            case 0x57: //  8  BIT 2, A
-                break;
-            case 0x58: //  8  BIT 3, B
-                break;
-            case 0x59: //  8  BIT 3, C
-                break;
-            case 0x5a: //  8  BIT 3, D
-                break;
-            case 0x5b: //  8  BIT 3, E
-                break;
-            case 0x5c: //  8  BIT 3, H
-                break;
-            case 0x5d: //  8  BIT 3, L
-                break;
-            case 0x5e: // 12  BIT 3, (HL)
-                break;
-            case 0x5f: //  8  BIT 3, A
-                break;
-            case 0x60: //  8  BIT 4, B
-                break;
-            case 0x61: //  8  BIT 4, C
-                break;
-            case 0x62: //  8  BIT 4, D
-                break;
-            case 0x63: //  8  BIT 4, E
-                break;
-            case 0x64: //  8  BIT 4, H
-                break;
-            case 0x65: //  8  BIT 4, L
-                break;
-            case 0x66: // 12  BIT 4, (HL)
-                break;
-            case 0x67: //  8  BIT 4, A
-                break;
-            case 0x68: //  8  BIT 5, B
-                break;
-            case 0x69: //  8  BIT 5, C
-                break;
-            case 0x6a: //  8  BIT 5, D
-                break;
-            case 0x6b: //  8  BIT 5, E
-                break;
-            case 0x6c: //  8  BIT 5, H
-                break;
-            case 0x6d: //  8  BIT 5, L
-                break;
-            case 0x6e: // 12  BIT 5, (HL)
-                break;
-            case 0x6f: //  8  BIT 5, A
-                break;
-            case 0x70: //  8  BIT 6, B
-                break;
-            case 0x71: //  8  BIT 6, C
-                break;
-            case 0x72: //  8  BIT 6, D
-                break;
-            case 0x73: //  8  BIT 6, E
-                break;
-            case 0x74: //  8  BIT 6, H
-                break;
-            case 0x75: //  8  BIT 6, L
-                break;
-            case 0x76: // 12  BIT 6, (HL)
-                break;
-            case 0x77: //  8  BIT 6, A
-                break;
-            case 0x78: //  8  BIT 7, B
-                break;
-            case 0x79: //  8  BIT 7, C
-                break;
-            case 0x7a: //  8  BIT 7, D
-                break;
-            case 0x7b: //  8  BIT 7, E
-                break;
-            case 0x7c: //  8  BIT 7, H
-                break;
-            case 0x7d: //  8  BIT 7, L
-                break;
-            case 0x7e: // 12  BIT 7, (HL)
-                break;
-            case 0x7f: //  8  BIT 7, A
-                break;
-            case 0x80: //  8  RES 0, B
-                break;
-            case 0x81: //  8  RES 0, C
-                break;
-            case 0x82: //  8  RES 0, D
-                break;
-            case 0x83: //  8  RES 0, E
-                break;
-            case 0x84: //  8  RES 0, H
-                break;
-            case 0x85: //  8  RES 0, L
-                break;
-            case 0x86: // 16  RES 0, (HL)
-                break;
-            case 0x87: //  8  RES 0, A
-                break;
-            case 0x88: //  8  RES 1, B
-                break;
-            case 0x89: //  8  RES 1, C
-                break;
-            case 0x8a: //  8  RES 1, D
-                break;
-            case 0x8b: //  8  RES 1, E
-                break;
-            case 0x8c: //  8  RES 1, H
-                break;
-            case 0x8d: //  8  RES 1, L
-                break;
-            case 0x8e: // 16  RES 1, (HL)
-                break;
-            case 0x8f: //  8  RES 1, A
-                break;
-            case 0x90: //  8  RES 2, B
-                break;
-            case 0x91: //  8  RES 2, C
-                break;
-            case 0x92: //  8  RES 2, D
-                break;
-            case 0x93: //  8  RES 2, E
-                break;
-            case 0x94: //  8  RES 2, H
-                break;
-            case 0x95: //  8  RES 2, L
-                break;
-            case 0x96: // 16  RES 2, (HL)
-                break;
-            case 0x97: //  8  RES 2, A
-                break;
-            case 0x98: //  8  RES 3, B
-                break;
-            case 0x99: //  8  RES 3, C
-                break;
-            case 0x9a: //  8  RES 3, D
-                break;
-            case 0x9b: //  8  RES 3, E
-                break;
-            case 0x9c: //  8  RES 3, H
-                break;
-            case 0x9d: //  8  RES 3, L
-                break;
-            case 0x9e: // 16  RES 3, (HL)
-                break;
-            case 0x9f: //  8  RES 3, A
-                break;
-            case 0xa0: //  8  RES 4, B
-                break;
-            case 0xa1: //  8  RES 4, C
-                break;
-            case 0xa2: //  8  RES 4, D
-                break;
-            case 0xa3: //  8  RES 4, E
-                break;
-            case 0xa4: //  8  RES 4, H
-                break;
-            case 0xa5: //  8  RES 4, L
-                break;
-            case 0xa6: // 16  RES 4, (HL)
-                break;
-            case 0xa7: //  8  RES 4, A
-                break;
-            case 0xa8: //  8  RES 5, B
-                break;
-            case 0xa9: //  8  RES 5, C
-                break;
-            case 0xaa: //  8  RES 5, D
-                break;
-            case 0xab: //  8  RES 5, E
-                break;
-            case 0xac: //  8  RES 5, H
-                break;
-            case 0xad: //  8  RES 5, L
-                break;
-            case 0xae: // 16  RES 5, (HL)
-                break;
-            case 0xaf: //  8  RES 5, A
-                break;
-            case 0xb0: //  8  RES 6, B
-                break;
-            case 0xb1: //  8  RES 6, C
-                break;
-            case 0xb2: //  8  RES 6, D
-                break;
-            case 0xb3: //  8  RES 6, E
-                break;
-            case 0xb4: //  8  RES 6, H
-                break;
-            case 0xb5: //  8  RES 6, L
-                break;
-            case 0xb6: // 16  RES 6, (HL)
-                break;
-            case 0xb7: //  8  RES 6, A
-                break;
-            case 0xb8: //  8  RES 7, B
-                break;
-            case 0xb9: //  8  RES 7, C
-                break;
-            case 0xba: //  8  RES 7, D
-                break;
-            case 0xbb: //  8  RES 7, E
-                break;
-            case 0xbc: //  8  RES 7, H
-                break;
-            case 0xbd: //  8  RES 7, L
-                break;
-            case 0xbe: // 16  RES 7, (HL)
-                break;
-            case 0xbf: //  8  RES 7, A
-                break;
-            case 0xc0: //  8  SET 0, B
-                break;
-            case 0xc1: //  8  SET 0, C
-                break;
-            case 0xc2: //  8  SET 0, D
-                break;
-            case 0xc3: //  8  SET 0, E
-                break;
-            case 0xc4: //  8  SET 0, H
-                break;
-            case 0xc5: //  8  SET 0, L
-                break;
-            case 0xc6: // 16  SET 0, (HL)
-                break;
-            case 0xc7: //  8  SET 0, A
-                break;
-            case 0xc8: //  8  SET 1, B
-                break;
-            case 0xc9: //  8  SET 1, C
-                break;
-            case 0xca: //  8  SET 1, D
-                break;
-            case 0xcb: //  8  SET 1, E
-                break;
-            case 0xcc: //  8  SET 1, H
-                break;
-            case 0xcd: //  8  SET 1, L
-                break;
-            case 0xce: // 16  SET 1, (HL)
-                break;
-            case 0xcf: //  8  SET 1, A
-                break;
-            case 0xd0: //  8  SET 2, B
-                break;
-            case 0xd1: //  8  SET 2, C
-                break;
-            case 0xd2: //  8  SET 2, D
-                break;
-            case 0xd3: //  8  SET 2, E
-                break;
-            case 0xd4: //  8  SET 2, H
-                break;
-            case 0xd5: //  8  SET 2, L
-                break;
-            case 0xd6: // 16  SET 2, (HL)
-                break;
-            case 0xd7: //  8  SET 2, A
-                break;
-            case 0xd8: //  8  SET 3, B
-                break;
-            case 0xd9: //  8  SET 3, C
-                break;
-            case 0xda: //  8  SET 3, D
-                break;
-            case 0xdb: //  8  SET 3, E
-                break;
-            case 0xdc: //  8  SET 3, H
-                break;
-            case 0xdd: //  8  SET 3, L
-                break;
-            case 0xde: // 16  SET 3, (HL)
-                break;
-            case 0xdf: //  8  SET 3, A
-                break;
-            case 0xe0: //  8  SET 4, B
-                break;
-            case 0xe1: //  8  SET 4, C
-                break;
-            case 0xe2: //  8  SET 4, D
-                break;
-            case 0xe3: //  8  SET 4, E
-                break;
-            case 0xe4: //  8  SET 4, H
-                break;
-            case 0xe5: //  8  SET 4, L
-                break;
-            case 0xe6: // 16  SET 4, (HL)
-                break;
-            case 0xe7: //  8  SET 4, A
-                break;
-            case 0xe8: //  8  SET 5, B
-                break;
-            case 0xe9: //  8  SET 5, C
-                break;
-            case 0xea: //  8  SET 5, D
-                break;
-            case 0xeb: //  8  SET 5, E
-                break;
-            case 0xec: //  8  SET 5, H
-                break;
-            case 0xed: //  8  SET 5, L
-                break;
-            case 0xee: // 16  SET 5, (HL)
-                break;
-            case 0xef: //  8  SET 5, A
-                break;
-            case 0xf0: //  8  SET 6, B
-                break;
-            case 0xf1: //  8  SET 6, C
-                break;
-            case 0xf2: //  8  SET 6, D
-                break;
-            case 0xf3: //  8  SET 6, E
-                break;
-            case 0xf4: //  8  SET 6, H
-                break;
-            case 0xf5: //  8  SET 6, L
-                break;
-            case 0xf6: // 16  SET 6, (HL)
-                break;
-            case 0xf7: //  8  SET 6, A
-                break;
-            case 0xf8: //  8  SET 7, B
-                break;
-            case 0xf9: //  8  SET 7, C
-                break;
-            case 0xfa: //  8  SET 7, D
-                break;
-            case 0xfb: //  8  SET 7, E
-                break;
-            case 0xfc: //  8  SET 7, H
-                break;
-            case 0xfd: //  8  SET 7, L
-                break;
-            case 0xfe: // 16  SET 7, (HL)
-                break;
-            case 0xff: //  8  SET 7, A
-                break;
-            }
-            break;
-        case 0xcc: // ??  CALL Z, yyxx
-            break;
-        case 0xcd: // 24  CALL yyxx
-            break;
-        case 0xce: //  8  ADC A, xx
-            break;
-        case 0xcf: // 16  RST 08h
-            break;
-        case 0xd0: // ??  CALL NC, yyxx
-            break;
-        case 0xd1: // 12  POP DE
-            break;
-        case 0xd2: // ??  JP NC, yyxx
-            break;
-        case 0xd3: // --  ----
-            break;
-        case 0xd4: // ??  CALL NC yyxx
-            break;
-        case 0xd5: // 12  PUSH DE
-            break;
-        case 0xd6: //  8  SUB xx
-            break;
-        case 0xd7: // 16  RST 10h
-            break;
-        case 0xd8: // ??  CALL C yyxx
-            break;
-        case 0xd9: // 16  RETI
-            break;
-        case 0xda: // ??  JP C yyxx
-            break;
-        case 0xdb: // --  ----
-            break;
-        case 0xdc: // ??  CALL C yyxx
-            break;
-        case 0xdd: // --  ----
-            break;
-        case 0xde: //  8  SBC A, xx
-            break;
-        case 0xdf: // 16  RST 18h
-            break;
-        case 0xe0: // 12  LD ($FF00 + xx), A
-            break;
-        case 0xe1: // 12  POP HL
-            break;
-        case 0xe2: //  8  LD ($FF00 + C), A
-            break;
-        case 0xe3: // --  ----
-            break;
-        case 0xe4: // --  ----
-            break;
-        case 0xe5: // 16  PUSH HL
-            break;
-        case 0xe6: //  8  AND xx
-            break;
-        case 0xe7: // 16  RST 20h
-            break;
-        case 0xe8: //  8  ADD  SP, xx
-            break;
-        case 0xe9: //  4  JP (HL)
-            break;
-        case 0xea: // 16  LD (yyxx), A
-            break;
-        case 0xeb: // --  ----
-            break;
-        case 0xec: // --  ----
-            break;
-        case 0xed: // --  ----
-            break;
-        case 0xee: //  8  XOR xx
-            break;
-        case 0xef: // 16  RST 28h
-            break;
-        case 0xf0: // 12  LD A, ($FF00 + xx)
-            break;
-        case 0xf1: // 12  POP AF
-            break;
-        case 0xf2: //  8  LD A, (FF00 + C)
-            break;
-        case 0xf3: //  4  DI
-            break;
-        case 0xf4: // --  ----
-            break;
-        case 0xf5: // 16  PUSH AF
-            break;
-        case 0xf6: //  8  OR xx
-            break;
-        case 0xf7: // 16  RST 30h
-            break;
-        case 0xf8: // 12  LD HL, SP + xx
-            break;
-        case 0xf9: //  8  LD SP, HL
-            break;
-        case 0xfa: // 16  LD A, (xx)
-            break;
-        case 0xfb: //  4  EI
-            break;
-        case 0xfc: // --  ----
-            break;
-        case 0xfd: // --  ----
-            break;
-        case 0xfe: //  8  CP xx
-            break;
-        case 0xff: // 16  RST 38h
-            break;
+void CPU::clock_pulse() {
+    if(!inst_clocks--) {
+        inst_clocks = decode(io->read(PC));
     }
 }
 
-u8 CPU::fetch_8() {
-    u8 dat = mem->read(PC);
-    std::cout << std::hex << (u16)dat << std::dec;
-    PC++;
-    return dat;
+u8 CPU::decode(u8 op) {
+    switch(op) {
+        case 0x00: return no_op();                       //   4  NOP
+        case 0x01: return load_rr_nn(&BC_REG);           //  12  LD BC, yyxx
+        case 0x02: return load_ll_r(BC_REG, &A_REG);     //   8  LD (BC), A
+        case 0x03: return inc_rr(&BC_REG);               //   8  INC BC
+        case 0x04: return inc_r(&B_REG);                 //   4  INC B
+        case 0x05: return dec_r(&B_REG);                 //   4  DEC B
+        case 0x06: return load_r_n(&B_REG);              //   8  LD B, xx
+        case 0x07: return rlca_r(&A_REG);                  //   4  RLCA
+        case 0x08: return load_llnn_rr(&SP_REG);         //  ??  LD (yyxx), SP  (?)
+        case 0x09: return add_rr_rr(&HL_REG, &BC_REG);   //   8  ADD HL, BC
+        case 0x0a: return load_r_ll(&A_REG, BC_REG);     //   8  LD A, (BC)
+        case 0x0b: return dec_rr(&BC_REG);               //   8  DEC BC
+        case 0x0c: return inc_r(&C_REG);                 //   4  INC C
+        case 0x0d: return inc_r(&D_REG);                 //   4  DEC C
+        case 0x0e: return load_r_n(&C_REG);              //   8  LD C, xx
+        case 0x0f: return rrca_r(&A_REG);                  //   4  RRCA
+        case 0x10: return stop();                        //  ??  STOP
+        case 0x11: return load_rr_nn(&DE_REG);           //  12  LD DE, yyxx
+        case 0x12: return load_ll_r(DE_REG, &A_REG);     //   8  LD (DE), A
+        case 0x13: return inc_rr(&DE_REG);               //   8  INC DE
+        case 0x14: return inc_r(&D_REG);                 //   4  INC D
+        case 0x15: return dec_r(&D_REG);                 //   4  DEC D
+        case 0x16: return load_r_n(&D_REG);              //   8  LD D, xx
+        case 0x17: return rla_r(&A_REG);                   //   4  RLA
+        case 0x18: return jump_rel_n();                  //  12  JR xx
+        case 0x19: return add_rr_rr(&HL_REG, &DE_REG);   //   8  ADD HL, DE
+        case 0x1a: return load_r_ll(&A_REG, DE_REG);     //   8  LD A,(DE)
+        case 0x1b: return dec_rr(&DE_REG);               //   8  DEC DE
+        case 0x1c: return inc_r(&E_REG);                 //   4  INC E
+        case 0x1d: return inc_r(&E_REG);                 //   4  DEC E
+        case 0x1e: return load_r_n(&E_REG);              //   8  LD E, xx
+        case 0x1f: return rra_r(&A_REG);                   //   4  RRA
+        case 0x20: return jump_rel_cond_n(NZ_COND);      //  ??  JR NZ, xx
+        case 0x21: return load_rr_nn(&HL_REG);           //  12  LD HL, yyxx
+        case 0x22: return loadi_rr_r(&HL_REG, &A_REG);   //   8  LDI (HL),A
+        case 0x23: return inc_rr(&HL_REG);               //   8  INC HL
+        case 0x24: return inc_r(&H_REG);                 //   4  INC H
+        case 0x25: return dec_r(&H_REG);                 //   4  DEC H
+        case 0x26: return load_r_n(&H_REG);              //   8  LD H, xx
+        case 0x27: return daa_r(&A_REG);                         //   4  DAA
+        case 0x28: return jump_rel_cond_n(Z_COND);       //  ??  JR Z, xx
+        case 0x29: return add_rr_rr(&HL_REG, &HL_REG);   //   8  ADD HL, HL
+        case 0x2a: return loadi_r_rr(&A_REG, &HL_REG);   //   8  LDI A, (HL)
+        case 0x2b: return dec_rr(&HL_REG);               //   8  DEC HL
+        case 0x2c: return inc_r(&L_REG);                 //   4  INC L
+        case 0x2d: return dec_r(&L_REG);                 //   4  DEC L
+        case 0x2e: return load_r_n(&L_REG);              //   8  LD L, xx
+        case 0x2f: return cpl_r(&A_REG);                         //   4  CPL
+        case 0x30: return jump_rel_cond_n(NC_COND);      //  ??  JR NC, xx
+        case 0x31: return load_rr_nn(&SP_REG);           //  12  LD SP, yyxx
+        case 0x32: return loadd_rr_r(&HL_REG, &A_REG);   //   8  LDD (HL), A
+        case 0x33: return inc_rr(&SP_REG);               //   8  INC SP
+        case 0x34: return inc_ll(HL_REG);                //  12  INC (HL)
+        case 0x35: return dec_ll(HL_REG);                //  12  DEC (HL)
+        case 0x36: return load_ll_n(HL_REG);             //  12  LD (HL), xx
+        case 0x37: return scf();                         //   4  SCF
+        case 0x38: return jump_rel_cond_n(C_COND);       //  ??  JR C, xx
+        case 0x39: return add_rr_rr(&HL_REG, &SP_REG);   //   8  ADD HL, SP
+        case 0x3a: return loadd_r_rr(&A_REG, &HL_REG);   //   8  LDD A, (HL)
+        case 0x3b: return dec_rr(&SP_REG);               //   8  DEC SP
+        case 0x3c: return inc_r(&A_REG);                 //   4  INC A
+        case 0x3d: return dec_r(&A_REG);                 //   4  DEC A
+        case 0x3e: return load_r_n(&A_REG);              //   8  LD A, xx
+        case 0x3f: return ccf();                         //   4  CCF
+        case 0x40: return load_r_r(&B_REG, &B_REG);      //   4  LD B, B
+        case 0x41: return load_r_r(&B_REG, &C_REG);      //   4  LD B, C
+        case 0x42: return load_r_r(&B_REG, &D_REG);      //   4  LD B, D
+        case 0x43: return load_r_r(&B_REG, &E_REG);      //   4  LD B, E
+        case 0x44: return load_r_r(&B_REG, &H_REG);      //   4  LD B, H
+        case 0x45: return load_r_r(&B_REG, &L_REG);      //   4  LD B, L
+        case 0x46: return load_r_ll(&B_REG, HL_REG);     //   8  LD B, (HL)
+        case 0x47: return load_r_r(&B_REG, &A_REG);      //   4  LD B, A
+        case 0x48: return load_r_r(&C_REG, &B_REG);      //   4  LD C, B
+        case 0x49: return load_r_r(&C_REG, &C_REG);      //   4  LD C, C
+        case 0x4a: return load_r_r(&C_REG, &D_REG);      //   4  LD C, D
+        case 0x4b: return load_r_r(&C_REG, &E_REG);      //   4  LD C, E
+        case 0x4c: return load_r_r(&C_REG, &H_REG);      //   4  LD C, H
+        case 0x4d: return load_r_r(&C_REG, &L_REG);      //   4  LD C, L
+        case 0x4e: return load_r_ll(&C_REG, HL_REG);     //   8  LD C, (HL)
+        case 0x4f: return load_r_r(&C_REG, &A_REG);      //   4  LD C, A
+        case 0x50: return load_r_r(&D_REG, &B_REG);      //   4  LD D, B
+        case 0x51: return load_r_r(&D_REG, &C_REG);      //   4  LD D, C
+        case 0x52: return load_r_r(&D_REG, &D_REG);      //   4  LD D, D
+        case 0x53: return load_r_r(&D_REG, &E_REG);      //   4  LD D, E
+        case 0x54: return load_r_r(&D_REG, &H_REG);      //   4  LD D, H
+        case 0x55: return load_r_r(&D_REG, &L_REG);      //   4  LD D, L
+        case 0x56: return load_r_ll(&D_REG, HL_REG);     //   8  LD D, (HL)
+        case 0x57: return load_r_r(&D_REG, &A_REG);      //   4  LD D, A
+        case 0x58: return load_r_r(&E_REG, &B_REG);      //   4  LD E, B
+        case 0x59: return load_r_r(&E_REG, &C_REG);      //   4  LD E, C
+        case 0x5a: return load_r_r(&E_REG, &D_REG);      //   4  LD E, D
+        case 0x5b: return load_r_r(&E_REG, &E_REG);      //   4  LD E, E
+        case 0x5c: return load_r_r(&E_REG, &H_REG);      //   4  LD E, H
+        case 0x5d: return load_r_r(&E_REG, &L_REG);      //   4  LD E, L
+        case 0x5e: return load_r_ll(&E_REG, HL_REG);     //   8  LD E, (HL)
+        case 0x5f: return load_r_r(&E_REG, &A_REG);      //   4  LD E, A
+        case 0x60: return load_r_r(&H_REG, &B_REG);      //   4  LD H, B
+        case 0x61: return load_r_r(&H_REG, &C_REG);      //   4  LD H, C
+        case 0x62: return load_r_r(&H_REG, &D_REG);      //   4  LD H, D
+        case 0x63: return load_r_r(&H_REG, &E_REG);      //   4  LD H, E
+        case 0x64: return load_r_r(&H_REG, &H_REG);      //   4  LD H, H
+        case 0x65: return load_r_r(&H_REG, &L_REG);      //   4  LD H, L
+        case 0x66: return load_r_ll(&H_REG, HL_REG);     //   8  LD H, (HL)
+        case 0x67: return load_r_r(&H_REG, &A_REG);      //   4  LD H, A
+        case 0x68: return load_r_r(&L_REG, &B_REG);      //   4  LD L, B
+        case 0x69: return load_r_r(&L_REG, &C_REG);      //   4  LD L, C
+        case 0x6a: return load_r_r(&L_REG, &D_REG);      //   4  LD L, D
+        case 0x6b: return load_r_r(&L_REG, &E_REG);      //   4  LD L, E
+        case 0x6c: return load_r_r(&L_REG, &H_REG);      //   4  LD L, H
+        case 0x6d: return load_r_r(&L_REG, &L_REG);      //   4  LD L, L
+        case 0x6e: return load_r_ll(&L_REG, HL_REG);     //   8  LD L, (HL)
+        case 0x6F: return load_r_r(&L_REG, &A_REG);      //   4  LD L, A
+        case 0x70: return load_ll_r(HL_REG, &B_REG);     //   8  LD (HL), B
+        case 0x71: return load_ll_r(HL_REG, &C_REG);     //   8  LD (HL), C
+        case 0x72: return load_ll_r(HL_REG, &D_REG);     //   8  LD (HL), D
+        case 0x73: return load_ll_r(HL_REG, &E_REG);     //   8  LD (HL), E
+        case 0x74: return load_ll_r(HL_REG, &H_REG);     //   8  LD (HL), H
+        case 0x75: return load_ll_r(HL_REG, &L_REG);     //   8  LD (HL), L
+        case 0x76: return halt();                        //   *  HALT
+        case 0x77: return load_ll_r(HL_REG, &A_REG);     //   8  LD (HL), A
+        case 0x78: return load_r_r(&A_REG, &B_REG);      //   4  LD A, B
+        case 0x79: return load_r_r(&A_REG, &C_REG);      //   4  LD A, C
+        case 0x7a: return load_r_r(&A_REG, &D_REG);      //   4  LD A, D
+        case 0x7b: return load_r_r(&A_REG, &E_REG);      //   4  LD A, E
+        case 0x7c: return load_r_r(&A_REG, &H_REG);      //   4  LD A, H
+        case 0x7d: return load_r_r(&A_REG, &L_REG);      //   4  LD A, L
+        case 0x7e: return load_r_ll(&A_REG, HL_REG);     //   8  LD A, (HL)
+        case 0x7f: return load_r_r(&A_REG, &A_REG);      //   4  LD A, A
+        case 0x80: return add_r_r(&A_REG, &B_REG);       //   4  ADD A, B
+        case 0x81: return add_r_r(&A_REG, &C_REG);       //   4  ADD A, C
+        case 0x82: return add_r_r(&A_REG, &D_REG);       //   4  ADD A, D
+        case 0x83: return add_r_r(&A_REG, &E_REG);       //   4  ADD A, E
+        case 0x84: return add_r_r(&A_REG, &H_REG);       //   4  ADD A, H
+        case 0x85: return add_r_r(&A_REG, &L_REG);       //   4  ADD A, L
+        case 0x86: return add_r_ll(&A_REG, HL_REG);      //   8  ADD A, (HL)
+        case 0x87: return add_r_r(&A_REG, &A_REG);       //   4  ADD A, A
+        case 0x88: return adc_r_r(&A_REG, &B_REG);       //   4  ADC A, B
+        case 0x89: return adc_r_r(&A_REG, &C_REG);       //   4  ADC A, C
+        case 0x8a: return adc_r_r(&A_REG, &D_REG);       //   4  ADC A, D
+        case 0x8b: return adc_r_r(&A_REG, &E_REG);       //   4  ADC A, E
+        case 0x8c: return adc_r_r(&A_REG, &H_REG);       //   4  ADC A, H
+        case 0x8d: return adc_r_r(&A_REG, &L_REG);       //   4  ADC A, L
+        case 0x8e: return adc_r_ll(&A_REG, HL_REG);      //   8  ADC A, (HL)
+        case 0x8f: return adc_r_r(&A_REG, &A_REG);       //   4  ADC A, A
+        case 0x90: return sub_r(&A_REG, &B_REG);         //   4  SUB B
+        case 0x91: return sub_r(&A_REG, &C_REG);         //   4  SUB C
+        case 0x92: return sub_r(&A_REG, &D_REG);         //   4  SUB D
+        case 0x93: return sub_r(&A_REG, &E_REG);         //   4  SUB E
+        case 0x94: return sub_r(&A_REG, &H_REG);         //   4  SUB H
+        case 0x95: return sub_r(&A_REG, &L_REG);         //   4  SUB L
+        case 0x96: return sub_ll(&A_REG, HL_REG);        //   8  SUB (HL)
+        case 0x97: return sub_r(&A_REG, &A_REG);         //   4  SUB A
+        case 0x98: return sbc_r_r(&A_REG, &B_REG);       //   4  SBC A, B
+        case 0x99: return sbc_r_r(&A_REG, &C_REG);       //   4  SBC A, C
+        case 0x9a: return sbc_r_r(&A_REG, &D_REG);       //   4  SBC A, D
+        case 0x9b: return sbc_r_r(&A_REG, &E_REG);       //   4  SBC A, E
+        case 0x9c: return sbc_r_r(&A_REG, &H_REG);       //   4  SBC A, H
+        case 0x9d: return sbc_r_r(&A_REG, &L_REG);       //   4  SBC A, L
+        case 0x9e: return sbc_r_ll(&A_REG, HL_REG);      //   8  SBC A, (HL)
+        case 0x9f: return sbc_r_r(&A_REG, &A_REG);       //   4  SBC A, A
+        case 0xa0: return and_r_r(&A_REG, &B_REG);       //   4  AND B
+        case 0xa1: return and_r_r(&A_REG, &C_REG);       //   4  AND C
+        case 0xa2: return and_r_r(&A_REG, &D_REG);       //   4  AND D
+        case 0xa3: return and_r_r(&A_REG, &E_REG);       //   4  AND E
+        case 0xa4: return and_r_r(&A_REG, &H_REG);       //   4  AND H
+        case 0xa5: return and_r_r(&A_REG, &L_REG);       //   4  AND L
+        case 0xa6: return and_r_ll(&A_REG, HL_REG);      //   8  AND (HL)
+        case 0xa7: return and_r_r(&A_REG, &A_REG);       //   4  AND A
+        case 0xa8: return xor_r_r(&A_REG, &B_REG);       //   4  XOR B
+        case 0xa9: return xor_r_r(&A_REG, &C_REG);       //   4  XOR C
+        case 0xaa: return xor_r_r(&A_REG, &D_REG);       //   4  XOR D
+        case 0xab: return xor_r_r(&A_REG, &E_REG);       //   4  XOR E
+        case 0xac: return xor_r_r(&A_REG, &H_REG);       //   4  XOR H
+        case 0xad: return xor_r_r(&A_REG, &L_REG);       //   4  XOR L
+        case 0xae: return xor_r_ll(&A_REG, HL_REG);      //   8  XOR (HL)
+        case 0xaf: return xor_r_r(&A_REG, &A_REG);       //   4  XOR A
+        case 0xb0: return or_r_r(&A_REG, &B_REG);        //   4  OR B
+        case 0xb1: return or_r_r(&A_REG, &C_REG);        //   4  OR C
+        case 0xb2: return or_r_r(&A_REG, &D_REG);        //   4  OR D
+        case 0xb3: return or_r_r(&A_REG, &E_REG);        //   4  OR E
+        case 0xb4: return or_r_r(&A_REG, &H_REG);        //   4  OR H
+        case 0xb5: return or_r_r(&A_REG, &L_REG);        //   4  OR L
+        case 0xb6: return or_r_ll(&A_REG, HL_REG);       //   8  OR (HL)
+        case 0xb7: return or_r_r(&A_REG, &A_REG);        //   4  OR A
+        case 0xb8: return cp_r_r(&A_REG, &B_REG);        //   4  CP B
+        case 0xb9: return cp_r_r(&A_REG, &C_REG);        //   4  CP C
+        case 0xba: return cp_r_r(&A_REG, &D_REG);        //   4  CP D
+        case 0xbb: return cp_r_r(&A_REG, &E_REG);        //   4  CP E
+        case 0xbc: return cp_r_r(&A_REG, &H_REG);        //   4  CP H
+        case 0xbd: return cp_r_r(&A_REG, &L_REG);        //   4  CP L
+        case 0xbe: return cp_r_ll(&A_REG, HL_REG);       //   8  CP (HL)
+        case 0xbf: return cp_r_r(&A_REG, &A_REG);        //   4  CP A
+        case 0xc0: return ret_cond(NZ_COND);             //  ??  RET NZ
+        case 0xc1: return pop_rr(&BC_REG);               //  12  POP BC
+        case 0xc2: return jump_cond_ll(NC_COND);         //  ??  JP NZ yyxx
+        case 0xc3: return jump_nn();                     //  16  JP yyxx
+        case 0xc4: return call_cond_nn(NZ_COND);         //  ??  CALL NZ yyxx
+        case 0xc5: return push_rr(&BC_REG);              //  16  PUSH BC
+        case 0xc6: return add_r_n(&A_REG);               //   8  ADD A, xx
+        case 0xc7: return rst_l(0x00);                   //  16  RST 00h
+        case 0xc8: return ret_cond(Z_COND);              //  ??  RET Z
+        case 0xc9: return ret();                         //  16  RET
+        case 0xca: return jump_cond_ll(Z_COND);          //  ??  JP Z yyxx
+        case 0xcb: {
+            u8 data = fetch_8();
+
+            u8 bit = (data >> 3) & 7;
+            u8 *reg = nullptr;
+
+
+            switch(data & 7) {
+            case 0: reg = &B_REG; break;
+            case 1: reg = &C_REG; break;
+            case 2: reg = &D_REG; break;
+            case 3: reg = &E_REG; break;
+            case 4: reg = &H_REG; break;
+            case 5: reg = &L_REG; break;
+            case 6:               break; //don't set this one so we can detect it later
+            case 7: reg = &A_REG; break;
+            default:              break;
+            }
+
+            switch(data >> 6) {
+            case 0x00:
+                switch(bit) {
+                case 0: //RLC
+                    if(reg) return rlc_r(reg);
+                    else    return rlc_ll(HL_REG);
+                case 1: //RRC
+                    if(reg) return rrc_r(reg);
+                    else    return rrc_ll(HL_REG);
+                case 2: //RL
+                    if(reg) return rl_r(reg);
+                    else    return rl_ll(HL_REG);
+                case 3: //RR
+                    if(reg) return rr_r(reg);
+                    else    return rr_ll(HL_REG);
+                case 4: //SLA
+                    if(reg) return sla_r(reg);
+                    else    return sla_ll(HL_REG);
+                case 5: //SRA
+                    if(reg) return sra_r(reg);
+                    else    return sra_ll(HL_REG);
+                case 6: //SWAP
+                    if(reg) return swap_r(reg);
+                    else    return swap_ll(HL_REG);
+                case 7: //SRL
+                    if(reg) return srl_r(reg);
+                    else    return srl_ll(HL_REG);
+                }
+                break; //just in case
+            case 0x01:
+                if(reg) return bit_b_r(bit, reg);
+                else    return bit_b_ll(bit, HL_REG);
+            case 0x02:
+                if(reg) return res_b_r(bit, reg);
+                else    return res_b_ll(bit, HL_REG);
+            case 0x03:
+                if(reg) return set_b_r(bit, reg);
+                else    return set_b_ll(bit, HL_REG);
+            }
+            // wat...
+            std::cerr << "CB end of case: " << data << std::endl;
+        }
+        break;
+        case 0xcc: return call_cond_nn(Z_COND);          //  ??  CALL Z, yyxx
+        case 0xcd: return call_nn();                     //  24  CALL yyxx
+        case 0xce: return adc_r_n(&A_REG);               //   8  ADC A, xx
+        case 0xcf: return rst_l(0x08);                   //  16  RST 08h
+        case 0xd0: return call_cond_nn(NC_COND);         //  ??  RET NC
+        case 0xd1: return pop_rr(&DE_REG);               //  12  POP DE
+        case 0xd2: return jump_cond_ll(NC_COND);         //  ??  JP NC, yyxx
+        case 0xd3: return invalid_op(0xd3);              //  --  ----
+        case 0xd4: return call_cond_nn(NC_COND);         //  ??  CALL NC yyxx
+        case 0xd5: return push_rr(&DE_REG);              //  12  PUSH DE
+        case 0xd6: return sub_r_n(&A_REG);               //   8  SUB xx
+        case 0xd7: return rst_l(0x10);                   //  16  RST 10h
+        case 0xd8: return ret_cond(C_COND);              //  ??  RET C
+        case 0xd9: return reti();                        //  16  RETI
+        case 0xda: return jump_cond_ll(C_COND);          //  ??  JP C yyxx
+        case 0xdb: return invalid_op(0xdb);              //  --  ----
+        case 0xdc: return call_cond_nn(C_COND);          //  ??  CALL C yyxx
+        case 0xdd: return invalid_op(0xdd);              //  --  ----
+        case 0xde: return sbc_r_n(&A_REG);               //   8  SBC A, xx
+        case 0xdf: return rst_l(0x18);                   //  16  RST 18h
+        case 0xe0: return load_lln_r(&A_REG);            //  12  LD ($FF00 + xx), A
+        case 0xe1: return pop_rr(&HL_REG);               //  12  POP HL
+        case 0xe2: return load_llr_r(&C_REG, &A_REG);    //   8  LD ($FF00 + C), A
+        case 0xe3: return invalid_op(0xe3);              //  --  ----
+        case 0xe4: return invalid_op(0xe4);              //  --  ----
+        case 0xe5: return push_rr(&HL_REG);              //  16  PUSH HL
+        case 0xe6: return and_r_n(&A_REG);               //   8  AND xx
+        case 0xe7: return rst_l(0x20);                   //  16  RST 20h
+        case 0xe8: return add_rr_n(&SP_REG);             //   8  ADD  SP, xx
+        case 0xe9: return jump_ll(HL_REG);               //   4  JP (HL)
+        case 0xea: return load_llnn_r(&A_REG);           //  16  LD (yyxx), A
+        case 0xeb: return invalid_op(0xeb);              //  --  ----
+        case 0xec: return invalid_op(0xec);              //  --  ----
+        case 0xed: return invalid_op(0xed);              //  --  ----
+        case 0xee: return xor_r_n(&A_REG);               //   8  XOR xx
+        case 0xef: return rst_l(0x28);                   //  16  RST 28h
+        case 0xf0: return load_r_lln(&A_REG);            //  12  LD A, ($FF00 + xx)
+        case 0xf1: return pop_rr(&AF_REG);               //  12  POP AF
+        case 0xf2: return load_r_llr(&A_REG, &C_REG);    //   8  LD A, (FF00 + C)
+        case 0xf3: return di();          //   4  DI
+        case 0xf4: return invalid_op(0xf4);              //  --  ----
+        case 0xf5: return push_rr(&AF_REG);              //  16  PUSH AF
+        case 0xf6: return or_r_n(&A_REG);                //   8  OR xx
+        case 0xf7: return rst_l(0x30);                   //  16  RST 30h
+        case 0xf8: return load_rr_rrn(&HL_REG, &SP_REG); //  12  LD HL, SP + xx
+        case 0xf9: return load_rr_rr(&SP_REG, &HL_REG);  //   8  LD SP, HL
+        case 0xfa: return load_r_llnn(&A_REG);           //  16  LD A, (yyxx)
+        case 0xfb: return ei();           //   4  EI
+        case 0xfc: return invalid_op(0xfc);              //  --  ----
+        case 0xfd: return invalid_op(0xfd);              //  --  ----
+        case 0xfe: return cp_r_n(&A_REG);                //   8  CP xx
+        case 0xff: return rst_l(0x38);                   //  16  RST 38h
+    }
 }
 
-u16 CPU::fetch_16() {
-    u8 xx = mem->read(PC++);
-    u8 yy = mem->read(PC++);
-    u16 dat = (u16)yy << 8 | xx;
-    std::cout << std::hex << dat << std::dec;
-    return dat;
+u8 CPU::fetch_8()   { return io->read(PC++); }
+u16 CPU::fetch_16() { return (io->read(PC++) | (io->read(PC++) << 8)); }
+
+void CPU::stack_push(u16 n) {
+    io->write(SP_REG--, n >> 8);
+    io->write(SP_REG--, n & 0xFF);
 }
 
-void CPU::store(u16 offset, u8 data) {mem->write(offset, data);}
+u16  CPU::stack_pop() {
+    u8 q1 = io->read(SP_REG++);
+    u8 q2 = io->read(SP_REG++);
+    return (u16)q2 << 8 | q1;
+}
 
-void CPU::load_8(u8 *dest, u8 data) { *dest = data; }
-void CPU::load_16(u16 *dest, u16 data) { *dest = data; }
+//============
+// Nop
+//============
+u8 CPU::no_op() {
+    return 4;
+}
 
-void CPU::ex_or(u8 data) { AF.b_AF.A ^= data; }
+//============
+// Loads
+//============
+u8 CPU::load_r_n(u8 *r1) {
+    *r1 = io->read(PC++);
+    return 8;
+}
 
-void CPU::jump(u16 offset) { PC = offset; }
-void CPU::jump_cond(u8 flag, u16 offset) { if(AF.b_AF.i_F & flag) jump(offset); }
+u8 CPU::load_r_r(u8 *r1, u8 *r2) {
+    *r1 = *r2;
+    return 4;
+}
+
+u8 CPU::load_r_ll(u8 *r1, u16 loc) {
+    *r1 = io->read(loc);
+    return 8;
+}
+
+u8 CPU::load_rr_nn(u16 *r1) {
+    *r1 = fetch_16();
+    return 16;
+}
+
+u8 CPU::loadi_rr_r(u16 *r1, u8 *r2) {
+    io->write(*r1, *r2);
+    (*r1)++;
+    return 8;
+}
+
+u8 CPU::loadi_r_rr(u8 *r1, u16 *r2) {
+    *r1 = io->read(*r2);
+    (*r2)++;
+    return 8;
+}
+
+u8 CPU::loadd_rr_r(u16 *r1, u8 *r2) {
+    io->write(*r1, *r2);
+    (*r1)--;
+    return 8;
+}
+
+u8 CPU::loadd_r_rr(u8 *r1, u16 *r2) {
+    *r1 = io->read(*r2);
+    (*r2)--;
+    return 8;
+}
+
+u8 CPU::load_rr_rr(u16 *r1, u16 *r2) {
+    *r1 = *r2;
+    return 8;
+}
+
+u8 CPU::load_llnn_r(u8 *r1) {
+    io->write(fetch_16(), *r1);
+    return 16;
+}
+
+u8 CPU::load_llnn_rr(u16 *r1) {
+    u16 addr = fetch_16();
+    io->write(addr++, *r1 & 0xFF);
+    io->write(addr, *r1 >> 8);
+    return 20;
+}
+
+u8 CPU::load_ll_n(u16 loc) {
+    io->write(loc, fetch_8());
+    return 12;
+}
+
+u8 CPU::load_ll_r(u16 loc, u8 *r1 ) {
+    io->write(loc, *r1);
+    return 8;
+}
+
+u8 CPU::load_lln_r(u8 *r1) {
+    io->write(0xFF00 + fetch_8(), *r1);
+    return 12;
+}
+
+u8 CPU::load_llr_r(u8 *r1, u8 *r2) {
+    io->write(0xFF00 + *r1, *r2);
+    return 8;
+}
+
+u8 CPU::load_r_lln(u8 *r1) {
+    *r1 = io->read(0xFF00 + fetch_8());
+    return 12;
+}
+
+u8 CPU::load_r_llr(u8 *r1, u8 *r2) {
+    *r1 = io->read(0xFF00 + *r2);
+    return 8;
+}
+
+u8 CPU::load_rr_rrn(u16 *r1, u16 *r2) {
+//CHNZ
+    s8 e = (s8)fetch_8(); //signed
+
+    Z_FLAG = 0;
+    H_FLAG = check_half_carry_8(*r2, e, (u16)*r2 + e);
+    N_FLAG = 0;
+    C_FLAG = check_half_carry_16(*r2, e, (u16)*r2 + e);
+
+    *r1 = *r2 + e;
+    return 12;
+}
+
+u8 CPU::load_r_llnn(u8 *r1) {
+    *r1 = io->read(fetch_16());
+    return 16;
+}
+
+//====================
+// Increment/Decrement
+//====================
+u8 CPU::inc_r(u8 *r1) {
+//HNZ
+    Z_FLAG = !(*r1);
+    H_FLAG = check_half_carry_8(1, *r1, (u16)*r1 + 1);
+    N_FLAG = 0;
+
+    (*r1)++;
+    return 4;
+}
+
+u8 CPU::dec_r(u8 *r1) {
+//HNZ
+    Z_FLAG = !(*r1);
+    H_FLAG = !~(*r1 & 0xF);
+    N_FLAG = 1;
+
+    (*r1)--;
+    return 4;
+}
+
+u8 CPU::inc_rr(u16 *r1) {
+    (*r1)++;
+    return 8;
+}
+
+u8 CPU::dec_rr(u16 *r1) {
+    (*r1)--;
+    return 8;
+}
+
+u8 CPU::inc_ll(u16 loc) {
+//HNZ
+    u8 r1 = io->read(loc)+1;
+
+    Z_FLAG = !r1;
+    H_FLAG = check_half_carry_8(1,r1, (u16)r1+1);
+    N_FLAG = 0;
+
+    io->write(loc, r1);
+    return 12;
+}
+
+u8 CPU::dec_ll(u16 loc) {
+//HNZ
+    u8 r1 = io->read(loc)-1;
+
+    Z_FLAG = !r1;
+    H_FLAG = check_half_carry_8(r1,1,r1-1);
+    N_FLAG = 0;
+
+    io->write(loc, r1);
+    return 12;
+}
+
+//====================
+// Add
+//====================
+u8 CPU::add_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1+r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
+
+    *r1 += r2;
+    return 8;
+}
+
+u8 CPU::add_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    Z_FLAG = !(*r1+*r2);
+    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1 + *r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1 + *r2);
+    *r1 += *r2;
+    return 4;
+}
+
+u8 CPU::add_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    Z_FLAG = !(*r1+r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
+
+    *r1 += r2;
+    return 8;
+}
+
+u8 CPU::add_rr_n(u16 *r1) {
+//CHNZ
+    s8 r2 = (s8)fetch_8();
+
+    Z_FLAG = 0;
+    H_FLAG = check_half_carry_16(*r1, r2, (u16)*r1 + r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_16(*r1, r2, (u16)*r1 + r2);
+
+    *r1 += r2;
+
+    return 16;
+}
+
+u8 CPU::add_rr_rr(u16 *r1, u16 *r2) {
+//CHN
+    H_FLAG = check_half_carry_16(*r1, *r2, (u16)*r1 + *r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_16(*r1, *r2, (u16)*r1 + *r2);
+
+    *r1 += *r2;
+    return 8;
+}
+
+//====================
+// Add with Carry
+//====================
+u8 CPU::adc_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+
+    Z_FLAG = 0;
+    H_FLAG = check_half_carry_8(*r1, r2+old_c, (u16)*r1 + r2 + old_c);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2+old_c, (u16)*r1 + r2 + old_c);
+
+    *r1 += r2+old_c;
+    return 8;
+}
+
+u8 CPU::adc_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+
+    Z_FLAG = 0;
+    H_FLAG = check_half_carry_8(*r1, *r2 + old_c, (u16)*r1 + *r2 + old_c);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, *r2 + old_c, (u16)*r1 + *r2 + old_c);
+
+    *r1 += *r2+old_c;
+    return 4;
+}
+
+u8 CPU::adc_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+
+    Z_FLAG = 0;
+    H_FLAG = check_half_carry_8(*r1, r2+old_c, (u16)*r1 + r2 + old_c);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2+old_c, (u16)*r1 + r2 + old_c);
+
+    *r1 += r2 + old_c; //ERROR
+    return 8;
+}
+
+//====================
+// Subtract
+//====================
+u8 CPU::sub_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    *r1 -= r2;
+    return 8;
+}
+
+u8 CPU::sub_r(u8 *r1, u8 *r2) {
+//CHNZ
+
+    Z_FLAG = !(*r1-*r2);
+    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1-*r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1-*r2);
+
+    *r1 -= *r2;
+    return 4;
+}
+
+u8 CPU::sub_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    *r1 -= r2;
+    return 8;
+}
+
+//====================
+// Subtract with Carry
+//====================
+u8 CPU::sbc_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8() + C_FLAG; //save the old C_FLAG so we can set the flags first
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2+C_FLAG, (u16)*r1-r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    *r1 -= r2;
+    return 8;
+}
+
+u8 CPU::sbc_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    *r2 += C_FLAG;
+
+    Z_FLAG = !(*r1-*r2);
+    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1-*r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1-*r2);
+
+    *r1 -= *r2;
+    return 4;
+}
+
+u8 CPU::sbc_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc) + C_FLAG;
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2+C_FLAG, (u16)*r1-r2);
+    N_FLAG = 0;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    *r1 -= r2;
+    return 8;
+}
+
+//====================
+// And
+//====================
+u8 CPU::and_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1 & r2);
+    H_FLAG = 1;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 &= r2;
+    return 8;
+}
+
+u8 CPU::and_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    Z_FLAG = !(*r1 & *r2);
+    H_FLAG = 1;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 &= *r2;
+    return 4;
+}
+
+u8 CPU::and_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    Z_FLAG = !(*r1 & r2);
+    H_FLAG = 1;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 &= r2;
+    return 8;
+}
+
+//====================
+// Or
+//====================
+u8 CPU::or_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1 | r2);
+    H_FLAG = 0;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 |= r2;
+    return 8;
+}
+
+u8 CPU::or_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    Z_FLAG = !(*r1 | *r2);
+    H_FLAG = 0;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 |= *r2;
+    return 4;
+}
+
+u8 CPU::or_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    Z_FLAG = !(*r1 | r2);
+    H_FLAG = 0;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 |= r2;
+    return 8;
+}
+
+//====================
+// Exclusive Or
+//====================
+u8 CPU::xor_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1 ^ r2);
+    H_FLAG = 0;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 ^= r2;
+    return 8;
+}
+
+u8 CPU::xor_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    Z_FLAG = !(*r1 ^ *r2);
+    H_FLAG = 0;
+    N_FLAG = 0;
+    C_FLAG = 0;
+
+    *r1 ^= *r2;
+    return 4;
+}
+
+u8 CPU::xor_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    C_FLAG = 0;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = !(*r1 | r2);
+
+    *r1 ^= r2;
+    return 8;
+}
+
+//====================
+// Compare
+//====================
+u8 CPU::cp_r_n(u8 *r1) {
+//CHNZ
+    u8 r2 = fetch_8();
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
+    N_FLAG = 1;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    return 8;
+}
+
+u8 CPU::cp_r_r(u8 *r1, u8 *r2) {
+//CHNZ
+    Z_FLAG = !(*r1-*r2);
+    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1-*r2);
+    N_FLAG = 1;
+    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1-*r2);
+
+    return 4;
+}
+
+u8 CPU::cp_r_ll(u8 *r1, u16 loc) {
+//CHNZ
+    u8 r2 = io->read(loc);
+
+    Z_FLAG = !(*r1-r2);
+    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
+    N_FLAG = 1;
+    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+
+    return 8;
+}
+
+//====================
+// Push/Pop
+//====================
+u8 CPU::pop_rr(u16 *r1) {
+    *r1 = stack_pop();
+    return 12;
+}
+
+u8 CPU::push_rr(u16 *r1) {
+    stack_push(*r1);
+    return 16;
+}
+
+//====================
+// Rotate
+//====================
+u8 CPU::rla_r(u8 *r1) {
+//CHNZ
+    u8 old_c = C_FLAG;
+
+    C_FLAG = *r1 & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = 0;
+    *r1 <<= 1;
+    *r1 += old_c;
+
+    return 4;
+}
+
+u8 CPU::rra_r(u8 *r1) {
+//CHNZ
+    u8 old_c = C_FLAG;
+
+    C_FLAG = *r1 & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = 0;
+    *r1 >>= 1;
+    *r1 |= old_c<<8;
+
+    return 4;
+}
+
+u8 CPU::rlca_r(u8 *r1) {
+//CHNZ
+    C_FLAG = *r1 & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = 0;
+    *r1 <<= 1;
+    *r1 += C_FLAG;
+
+    return 4;
+}
+
+u8 CPU::rrca_r(u8 *r1) {
+//CHNZ
+    C_FLAG = *r1 & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = 0;
+    *r1 >>= 1;
+    *r1 |= C_FLAG<<8;
+
+    return 4;
+}
+
+u8 CPU::rlc_r(u8 *r1) {
+//CHNZ
+    C_FLAG = *r1 & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    *r1 <<= 1;
+    *r1 += C_FLAG;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::rlc_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+
+    C_FLAG = r & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r <<= 1;
+    r += C_FLAG;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+u8 CPU::rrc_r(u8 *r1) {
+//CHNZ
+
+    C_FLAG = *r1 & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    *r1 >>= 1;
+    *r1 |= C_FLAG<<8;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::rrc_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+
+    C_FLAG = r & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    r >>= 1;
+    r |= C_FLAG<<8;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 4;
+}
+
+u8 CPU::rl_r(u8 *r1) {
+//CHNZ
+    u8 old_c = C_FLAG;
+
+    C_FLAG = *r1 & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    *r1 <<= 1;
+    *r1 += old_c;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::rl_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+    u8 old_c = C_FLAG;
+
+    C_FLAG = r & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r <<= 1;
+    r += old_c;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+u8 CPU::rr_r(u8 *r1) {
+//CHNZ
+    u8 old_c = C_FLAG;
+
+    C_FLAG = *r1 & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    *r1 >>= 1;
+    *r1 |= old_c<<8;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::rr_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+    u8 old_c = C_FLAG;
+
+    C_FLAG = r & 1;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r >>= 1;
+    r |= old_c<<8;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+//====================
+// Shift
+//====================
+u8 CPU::sla_r(u8 *r1) {
+//CHNZ
+    C_FLAG = *r1 & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    *r1 <<= 1;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::sla_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+
+    C_FLAG = r & 0x80;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r <<= 1;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+u8 CPU::sra_r(u8 *r1) {
+//CHNZ
+    u8 a = *r1 & 0x80; //save eight bit for arithmetic shift
+
+    C_FLAG = *r1 & 0x01;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    *r1 >>= 1;
+    *r1 |= a; //set eighth bit for arithmetic shift;
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::sra_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+    u8 a = r & 0x80; //save eight bit for arithmetic shift
+
+    C_FLAG = r & 0x01;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r >>= 1;
+    r |= a; //set eighth bit for arithmetic shift;
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+u8 CPU::srl_r(u8 *r1) {
+//CHNZ
+
+    C_FLAG = *r1 & 0x01;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    *r1 >>= 1;
+    *r1 &= 0x7F; // logical shift, force the last bit to zero
+
+    Z_FLAG = !*r1;
+
+    return 8;
+}
+
+u8 CPU::srl_ll(u16 loc) {
+//CHNZ
+    u8 r = io->read(loc);
+
+    C_FLAG = r & 0x01;
+    H_FLAG = 0;
+    N_FLAG = 0;
+
+    r >>= 1;
+    r &= 0x7F; // logical shift, force the last bit to zero
+
+    Z_FLAG = !r;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+//====================
+// Swap
+//====================
+u8 CPU::swap_r(u8 *r1) {
+    u8 t = *r1 >> 4;
+
+    C_FLAG = 0;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = !*r1; //swapping a 0x00 will still be 0x00
+
+    *r1 = (*r1 << 4) | t;
+
+    return 8;
+}
+
+u8 CPU::swap_ll(u16 loc) {
+    u8 r = io->read(loc);
+    u8 t = r >> 4;
+
+    C_FLAG = 0;
+    H_FLAG = 0;
+    N_FLAG = 0;
+    Z_FLAG = !r; //swapping a 0x00 will still be 0x00
+
+    r = (r << 4) | t;
+
+    io->write(loc, r);
+
+    return 16;
+}
+
+//====================
+// Test Bit
+//====================
+u8 CPU::bit_b_r(u8 bit, u8 *reg) {
+//HNZ
+
+    H_FLAG = 1;
+    N_FLAG = 0;
+    Z_FLAG = !(*reg & 1<<bit);
+
+    return 8;
+}
+
+u8 CPU::bit_b_ll(u8 bit, u16 loc) {
+//HNZ
+    u8 r1 = io->read(loc);
+
+    H_FLAG = 1;
+    N_FLAG = 0;
+    Z_FLAG = !(r1 & 1<<bit);
+
+    return 12;
+}
+
+//====================
+// Reset Bit
+//====================
+u8 CPU::res_b_r(u8 bit, u8 *reg) {
+    *reg &= ~(1<<bit);
+    return 8;
+}
+
+u8 CPU::res_b_ll(u8 bit, u16 loc) {
+    u8 r = io->read(loc);
+
+    r &= ~(1<<bit);
+    io->write(loc, r);
+
+    return 16;
+}
+
+//====================
+// Set Bit
+//====================
+u8 CPU::set_b_r(u8 bit, u8 *reg) {
+    *reg |= 1<<bit;
+    return 8;
+}
+
+u8 CPU::set_b_ll(u8 bit, u16 loc) {
+    u8 r = io->read(loc);
+
+    r |= 1<<bit;
+    io->write(loc, r);
+
+    return 16;
+}
+
+//====================
+// Decimal Adjust
+//====================
+u8 CPU::daa_r(u8 *r1) {
+//CHZ
+
+    u8 h = *r1 >> 4;
+    u8 l = *r1 & 0xF;
+
+    //these lookup tables were derived from the Gameboy Prgrammers Manual P.122
+    if(!N_FLAG) { // addition
+        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x8) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x9) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0xA,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if(!C_FLAG && bounded(h,0x9,0xF) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if(!C_FLAG && bounded(h,0xA,0xF) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x3) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        } else {
+            std::cerr << "DAA error N1: " << *r1 << std::endl;
+        }
+    } else { // subtraction
+        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x8) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
+        } else if( C_FLAG && bounded(h,0x7,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
+        } else if( C_FLAG && bounded(h,0x6,0xF) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
+        } else {
+            std::cerr << "DAA error N0: " << *r1 << std::endl;
+        }
+    }
+
+    H_FLAG = 0;
+    Z_FLAG = !*r1;
+
+    return 4;
+}
+
+//====================
+// Complement
+//====================
+u8 CPU::cpl_r(u8 *r1) {
+//HN
+    H_FLAG = 1;
+    N_FLAG = 1;
+
+    *r1 = ~*r1;
+    return 4;
+}
+
+//====================
+// Set/Clear Carry
+//====================
+u8 CPU::scf() {
+    N_FLAG = 0;
+    H_FLAG = 0;
+    C_FLAG = 1;
+
+    return 4;
+}
+
+u8 CPU::ccf() {
+    N_FLAG = 0;
+    H_FLAG = 0;
+    C_FLAG = !C_FLAG;
+
+    return 4;
+}
+
+//====================
+// Halt/Stop
+//====================
+u8 CPU::halt() {
+    is_halted = true;
+    return 0;
+}
+
+u8 CPU::stop() {
+    is_stopped = true;
+    return 0;
+}
+
+//====================
+// Enable/Disable Interrupts
+//====================
+u8 CPU::ei() {
+    IME = 1;
+}
+
+u8 CPU::di() {
+    IME = 0;
+}
+
+//====================
+// Reset
+//====================
+u8 CPU::rst_l(u8 loc) {
+    stack_push(PC);
+    PC = loc;
+}
+
+//====================
+// Jump
+//====================
+u8 CPU::jump_nn() {
+    PC = fetch_16();
+
+    return 16;
+}
+
+u8 CPU::jump_ll(u16 loc) {
+    PC = loc;
+
+    return 4;
+}
+
+u8 CPU::jump_cond_ll(bool cond) {
+    u16 t = fetch_16(); //need to fetch regardless of the condition;
+    if(cond) {
+        PC = t;
+        return 16;
+    }
+    return 12;
+}
+
+u8 CPU::jump_rel_n() {
+    s8 e = fetch_8();
+    PC += e;
+    return 12;
+}
+
+u8 CPU::jump_rel_cond_n(bool cond) {
+    s8 e = fetch_8();
+    if(cond) {
+        PC += e;
+        return 12;
+    }
+    return 8;
+}
+
+//====================
+// Call
+//====================
+u8 CPU::call_nn() {
+    stack_push(PC);
+    PC = fetch_16();
+    return 24;
+}
+
+u8 CPU::call_cond_nn(bool cond) {
+    u16 t = fetch_16();
+    if(cond) {
+        stack_push(PC);
+        PC = t;
+        return 24;
+    } else {
+        return 12;
+    }
+}
+
+//====================
+// Return
+//====================
+u8 CPU::ret() {
+    PC = stack_pop();
+    return 16;
+}
+
+u8 CPU::reti() { //TODO: master-interrupt flag
+    PC = stack_pop();
+    return 16;
+}
+
+u8 CPU::ret_cond(bool cond) {
+    if(cond) {
+        PC = stack_pop();
+        return 20;
+    } else {
+        return 8;
+    }
+}
+
+//====================
+// Invalid Op
+//====================
+u8 CPU::invalid_op(u8 op) {
+    std::cerr << "Invalid OP" << std::endl;
+    PC--; //to make the game freeze
+}
