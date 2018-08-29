@@ -1,10 +1,11 @@
+#pragma once
+
 #include "io.hpp"
 #include "util.hpp"
 
 #include <iostream>
 
-#ifndef CPU_HPP
-#define CPU_HPP
+#define DIV_MAX 1024
 
 class CPU {
 public:
@@ -19,9 +20,15 @@ public:
     //static std::string getCBOpString(u8 op);
 
 private:
+    void CPU::on_div16();
+    void CPU::on_div64();
+    void CPU::on_div256();
+    void CPU::on_div1024();
+
     IO_Bus *io;
 
     u8 inst_clocks;
+    u16 cpu_counter;
 
     //registers:
     union {
@@ -290,5 +297,3 @@ private:
     //====================
     u8 invalid_op(u8 op);
 };
-
-#endif

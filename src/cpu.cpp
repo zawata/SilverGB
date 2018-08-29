@@ -30,17 +30,85 @@ inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
 inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
 inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
 
-inline bool bounded(u8 x, u8 y, u8 z) { return (x >= y) && (x <= z); }
-
 CPU::CPU(IO_Bus *m) :
 io(m),
 PC(0x100) {}
 
-void CPU::clock_pulse() {
-    if(!inst_clocks--) {
-        inst_clocks = decode(io->read(PC));
+void CPU::clock_pulse() { //TODO: rename to tick
+    //divider functions
+    cpu_counter++;
+    if(!(cpu_counter % 16))   on_div16();
+    if(!(cpu_counter % 64))   on_div64();
+    if(!(cpu_counter % 256))  on_div256();
+    if(!(cpu_counter % 1024)) on_div1024();
+    cpu_counter %= DIV_MAX;
+
+    if(!inst_clocks--) { //used to properly time the instruction execution
+        bool int_set = false;
+        //ISR transfer summary:
+        // disable Interrupts
+        // push the PC
+        // set the PC to the interrupt offset
+        // unset the interrupt flag
+        if(IME) {
+            if(io->cpu_check_interrupts() & IO_Bus::Interrupt::V_BLANK_INT) {
+                IME=false;
+                stack_push(PC);
+                PC = V_BLANK_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::V_BLANK_INT);
+                int_set = true;
+            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::LCD_STAT_INT) {
+                IME=false;
+                stack_push(PC);
+                PC = LCD_STAT_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
+                int_set = true;
+            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::TIMER_INT) {
+                IME=false;
+                stack_push(PC);
+                PC = TIMER_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::TIMER_INT);
+                int_set = true;
+            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::SERIAL_INT) {
+                IME=false;
+                stack_push(PC);
+                PC = SERIAL_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::SERIAL_INT);
+                int_set = true;
+            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::JOYPAD_INT) {
+                IME=false;
+                stack_push(PC);
+                PC = JOYPAD_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::JOYPAD_INT);
+                int_set = true;
+            }
+        }
+        //if an interupt was just set, set the instruction delay, then execute once it's done
+        if(!int_set) inst_clocks = decode(io->read(PC));
+        else inst_clocks = 20; //ISR transfer takes 5 machine cycles
     }
 }
+
+void CPU::on_div16() {
+    if(io->cpu_get_TAC_cs() == 16) io->cpu_inc_TIMA();
+}
+
+void CPU::on_div64() {
+    if(io->cpu_get_TAC_cs() == 64) io->cpu_inc_TIMA();
+}
+
+void CPU::on_div256() {
+    if(io->cpu_get_TAC_cs() == 256) io->cpu_inc_TIMA();
+    io->cpu_inc_DIV(); //DIV register always incremented on the 256th clock pulse
+}
+
+void CPU::on_div1024() {
+    if(io->cpu_get_TAC_cs() == 1024) io->cpu_inc_TIMA();
+}
+
+// void CPU::on_div8192() {
+
+// }
 
 u8 CPU::decode(u8 op) {
     switch(op) {
@@ -1304,24 +1372,26 @@ u8 CPU::daa_r(u8 *r1) {
     u8 l = *r1 & 0xF;
 
     //these lookup tables were derived from the Gameboy Prgrammers Manual P.122
+
+    //TODO: find someway to shorten the Utility_Functions::bounded(...) calls
     if(!N_FLAG) { // addition
-        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x8) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x9) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0xA,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if(!C_FLAG && bounded(h,0x9,0xF) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if(!C_FLAG && bounded(h,0xA,0xF) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x3) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        if(       !C_FLAG && Utility_Functions::bounded(h,0x0,0x9) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x8) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x9) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0xA,0xF) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0x9,0xF) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0xA,0xF) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x2) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x2) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x3) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
         } else {
             std::cerr << "DAA error N1: " << *r1 << std::endl;
         }
     } else { // subtraction
-        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x8) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
-        } else if( C_FLAG && bounded(h,0x7,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
-        } else if( C_FLAG && bounded(h,0x6,0xF) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
+        if(       !C_FLAG && Utility_Functions::bounded(h,0x0,0x9) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x8) &&  H_FLAG && Utility_Functions::bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
+        } else if( C_FLAG && Utility_Functions::bounded(h,0x7,0xF) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
+        } else if( C_FLAG && Utility_Functions::bounded(h,0x6,0xF) &&  H_FLAG && Utility_Functions::bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
         } else {
             std::cerr << "DAA error N0: " << *r1 << std::endl;
         }
@@ -1463,8 +1533,9 @@ u8 CPU::ret() {
     return 16;
 }
 
-u8 CPU::reti() { //TODO: master-interrupt flag
+u8 CPU::reti() {
     PC = stack_pop();
+    IME = 1; //re-enable interrupts
     return 16;
 }
 
