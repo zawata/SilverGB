@@ -1,3 +1,5 @@
+#pragma once
+
 #include <iostream>
 #include <SDL2/SDL.h>
 
@@ -8,9 +10,6 @@
 #include "nfd.h"
 
 #include "util.hpp"
-
-#ifndef GUI_HPP
-#define GUI_HPP
 
 #define IMAGE_FORMAT_SIZE 3 //because RGB...for now
 

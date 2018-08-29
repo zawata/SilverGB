@@ -1,8 +1,7 @@
+#pragma once
+
 #include <iostream>
 #include <string>
-
-#ifndef UTIL_HPP
-#define UTIL_HPP
 
 #ifndef INTS_DEF
 #define INTS_DEF
@@ -19,7 +18,6 @@ typedef unsigned long long u64;
 class Utility_Functions {
 public:
     static bool byteCompare(const u8 *a, const u8 *b, u64 l);
+    static bool bounded(u8 x, u8 y, u8 z);
     static std::string itoh(u64 i, u8 zp = 0);
 };
-
-#endif

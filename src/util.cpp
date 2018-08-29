@@ -5,6 +5,11 @@ bool Utility_Functions::byteCompare(const u8 *a, const u8 *b, u64 l) {
     return l == 0;
 }
 
+//Inclusive
+bool Utility_Functions::bounded(u8 x, u8 y, u8 z) {
+    return (x >= y) && (x <= z);
+}
+
 std::string Utility_Functions::itoh(u64 i, u8 zp) {
     char buf[17];
     switch(zp){

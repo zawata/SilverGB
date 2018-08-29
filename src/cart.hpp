@@ -1,11 +1,8 @@
-#include "file.hpp"
-#include "util.hpp"
+#pragma once
 
-#ifndef CART_H
-#define CART_H
+#include "file.hpp"
 
 class Cartridge_Constants {
-//http://gbdev.gg8.se/wiki/articles/The_Cartridge_Header
 public:
     typedef struct __cart_type_t {
         static struct __cart_type_t determineCartType(u8 cart_type) {
@@ -188,8 +185,11 @@ public:
     bool checkHeaderChecksum();
     bool checkGlobalChecksum();
 
-    u8   readFromCart(u16 offset);
-    void writeToCart(u16 offset, u8 data);
+    u8   read_rom(u16 loc);
+    //void write_rom(u16 loc, u8 data);
+
+    u8   read_ram(u16 loc);
+    void write_ram(u16 loc, u8 data);
 
 private:
     File_Interface *rom_file;
@@ -197,9 +197,3 @@ private:
 
     Cartridge_Constants::cart_type_t cart_type;
 };
-
-
-
-
-
-#endif
