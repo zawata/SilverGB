@@ -76,10 +76,10 @@ Sound_Controller::Sound_Controller() {
 //Noise:             Timer -> LFSR -> Length Counter -> Envelope -> Mixer
 
 //My Function Table
-//Square 1: fs_freq_sweep_clock -> timer_clock -> timer_clock -> fs_length_counter_clock -> fs_vol_env_clock -> ??
-//Square 2:                        timer_clock -> timer_clock -> fs_length_counter_clock -> fs_vol_env_clock -> ??
-//Wave:                            timer_clock -> ??          -> fs_length_counter_clock -> fs_vol_env_clock -> ??
-//Noise:                           timer_clock -> ??          -> fs_length_counter_clock -> fs_vol_env_clock -> ??
+//Square 1: fs_freq_sweep_clock -> timer_clock -> timer_clock -> length_counter_clock -> vol_env_clock -> ??
+//Square 2:                        timer_clock -> timer_clock -> length_counter_clock -> vol_env_clock -> ??
+//Wave:                            timer_clock -> ??          -> length_counter_clock -> vol_env_clock -> ??
+//Noise:                           timer_clock -> ??          -> length_counter_clock -> vol_env_clock -> ??
 
 /**
  * Simple Event Flow:
@@ -98,57 +98,51 @@ Sound_Controller::Sound_Controller() {
  *  The "inputs" to the DAC will take the form of volatile variables so that they may be sampled
  * at any available rate. as the audio callback takes a signed 16 bit number representing the
  * the height of the waveform at the current time, this should work nicely.
- *  A scaling function will have to be used to convert the output from what i assume 
+ *  A scaling function will have to be used to convert the output from what i assume
  * is a 4bit space to a 16bit space to ensure audio doesn't seem overly quiet.
  */
 
 #define getFREQ(x,y) (((u16)(x))|(((y)&0x7)<<8))
 
 void Sound_Controller::tick() {
-    if(!channel_1.timer--) {
-        channel_1.timer = getFREQ(registers.NR13, registers.NR14);
-        timer_clock(1);
-    }
-
-    if(!channel_2.timer--) {
-        channel_2.timer = getFREQ(registers.NR23, registers.NR24);
-        timer_clock(2);
-    }
-
-    if(!channel_2.timer--) {
-        channel_2.timer = getFREQ(registers.NR33, registers.NR34);
-        timer_clock(2);
-    }
-
-    if(!channel_4.timer--) {
-        channel_2.timer = getFREQ(registers.NR33, registers.NR34);
-        timer_clock(4);
-    }
 
     tick_counter++;
-    if(!(tick_counter % 8192)) {
-        fs_counter++;
-        switch(fs_counter %= 8) {
-        case 0: //clock length_counter
-            fs_length_counter_clock(0);
-            break;
-        case 2: //clock length_counter, sweep
-            fs_length_counter_clock(0);
-            fs_freq_sweep_clock();
-            break;
-        case 4: //clock length_counter
-            fs_length_counter_clock(0);
-            break;
-        case 6: //clock length_counter, sweep
-            fs_length_counter_clock(0);
-            fs_freq_sweep_clock();
-            break;
-        case 7: //clock vol_env
-            fs_vol_env_clock(0);
-            break;
-        default: break;
+
+    if(!(tick_counter % 65536)) { //128hz
+        vol_env_clock(0);
+    }
+
+    if(!(tick_counter % 32768)) { //128hz
+        freq_sweep_clock();
+    }
+
+    if(!(tick_counter % 16384)) { //256hz
+        length_counter_clock(0);
+    }
+
+    if(!(tick_counter % 32)) {    //1317032 Hz
+        if(!channel_1.timer--) {
+            channel_1.timer = getFREQ(registers.NR13, registers.NR14);
+            timer_clock(1);
+        }
+
+        if(!channel_2.timer--) {
+            channel_2.timer = getFREQ(registers.NR23, registers.NR24);
+            timer_clock(2);
+        }
+
+        if(!channel_3.timer--) {
+            channel_3.timer = getFREQ(registers.NR33, registers.NR34);
+            timer_clock(2);
+        }
+
+        if(!channel_4.timer--) {
+            channel_2.timer = getFREQ(registers.NR33, registers.NR34);
+            timer_clock(4);
         }
     }
+
+    tick_counter %= 16384; //TODO
 }
 
 void Sound_Controller::timer_clock(u8 chan) {
@@ -165,13 +159,13 @@ void Sound_Controller::timer_clock(u8 chan) {
     }
 }
 
-void Sound_Controller::fs_length_counter_clock(u8 chan) {
+void Sound_Controller::length_counter_clock(u8 chan) {
     switch(chan) {
     case 0:
-        fs_length_counter_clock(1);
-        fs_length_counter_clock(2);
-        fs_length_counter_clock(3);
-        fs_length_counter_clock(4);
+        length_counter_clock(1);
+        length_counter_clock(2);
+        length_counter_clock(3);
+        length_counter_clock(4);
         break;
     case 1:
         if(!channel_1.length_counter && channel_1.enabled) {
@@ -200,7 +194,7 @@ void Sound_Controller::fs_length_counter_clock(u8 chan) {
     }
 }
 
-void Sound_Controller::fs_freq_sweep_clock() {
+void Sound_Controller::freq_sweep_clock() {
 
 }
 
@@ -208,14 +202,14 @@ void Sound_Controller::freq_sweep_reset() {
 
 }
 
-void Sound_Controller::fs_vol_env_clock(u8 chan) {
+void Sound_Controller::vol_env_clock(u8 chan) {
     //TODO: does the period counter get reset both here and on a trigger?
     switch(chan) {
     case 0:
-        fs_vol_env_clock(1);
-        fs_vol_env_clock(2);
-        fs_vol_env_clock(3);
-        fs_vol_env_clock(4);
+        vol_env_clock(1);
+        vol_env_clock(2);
+        vol_env_clock(3);
+        vol_env_clock(4);
         break;
     case 1:
         if(channel_1.env_enabled && !channel_1.period_counter--) {
@@ -284,7 +278,7 @@ void Sound_Controller::trigger(u8 chan) {
         if(!channel_1.length_counter) channel_1.length_counter = 64;
         //TODO: if the period in NR12 refers to the volume envelope, the what the hell is the period for the frequency timer?
         channel_1.timer = registers.NR12 & 0x7;
-        channel_1.period_counter = registers.NR12 & 0x07; 
+        channel_1.period_counter = registers.NR12 & 0x07;
         channel_1.volume = registers.NR12 >> 4;
 
         // Square 1's sweep does several things

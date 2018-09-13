@@ -21,7 +21,7 @@ public:
     void write_wavram(u8 loc, u8 data);
 
 private:
-    int tick_counter, fs_counter;
+    u32 tick_counter;
 
     struct {
         bool enabled;
@@ -99,9 +99,9 @@ private:
     u8 wav_ram[WAVRAM_LEN];
 
     void timer_clock(u8 chan);
-    void fs_length_counter_clock(u8 chan);
-    void fs_freq_sweep_clock();
+    void length_counter_clock(u8 chan);
+    void freq_sweep_clock();
     void freq_sweep_reset();
-    void fs_vol_env_clock(u8 chan);
+    void vol_env_clock(u8 chan);
     void trigger(u8 chan);
 };
