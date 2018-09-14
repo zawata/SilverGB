@@ -34,8 +34,7 @@ but I'm developing and testing it on Linux so that is where it's guaranteed to w
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Header Parsing  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫Memory Blocks  
 ➕Sound  
-&nbsp;&nbsp;&nbsp;&nbsp;✔️SDL Audio Interface  
-&nbsp;&nbsp;&nbsp;&nbsp;➕Sound Stuff  
+&nbsp;&nbsp;&nbsp;&nbsp;(See the `sound_impl` branch)  
 🚫Video  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫Video Stuff  
 🚫Input  
