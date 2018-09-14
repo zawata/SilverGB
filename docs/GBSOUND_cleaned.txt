@@ -379,7 +379,7 @@ Channels 1,2,4 - $FF12(NR12)[sq1], $FF17(NR22)[sq2], $FF21(NR42)[noise]
 
 if the direction is 0, the counter outputs its signal through the selector into the decrease (-) delta terminal of the volume counter. If the direction is 1, the counter outputs its signal through the selector into the increase (+) delta terminal of the volume counter.
 
-SPECULATION: The volume counter itself has an overflow/underflow line, which is connected to a switch that prevents the step length counter from reloading its original value when it reaches 0. When this occurs, the terminal count line of the step length counter is ON steadily, and unless the channel's length counter is enabled (and will shut the channel off), the channel enters 'zombie mode'. 
+SPECULATION: The volume counter itself has an overflow/underflow line, which is connected to a switch that prevents the step length counter from reloading its original value when it reaches 0. When this occurs, the terminal count line of the step length counter is ON steadily, and unless the channel's length counter is enabled (and will shut the channel off), the channel enters 'zombie mode'.
 
 ZOMBIE MODE: UNDEAD CHANNELS!
 The channel's volume is now whatever it was set to, or 0/15 if a sweep occured, and will sustain that volume indefinitely unless the length counter halts the channel. If any envelope register bits are now changed, the volume of the channel will increase by 1 or 2, looping around to 0 if necessary. (1 if the channel was INIT-ed with the sweep step number set to 0, 2 if otherwise; also 2 if the step number has been changed to a non-zero value since the INIT,

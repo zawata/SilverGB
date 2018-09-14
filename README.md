@@ -35,7 +35,28 @@ but I'm developing and testing it on Linux so that is where it's guaranteed to w
 &nbsp;&nbsp;&nbsp;&nbsp;🚫Memory Blocks  
 ➕Sound  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️SDL Audio Interface  
-&nbsp;&nbsp;&nbsp;&nbsp;➕Sound Stuff  
+&nbsp;&nbsp;&nbsp;&nbsp;✔️Registers  
+&nbsp;&nbsp;&nbsp;&nbsp;➕Channel 1  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕programmable timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕length counter  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Volume Envelope  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Frequency Sweep  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Duty Cycle Generator  
+&nbsp;&nbsp;&nbsp;&nbsp;➕Channel 2  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕programmable timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕length counter  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Volume Envelope  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Duty Cycle Generator  
+&nbsp;&nbsp;&nbsp;&nbsp;🚫Channel 3  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Wave RAM  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫programmable timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕length counter  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Volume Shift  
+&nbsp;&nbsp;&nbsp;&nbsp;✔️Channel 4  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️configurable timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️LFSR PRNG  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕length counter  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Volume Envelope  
 🚫Video  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫Video Stuff  
 🚫Input  
