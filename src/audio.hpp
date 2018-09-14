@@ -26,10 +26,12 @@ private:
     struct {
         bool enabled;
         s8 volume;
-        u8 timer;
+        u16 timer;
         int length_counter;
 
         u8 duty_counter;
+
+        bool wav_out;
 
         //envelope
         bool env_enabled;
@@ -39,10 +41,12 @@ private:
     struct {
         bool enabled;
         s8 volume;
-        u8 timer;
+        u16 timer;
         int length_counter;
 
         u8 duty_counter;
+
+        bool wav_out;
 
         //envelope
         bool env_enabled;
@@ -51,6 +55,8 @@ private:
 
     struct {
         bool enabled;
+        s8 volume;
+        u16 timer;
         int length_counter;
 
         u8 wave_pos;
@@ -58,13 +64,21 @@ private:
 
     struct {
         bool enabled;
-        u8 timer;
+
+        //CFG timer and PRNG
+        u32  cfg_counter;
+        u32  cfg_timer;
+        u16 LFSR_REG;
+        bool LFSR_7bit; 
+
         int length_counter;
         s8 volume;
         u8 period_counter;
         bool env_enabled;
 
-        u8 LFSR_REG;
+        bool wav_out;
+
+
     } channel_4;
 
     struct __registers {
@@ -97,6 +111,8 @@ private:
     } registers;
 
     u8 wav_ram[WAVRAM_LEN];
+
+    inline u8 getDivisor(u8 i) { return (u8[8]){8, 16, 32, 48, 64, 80, 96, 112}[i & 0x7]; }
 
     void timer_clock(u8 chan);
     void length_counter_clock(u8 chan);

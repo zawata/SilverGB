@@ -108,7 +108,7 @@ void Sound_Controller::tick() {
 
     tick_counter++;
 
-    if(!(tick_counter % 65536)) { //128hz
+    if(!(tick_counter % 65536)) { //64hz
         vol_env_clock(0);
     }
 
@@ -121,25 +121,25 @@ void Sound_Controller::tick() {
     }
 
     if(!(tick_counter % 32)) {    //1317032 Hz
+        //adding 1 here because it takes an extra cycle to reload the timer
         if(!channel_1.timer--) {
-            channel_1.timer = getFREQ(registers.NR13, registers.NR14);
+            channel_1.timer = ~getFREQ(registers.NR13, registers.NR14) + 1;
             timer_clock(1);
         }
 
         if(!channel_2.timer--) {
-            channel_2.timer = getFREQ(registers.NR23, registers.NR24);
+            channel_2.timer = ~getFREQ(registers.NR23, registers.NR24) + 1;
             timer_clock(2);
         }
 
         if(!channel_3.timer--) {
-            channel_3.timer = getFREQ(registers.NR33, registers.NR34);
+            channel_3.timer = ~getFREQ(registers.NR33, registers.NR34) + 1;
             timer_clock(2);
         }
+    }
 
-        if(!channel_4.timer--) {
-            channel_2.timer = getFREQ(registers.NR33, registers.NR34);
-            timer_clock(4);
-        }
+    if(!(tick_counter % 2)) {     //2097152 Hz
+        timer_clock(4);
     }
 
     tick_counter %= 16384; //TODO
@@ -149,13 +149,38 @@ void Sound_Controller::timer_clock(u8 chan) {
     switch(chan) {
     case 1:
         channel_1.duty_counter++;
-        _duty_check(registers.NR11 & 0xC, channel_1.duty_counter %= 8);
+        channel_1.duty_counter %= 8;
+        channel_1.wav_out = _duty_check(registers.NR11 & 0xC, channel_1.duty_counter);
         break;
     case 2:
         channel_2.duty_counter++;
-        _duty_check(registers.NR11 & 0xC, channel_1.duty_counter %= 8);
+        channel_2.duty_counter %= 8;
+        channel_1.wav_out = _duty_check(registers.NR21 & 0xC, channel_2.duty_counter);
     case 3:
+
     case 4:
+        if(!--channel_4.cfg_counter) {
+            //reset counter
+            channel_4.cfg_counter = getDivisor(registers.NR43 & 0x7) << (registers.NR43 >> 4);
+
+            //XOR bottom 2 bits
+            u8 b = Bit.test(channel_4.LFSR_REG, 0) ^ Bit.test(channel_4.LFSR_REG, 1);
+
+            //right shift the register
+            channel_4.LFSR_REG >>= 1;
+
+            //set the high bit
+            if(b) Bit.set(&channel_4.LFSR_REG, 14);
+            else  Bit.reset(&channel_4.LFSR_REG, 14);
+
+            //if 7 bit mode
+            if (Bit.test(registers.NR43, 6)) {
+                //set bit 6 too
+                if(b) Bit.set(&channel_4.LFSR_REG, 6);
+                else  Bit.reset(&channel_4.LFSR_REG, 6);
+            }
+        }
+        channel_4.wav_out = Bit.test(channel_4.LFSR_REG, 0);
     }
 }
 
@@ -415,7 +440,9 @@ void Sound_Controller::write_reg(u8 loc, u8 data) {
         registers.NR42 = data & NR42_WRITE_MASK;
         break;
     case NR43_REG:
-        registers.NR43 = data & NR43_WRITE_MASK;
+        //registers.NR43 = data & NR43_WRITE_MASK;
+        channel_4.cfg_counter = channel_4.cfg_timer = getDivisor(registers.NR43 & 0x7) << (registers.NR43 >> 4);
+        channel_4.LFSR_7bit = (bool)Bit.test(registers.NR43, 3);
         break;
     case NR44_REG:
         registers.NR44 = data & NR44_WRITE_MASK;
@@ -438,6 +465,7 @@ u8 Sound_Controller::read_wavram(u8 loc) {
     if(loc >= WAVRAM_LEN) return wav_ram[loc];
     return 0;
 }
+
 void Sound_Controller::write_wavram(u8 loc, u8 data) {
     if(loc < WAVRAM_LEN) wav_ram[loc] = data;
 }
