@@ -4,9 +4,16 @@ File_Interface::File_Interface() {}
 
 File_Interface::~File_Interface() {}
 
+File_Interface *File_Interface::createFile(std::string filename) {
+    if(std::ifstream(filename)) return nullptr; //don't create file if it exists
+
+    //not casting to void throws an error about shaddowing filename?
+    (void)std::ofstream(filename); //create file
+    return openFile(filename, true);
+}
+
 File_Interface *File_Interface::openFile(std::string filename, bool write) {
     auto ret = new File_Interface();
-
     if(ret->file = std::fstream(filename,
             std::ifstream::in |
             std::ifstream::out |
