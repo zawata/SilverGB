@@ -6,6 +6,12 @@ gl_context(g),
 io(io),
 screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 
+    config = Configuration::loadConfigFile("config.cfg");
+    if(!config) {
+        //the config doesn't exist so lets just start a new one
+        config = new Configuration();
+    }
+
     glGenTextures(1, &screen_texture);
     glBindTexture(GL_TEXTURE_2D, screen_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -14,13 +20,19 @@ screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 }
 
 GUI::~GUI() {
+    config->config_data.bin_enabled = true;
+    memcpy(config->config_data.bin_file,"insert path here",17);
+    config->saveConfigFile("config.cfg");
+
     //delete custom textures
     glDeleteTextures(1, &screen_texture);
 
+    //shutdown ImGUI
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
+    //shutdown SDL
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();

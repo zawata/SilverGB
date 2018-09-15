@@ -9,6 +9,7 @@
 #include "GL/gl3w.h"
 #include "nfd.h"
 
+#include "cfg.hpp"
 #include "util.hpp"
 
 #define IMAGE_FORMAT_SIZE 3 //because RGB...for now
@@ -38,6 +39,7 @@ private:
     struct {
         bool done             = false;
         bool opening_file     = false;
+        bool opening_bios     = false;
         bool debug_mode       = false;
         bool set_debug_mode   = false;
     } state_flags;
@@ -53,6 +55,8 @@ private:
     SDL_GLContext gl_context;
 
     ImGuiIO& io;
+
+    Configuration *config;
 
     GLuint screen_texture;
     u8 *screen_buffer;

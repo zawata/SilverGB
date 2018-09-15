@@ -2,7 +2,8 @@
 
 #include "file.hpp"
 
-struct Configuration {
+class Configuration {
+public:
     static Configuration *loadConfigFile(std::string filepath);
 
     Configuration();
@@ -10,7 +11,8 @@ struct Configuration {
 
     bool saveConfigFile(std::string filepath);
 
-    //Config data
-    bool bin_enabled = false;
-    const char bin_file[256] = {0};
+    struct __config_data {
+        bool bin_enabled = false;
+        char bin_file[256] = { 0 };
+    } config_data;
 };
