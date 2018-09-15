@@ -15,10 +15,10 @@ typedef unsigned long      u32;
 typedef unsigned long long u64;
 #endif
 
-inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { while(l--) if(*a++ != *b++) break; return l == 0; }
-inline bool bounded(u8 x, u8 y, u8 z)                    { return (x >= y) && (x <= z); }
+static inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { while(l--) if(*a++ != *b++) break; return l == 0; }
+static inline bool bounded(u8 x, u8 y, u8 z)                    { return (x >= y) && (x <= z); }
 
-std::string itoh(u64 i, u8 zp = 0) {
+static inline std::string itoh(u64 i, u8 zp = 0) {
     char buf[17];
     switch(zp) {
     case 0:
@@ -40,6 +40,7 @@ std::string itoh(u64 i, u8 zp = 0) {
     return std::string(buf);
 }
 
+//TODO: make this static
 struct {
     u8    test(int reg,  u8 i) { return (reg >> i) & 1; }
 
