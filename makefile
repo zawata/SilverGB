@@ -26,7 +26,7 @@ LIB_DIRS := \
 	$(ROOT_DIR)/lib \
 	$(ROOT_DIR)/lib/nfd/build/lib/Release/x64
 
-LIBS := dl SDL2 SDL2_ttf nfd
+LIBS := dl pthread SDL2 SDL2_ttf nfd
 
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp' -or -name '*.c')
 OBJS := $(SRCS:%=$(BLD_DIRS)/%.o)
