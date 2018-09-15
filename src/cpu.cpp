@@ -34,6 +34,8 @@ CPU::CPU(IO_Bus *m) :
 io(m),
 PC(0x100) {}
 
+CPU::~CPU() {}
+
 void CPU::clock_pulse() { //TODO: rename to tick
     //divider functions
     cpu_counter++;

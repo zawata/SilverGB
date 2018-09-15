@@ -23,7 +23,7 @@ u16 Cartridge::getCodeOffset() {
 bool Cartridge::checkMagicNumber() {
     u8 buf[Cartridge_Constants::MAGIC_NUM_LENGTH];
     rom_file->getBuffer(Cartridge_Constants::MAGIC_NUM_OFFSET, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
-    return Utility_Functions::byteCompare(Cartridge_Constants::MAGIC_NUM, buf, 48);
+    return byteCompare(Cartridge_Constants::MAGIC_NUM, buf, 48);
 }
 
 std::string Cartridge::getCartTitle() {
@@ -120,12 +120,12 @@ bool Cartridge::checkHeaderChecksum() {
 }
 
 bool Cartridge::checkGlobalChecksum() {
-    //return false until i care enough to figure out how this is calculated.
+    //return false until I care enough to figure out how this is calculated.
     // real gameboy hardware doesn't even use this.
     return false;
 }
 
-u8 Cartridge::readFromCart(u16 offset) {
+u8 Cartridge::read_rom(u16 offset) {
     if(cart_type.ROM) {
         if(offset <= 0x7FFF) {
             return rom_file->getByte(offset);
@@ -135,6 +135,14 @@ u8 Cartridge::readFromCart(u16 offset) {
             std::cout << "read out of bounds" << std::endl;
         }
     } else {
-        // cart not supported yet
+        std::cerr << "cart not supported yet" << std::endl;
     }
+}
+
+u8   Cartridge::read_ram(u16 loc) {
+
+}
+
+void Cartridge::write_ram(u16 loc, u8 data) {
+
 }

@@ -8,16 +8,19 @@ config(config),
 vpu(new Video_Controller()),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
-    if(config->bin_enabled) {
-        boot_rom_file = File_Interface::openFile(config->bin_file);
+    if(config->config_data.bin_enabled) {
+        boot_rom_file = File_Interface::openFile(config->config_data.bin_file);
     }
     else {
-        //TODO what if we don't have the bios
+        std::cerr << "BIOS Emulation not supported yet..." << std::endl;
+        exit(-1);
     }
 }
 
 IO_Bus::~IO_Bus() {
-
+    delete vpu;
+    delete snd;
+    delete input;
 }
 
 u8 IO_Bus::read(u16 offset) {
@@ -309,6 +312,23 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         std::cerr << "REG err at " << loc << std::endl;
         return;
     }
+}
+
+//TODO:
+u8 IO_Bus::read_ram(u8 loc) {
+
+}
+
+u8 IO_Bus::write_ram(u8 loc, u8 data) {
+
+}
+
+u8 IO_Bus::read_hram(u8 loc) {
+
+}
+
+u8 IO_Bus::write_hram(u8 loc, u8 data) {
+
 }
 
 void IO_Bus::cpu_inc_DIV() {

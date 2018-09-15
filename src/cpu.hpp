@@ -20,10 +20,10 @@ public:
     //static std::string getCBOpString(u8 op);
 
 private:
-    void CPU::on_div16();
-    void CPU::on_div64();
-    void CPU::on_div256();
-    void CPU::on_div1024();
+    void on_div16();
+    void on_div64();
+    void on_div256();
+    void on_div1024();
 
     IO_Bus *io;
 
