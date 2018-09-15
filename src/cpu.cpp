@@ -106,10 +106,6 @@ void CPU::on_div1024() {
     if(io->cpu_get_TAC_cs() == 1024) io->cpu_inc_TIMA();
 }
 
-// void CPU::on_div8192() {
-
-// }
-
 u8 CPU::decode(u8 op) {
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -1368,30 +1364,31 @@ u8 CPU::set_b_ll(u8 bit, u16 loc) {
 u8 CPU::daa_r(u8 *r1) {
 //CHZ
 
+    //really want to know if anyone actually uses this instruction
+    std::cout << "DAA called. HFS" << std::endl;
+
     u8 h = *r1 >> 4;
     u8 l = *r1 & 0xF;
 
     //these lookup tables were derived from the Gameboy Prgrammers Manual P.122
-
-    //TODO: find someway to shorten the Utility_Functions::bounded(...) calls
     if(!N_FLAG) { // addition
-        if(       !C_FLAG && Utility_Functions::bounded(h,0x0,0x9) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x8) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x9) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0xA,0xF) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0x9,0xF) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0xA,0xF) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x2) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x2) && !H_FLAG && Utility_Functions::bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && Utility_Functions::bounded(h,0x0,0x3) &&  H_FLAG && Utility_Functions::bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x8) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x9) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0xA,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if(!C_FLAG && bounded(h,0x9,0xF) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if(!C_FLAG && bounded(h,0xA,0xF) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
+        } else if( C_FLAG && bounded(h,0x0,0x3) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
         } else {
             std::cerr << "DAA error N1: " << *r1 << std::endl;
         }
     } else { // subtraction
-        if(       !C_FLAG && Utility_Functions::bounded(h,0x0,0x9) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && Utility_Functions::bounded(h,0x0,0x8) &&  H_FLAG && Utility_Functions::bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
-        } else if( C_FLAG && Utility_Functions::bounded(h,0x7,0xF) && !H_FLAG && Utility_Functions::bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
-        } else if( C_FLAG && Utility_Functions::bounded(h,0x6,0xF) &&  H_FLAG && Utility_Functions::bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
+        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
+        } else if(!C_FLAG && bounded(h,0x0,0x8) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
+        } else if( C_FLAG && bounded(h,0x7,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
+        } else if( C_FLAG && bounded(h,0x6,0xF) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
         } else {
             std::cerr << "DAA error N0: " << *r1 << std::endl;
         }

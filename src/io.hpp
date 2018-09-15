@@ -39,9 +39,9 @@ public:
     u8 read_hram(u8 loc);
     u8 write_hram(u8 loc, u8 data);
 
-    void cpu_inc_DIV();
-    void cpu_inc_TIMA();
-    u16  cpu_get_TAC_cs();
+    void      cpu_inc_DIV();
+    void      cpu_inc_TIMA();
+    u16       cpu_get_TAC_cs();
 
     Interrupt cpu_check_interrupts();
     void      cpu_unset_interrupt(Interrupt i);

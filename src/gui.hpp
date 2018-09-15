@@ -57,5 +57,3 @@ private:
     GLuint screen_texture;
     u8 *screen_buffer;
 };
-
-#endif
