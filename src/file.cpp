@@ -47,9 +47,11 @@ size_t File_Interface::getBuffer(u32 offset, u8 *buf, size_t len) {
 void File_Interface::setByte(u32 offset, u8 data) {
     seekFile_p(offset);
     file.put(data);
+    file.flush();
 }
 
 void File_Interface::setBuffer(u32 offset, u8 *buf, size_t len) {
     seekFile_g(offset);
     file.write((char *)buf, len);
+    file.flush();
 }
