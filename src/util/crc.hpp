@@ -2,7 +2,11 @@
 
 #include "util/ints.hpp"
 
+#include <zlib.h>
+
+//TODO: fix this...
 static struct __CRC {
+#if 0
     u32 __table[256];
     __CRC() {
         u32 polynomial = 0xEDB88320;
@@ -24,5 +28,13 @@ static struct __CRC {
             c = __table[(c ^ u[i]) & 0xFF] ^ (c >> 8);
         return c ^ 0xFFFFFFFF;
     }
+#else
+    u32 begin() {
+        return crc32(0, 0, 0);
+    }
 
+    u32 update(u32 initial, const void* buf, u32 len) {
+        return crc32(initial, (u8 *)buf, len);
+    }
+#endif
 } crc;
