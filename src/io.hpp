@@ -4,8 +4,9 @@
 #include "cart.hpp"
 #include "cfg.hpp"
 #include "input.hpp"
-#include "util.hpp"
 #include "video.hpp"
+
+#include "util/ints.hpp"
 
 //Interupt Offsets
 #define V_BLANK_INT_OFFSET  0x40

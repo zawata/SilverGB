@@ -1,7 +1,7 @@
 #pragma once
 
 #include "io_reg.hpp"
-#include "util.hpp"
+#include "util/ints.hpp"
 
 #define WAVRAM_LEN 16
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util.hpp"
+#include "util/ints.hpp"
 
 class Input_Manager {
 public:

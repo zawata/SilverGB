@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cfg.hpp"
-#include "util.hpp"
+#include "util/ints.hpp"
 
 class Video_Controller {
 public:
