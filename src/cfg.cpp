@@ -1,5 +1,7 @@
 #include "cfg.hpp"
 
+#include <cstring>
+
 Configuration *Configuration::loadConfigFile(std::string filepath) {
     File_Interface *f;
     if(!(f=File_Interface::openFile(filepath))) {
@@ -8,10 +10,14 @@ Configuration *Configuration::loadConfigFile(std::string filepath) {
     }
 
     Configuration c;
+
+    //I don't remember if the class would be implicitly zeroed...
+    // but it doesn't hurt to keep this here for now
+    memset(&(c.config_data), 0, sizeof(__config_data));
+
     size_t retreived = f->getBuffer(0, (u8 *)&(c.config_data), sizeof(__config_data));
-    if(retreived != sizeof(c)) {
-        std::cerr << "Config File not big enough." << std::endl;
-        return nullptr;
+    if(retreived != sizeof(__config_data)) {
+        std::cerr << "Warning: Config File not big enough." << std::endl;
     }
 
     return new Configuration(c); // Hooray implicit copy constructors

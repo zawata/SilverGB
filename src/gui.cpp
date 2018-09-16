@@ -8,6 +8,7 @@ screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 
     config = Configuration::loadConfigFile("config.cfg");
     if(!config) {
+        std::cout << "creating new Config" << std::endl;
         //the config doesn't exist so lets just start a new one
         config = new Configuration();
     }
@@ -20,8 +21,7 @@ screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 }
 
 GUI::~GUI() {
-    config->config_data.bin_enabled = true;
-    memcpy(config->config_data.bin_file,"insert path here",17);
+    //Save Configuration
     config->saveConfigFile("config.cfg");
 
     //delete custom textures

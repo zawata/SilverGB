@@ -12,7 +12,9 @@ public:
     bool saveConfigFile(std::string filepath);
 
     struct __config_data {
-        bool bin_enabled = false;
-        char bin_file[256] = { 0 };
+        __config_data() = default;
+
+        bool bin_enabled;
+        char bin_file[256];
     } config_data;
 };

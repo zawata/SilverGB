@@ -40,7 +40,7 @@ u8 File_Interface::getByte(u32 offset) {
 
 size_t File_Interface::getBuffer(u32 offset, u8 *buf, size_t len) {
     seekFile_g(offset);
-    file.get((char *)buf, len);
+    file.get((char *)buf, len + 1);
     return this->file.gcount();
 }
 
