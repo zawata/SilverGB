@@ -1,8 +1,9 @@
 #pragma once
 
 #include <fstream>
+#include <iostream>
 
-#include "util.hpp"
+#include "util/ints.hpp"
 
 class File_Interface {
 public:
@@ -11,6 +12,8 @@ public:
 
     static File_Interface *openFile(std::string filename, bool write=false);
     static File_Interface *createFile(std::string filename);
+
+    u32 getCRC();
 
     u8 getByte(u32 offset);
     size_t getBuffer(u32 offset, u8 *buf, size_t len);

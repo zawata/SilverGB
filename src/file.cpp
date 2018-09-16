@@ -1,5 +1,8 @@
 #include "file.hpp"
 
+#include "util/crc.hpp"
+#include "util/util.hpp"
+
 File_Interface::File_Interface() {}
 
 File_Interface::~File_Interface() {}
@@ -31,6 +34,22 @@ void File_Interface::seekFile_g(u32 offset) {
 
 void File_Interface::seekFile_p(u32 offset) {
     file.seekp(offset, std::ios_base::beg);
+}
+
+u32 File_Interface::getCRC() {
+    const int buf_size = 1024;
+    u32 file_crc = crc.begin(), pos;
+    u16 retrieved;
+    u8 buf[buf_size];
+
+    do {
+        retrieved = this->getBuffer(0, buf, buf_size);
+
+        file_crc = crc.update(file_crc, buf, retrieved);
+        pos += retrieved;
+    } while(retrieved == buf_size);
+
+    return file_crc;
 }
 
 u8 File_Interface::getByte(u32 offset) {
