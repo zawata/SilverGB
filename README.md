@@ -23,6 +23,9 @@ but I'm developing and testing it on Linux so that is where it's guaranteed to w
 &nbsp;&nbsp;&nbsp;&nbsp;✔️File Handling  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Main Window  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Debug Windows  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Debug Mode
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️CPU Registers Window  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Disassembly Window  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Prettification  
 ➕CPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️OpCodes  

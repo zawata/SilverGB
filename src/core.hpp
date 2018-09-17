@@ -13,10 +13,14 @@ public:
     GB_Core(File_Interface *rom, Configuration *cfg);
     ~GB_Core();
 
-    void start();
+    void start(bool paused = false);
     void pause();
+    bool paused();
     void resume();
     void stop();
+    void tick();
+
+    CPU::registers_t getRegistersFromCPU();
 private:
     Cartridge *cart;
     IO_Bus *io;
@@ -24,7 +28,7 @@ private:
 
 
     std::atomic<bool>
-            thread_killed = ATOMIC_VAR_INIT(false),
+            thread_killed = ATOMIC_VAR_INIT(true),
             thread_paused = ATOMIC_VAR_INIT(false);
 
     std::thread core_thread;

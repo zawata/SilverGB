@@ -9,8 +9,8 @@
 #include "GL/gl3w.h"
 #include "nfd.h"
 
+#include "core.hpp"
 #include "cfg.hpp"
-#include "util.hpp"
 
 #define IMAGE_FORMAT_SIZE 3 //because RGB...for now
 
@@ -18,6 +18,8 @@
 #define GB_S_H 144                           //screen height
 #define GB_S_P 23040                         //screen pixel count
 #define GB_S_P_SZ GB_S_P * IMAGE_FORMAT_SIZE //screen pixel buffer size
+
+#define DMG_BIOS_CRC 0x59c8598e
 
 #define MENUBAR_HEIGHT 19
 
@@ -42,6 +44,7 @@ private:
         bool opening_bios     = false;
         bool debug_mode       = false;
         bool set_debug_mode   = false;
+        bool game_loaded      = false;
     } state_flags;
 
     GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io);
@@ -57,6 +60,8 @@ private:
     ImGuiIO& io;
 
     Configuration *config;
+    File_Interface *rom_file;
+    GB_Core *core;
 
     GLuint screen_texture;
     u8 *screen_buffer;

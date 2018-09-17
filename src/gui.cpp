@@ -1,9 +1,12 @@
 #include "gui.hpp"
 
+#include "util/bit.hpp"
+
 GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
 window(w),
 gl_context(g),
 io(io),
+core(nullptr), //if this isn't here, the core will break wildly.
 screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 
     config = Configuration::loadConfigFile("config.cfg");
@@ -67,14 +70,13 @@ GUI *GUI::createGUI() {
     gl3wInit();
 
     ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init();
 
     ImGui::StyleColorsDark();
 
-    return new GUI(window, gl_context, io);
+    return new GUI(window, gl_context, ImGui::GetIO());
 }
 
 GUI::loop_return_code_t GUI::mainLoop() {
@@ -97,16 +99,55 @@ GUI::loop_return_code_t GUI::mainLoop() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
     ImGui::NewFrame();
+
+    //build the UI
     buildUI();
-    //ImGui::ShowMetricsWindow();
 
     if(state_flags.opening_file) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
-            printf("%s\n", file); //TODO: heres the file. do something with it
+            std::cout << "Starting Core" <<std::endl;
+            rom_file = File_Interface::openFile(std::string(file));
+            core = new GB_Core(rom_file, config);
+            //core->start(true);
+            state_flags.game_loaded = true;
             free(file);
         }
         state_flags.opening_file = false;
+    }
+
+    if(state_flags.opening_bios) {
+        char *file = nullptr;
+        if(NFD_OpenDialog("bin", nullptr, &file) == NFD_OKAY) {
+            File_Interface *bios = File_Interface::openFile(file);
+
+            if(!bios) std::cerr << "bios file could not be opened" << std::endl;
+            else {
+                if(bios->getCRC() != DMG_BIOS_CRC) {
+                    std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
+                    SDL_ShowSimpleMessageBox(
+                            SDL_MESSAGEBOX_ERROR ,
+                            "CRC Mismatch",
+                            "CRC does not match known DMG CRC. File will not be loaded.",
+                            nullptr);
+                } else {
+                    int file_len = std::string(file).size();
+                    if(file_len <= 255) {
+                        std::cout << "File loaded" << std::endl;
+                        config->config_data.bin_enabled = true;
+                        memcpy(config->config_data.bin_file, file, file_len);
+                    } else {
+                        SDL_ShowSimpleMessageBox(
+                            SDL_MESSAGEBOX_ERROR,
+                            "File path is too long",
+                            "File path is too long...Maybe the developer should bump up the limit?",
+                            nullptr);
+                    }
+                }
+            }
+            free(file);
+        }
+        state_flags.opening_bios = false;
     }
 
     if(state_flags.set_debug_mode && !state_flags.debug_mode) {
@@ -131,12 +172,8 @@ GUI::loop_return_code_t GUI::mainLoop() {
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     SDL_GL_SwapWindow(window);
 
-    if(state_flags.done) {
-        return loop_return_code_t::LOOP_FINISH;
-    }
-    else {
-        return loop_return_code_t::LOOP_CONTINUE;
-    }
+    if(state_flags.done) return loop_return_code_t::LOOP_FINISH;
+    else                 return loop_return_code_t::LOOP_CONTINUE;
 }
 
 void GUI::buildUI() {
@@ -151,8 +188,27 @@ void GUI::buildUI() {
     if(BeginMainMenuBar()) {
         if(BeginMenu("File")) {
             MenuItem("Open File", NULL, &state_flags.opening_file);
-            MenuItem("Enable Debug", NULL, &state_flags.set_debug_mode);
             MenuItem("Exit", NULL, &state_flags.done);
+            EndMenu();
+        }
+
+        if(state_flags.game_loaded) {
+            if(BeginMenu("Emulation")) {
+                if(core->paused()) {
+                    if(MenuItem("Unpause")) core->resume();
+                    if(MenuItem("tick")) core->tick();
+                }
+                else {
+                    if(MenuItem("Pause")) core->pause();
+                }
+                EndMenu();
+            }
+        }
+
+        if(BeginMenu("Options")) {
+            MenuItem("BIOS File", nullptr, &config->config_data.bin_enabled, false);
+            MenuItem("Open BIOS File", NULL, &state_flags.opening_bios);
+            MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
             EndMenu();
         }
 
@@ -249,6 +305,10 @@ void GUI::buildRegisterUI() {
         bool HL;
     } reg_flags;
 
+    CPU::registers_t regs = { 0 };
+    if(core) regs = core->getRegistersFromCPU();
+    else     regs = { 0 };
+
     //The Indentation on this window is very sensitive...
     SetNextWindowSize({120,0});
     Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
@@ -263,10 +323,10 @@ void GUI::buildRegisterUI() {
         if(TreeNode("F")) {
             reg_flags.F = true;
             Indent(5.0);
-            Text("CY");
+            Text("C");
             Text("H");
             Text("N");
-            Text("ZF");
+            Text("Z");
             Unindent(5.0);
             TreePop();
         } else {
@@ -322,38 +382,46 @@ void GUI::buildRegisterUI() {
     }
     NextColumn();
     SetColumnWidth(-1, 50);
-    Text("0x0000");
+
+    //AF
+    Text("0x%s", itoh(regs.AF, 4).c_str());
     if(reg_flags.AF) {
-        Text("0x00");
-        Text("0x00");
+        Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
+        Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
         if(reg_flags.F) {
-            Text("1");
-            Text("1");
-            Text("1");
-            Text("1");
+            Text("%u", Bit.test(regs.AF, 4)); //C
+            Text("%u", Bit.test(regs.AF, 5)); //H
+            Text("%u", Bit.test(regs.AF, 6)); //N
+            Text("%u", Bit.test(regs.AF, 7)); //Z
         }
     }
 
-    Text("0x0000");
+    //BC
+    Text("0x%s", itoh(regs.BC, 4).c_str());
     if(reg_flags.BC) {
-        Text("0x00");
-        Text("0x00");
+        Text("0x%s", itoh(regs.BC >> 8, 2).c_str());  //B
+        Text("0x%s", itoh(regs.BC & 0xFF, 2).c_str()); //C
     }
 
-    Text("0x0000");
+    //DE
+    Text("0x%s", itoh(regs.DE, 4).c_str());
     if(reg_flags.DE) {
-        Text("0x00");
-        Text("0x00");
+        Text("0x%s", itoh(regs.DE >> 8, 2).c_str());  //D
+        Text("0x%s", itoh(regs.DE & 0xFF, 2).c_str()); //E
     }
 
-    Text("0x0000");
+    //HL
+    Text("0x%s", itoh(regs.HL, 4).c_str());
     if(reg_flags.HL) {
-        Text("0x00");
-        Text("0x00");
+        Text("0x%s", itoh(regs.HL >> 8, 2).c_str());  //H
+        Text("0x%s", itoh(regs.HL & 0xFF, 2).c_str()); //L
     }
 
-    Text("0x0000");
-    Text("0x0000");
+    //PC
+    Text("0x%s", itoh(regs.PC, 4).c_str());
+
+    //SP
+    Text("0x%s", itoh(regs.SP, 4).c_str());
     End();
 }
 
