@@ -9,15 +9,26 @@
 
 class CPU {
 public:
-    CPU(IO_Bus *m);
+    //for public use
+    struct registers_t {
+        u16 AF;
+        u16 BC;
+        u16 DE;
+        u16 HL;
+        u16 SP;
+        u16 PC;
+    };
+
+    CPU(IO_Bus *m, Configuration *config);
     ~CPU();
 
     void clock_pulse();
 
     u8 decode(u8 op);
+    std::string getOpString(u8 op);
+    std::string getCBOpString(u8 op);
 
-    //static std::string getOpString(u8 op, u8 *opLen);
-    //static std::string getCBOpString(u8 op);
+    registers_t getRegisters();
 
 private:
     void on_div16();
@@ -25,7 +36,13 @@ private:
     void on_div256();
     void on_div1024();
 
+    //used for disassembly
+    std::string i8();
+    std::string i16();
+    std::string format(std::string fmt);
+
     IO_Bus *io;
+    Configuration *cfg;
 
     u8 inst_clocks;
     u16 cpu_counter;

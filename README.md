@@ -29,9 +29,14 @@ but I'm developing and testing it on Linux so that is where it's guaranteed to w
 &nbsp;&nbsp;&nbsp;&nbsp;➕Prettification  
 ➕CPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️OpCodes  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️OpCode Disassembly
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Timers  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Interrupt Handling  
 &nbsp;&nbsp;&nbsp;&nbsp;➕IO Registers  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Core Registers
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕Input Registers
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Sound Registers
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫ideo Registers
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Memory Layout  
 ➕Cartridge  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Header Parsing  

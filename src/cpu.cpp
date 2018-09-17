@@ -24,19 +24,52 @@
 #define DE_REG this->DE.i_DE
 #define HL_REG this->HL.i_HL
 #define SP_REG this->SP
+#define PC_REG this->PC
 
 inline bool check_half_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x10; }
 inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
 inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
 inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
 
-CPU::CPU(IO_Bus *m) :
+CPU::CPU(IO_Bus *m, Configuration *config) :
 io(m),
-PC(0x100) {}
+cfg(config),
+inst_clocks(0) {
+    if(cfg->config_data.bin_enabled) {
+        AF_REG = 0x0000;
+        BC_REG = 0x0000;
+        DE_REG = 0x0000;
+        HL_REG = 0x0000;
+        SP_REG = 0x0000;
+        PC_REG = 0x0000;
+    } else {
+        AF_REG = 0x01b0;
+        BC_REG = 0x0013;
+        DE_REG = 0x00D8;
+        HL_REG = 0x014D;
+        SP_REG = 0xFFFE;
+        PC_REG = 0x0100;
+    }
+}
 
 CPU::~CPU() {}
 
-void CPU::clock_pulse() { //TODO: rename to tick
+CPU::registers_t CPU::getRegisters() {
+    return (CPU::registers_t){
+        AF_REG,
+        BC_REG,
+        DE_REG,
+        HL_REG,
+        SP_REG,
+        PC_REG
+    };
+}
+
+//TODO: rename to tick
+//TODO: make this execute 4 clock cycles properly timed. not one.
+//TODO: halt and stop
+void CPU::clock_pulse() {
+    std::cout << "cpu tick: " << (u32)inst_clocks << std::endl;
     //divider functions
     cpu_counter++;
     if(!(cpu_counter % 16))   on_div16();
@@ -45,8 +78,12 @@ void CPU::clock_pulse() { //TODO: rename to tick
     if(!(cpu_counter % 1024)) on_div1024();
     cpu_counter %= DIV_MAX;
 
-    if(!inst_clocks--) { //used to properly time the instruction execution
+    if(!inst_clocks) { //used to properly time the instruction execution
+        std::cout << "Fetching next Instruction: ";
+
+        //flag for if an interrupt has been thrown
         bool int_set = false;
+
         //ISR transfer summary:
         // disable Interrupts
         // push the PC
@@ -86,10 +123,10 @@ void CPU::clock_pulse() { //TODO: rename to tick
             }
         }
         //if an interupt was just set, set the instruction delay, then execute once it's done
-        if(!int_set) inst_clocks = decode(io->read(PC));
+        if(!int_set) inst_clocks = decode(fetch_8());
         else inst_clocks = 20; //ISR transfer takes 5 machine cycles
+    } else inst_clocks--;
     }
-}
 
 void CPU::on_div16() {
     if(io->cpu_get_TAC_cs() == 16) io->cpu_inc_TIMA();
@@ -109,6 +146,8 @@ void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
+    std::cout << getOpString(op) << std::endl;
+
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
         case 0x01: return load_rr_nn(&BC_REG);           //  12  LD BC, yyxx
@@ -319,7 +358,6 @@ u8 CPU::decode(u8 op) {
             u8 bit = (data >> 3) & 7;
             u8 *reg = nullptr;
 
-
             switch(data & 7) {
             case 0: reg = &B_REG; break;
             case 1: reg = &C_REG; break;
@@ -427,6 +465,7 @@ u8 CPU::decode(u8 op) {
         case 0xfd: return invalid_op(0xfd);              //  --  ----
         case 0xfe: return cp_r_n(&A_REG);                //   8  CP xx
         case 0xff: return rst_l(0x38);                   //  16  RST 38h
+        default: return 0; //to silence the warnings
     }
 }
 
@@ -1451,10 +1490,12 @@ u8 CPU::stop() {
 //====================
 u8 CPU::ei() {
     IME = 1;
+    return 0; //TODO: return length of intruction
 }
 
 u8 CPU::di() {
     IME = 0;
+    return 0; //TODO: return length of intruction
 }
 
 //====================
@@ -1463,6 +1504,7 @@ u8 CPU::di() {
 u8 CPU::rst_l(u8 loc) {
     stack_push(PC);
     PC = loc;
+    return 0; //TODO: return length of intruction
 }
 
 //====================
@@ -1553,4 +1595,5 @@ u8 CPU::ret_cond(bool cond) {
 u8 CPU::invalid_op(u8 op) {
     std::cerr << "Invalid OP" << std::endl;
     PC--; //to make the game freeze
+    return 0;
 }
