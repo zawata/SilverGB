@@ -389,10 +389,10 @@ void GUI::buildRegisterUI() {
         Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
         Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
         if(reg_flags.F) {
-            Text("%u", Bit.test(regs.AF, 4)); //C
-            Text("%u", Bit.test(regs.AF, 5)); //H
-            Text("%u", Bit.test(regs.AF, 6)); //N
-            Text("%u", Bit.test(regs.AF, 7)); //Z
+            Text("%u", Bit.test(regs.AF, 3)); //C
+            Text("%u", Bit.test(regs.AF, 2)); //H
+            Text("%u", Bit.test(regs.AF, 1)); //N
+            Text("%u", Bit.test(regs.AF, 0)); //Z
         }
     }
 

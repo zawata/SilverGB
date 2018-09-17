@@ -125,8 +125,9 @@ void CPU::clock_pulse() {
         //if an interupt was just set, set the instruction delay, then execute once it's done
         if(!int_set) inst_clocks = decode(fetch_8());
         else inst_clocks = 20; //ISR transfer takes 5 machine cycles
-    } else inst_clocks--;
     }
+    inst_clocks--;
+}
 
 void CPU::on_div16() {
     if(io->cpu_get_TAC_cs() == 16) io->cpu_inc_TIMA();
