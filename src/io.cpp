@@ -57,7 +57,7 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        std::cerr << "call to ECHO RAM" << std::endl;
+        std::cerr << "read to ECHO RAM" << std::endl;
         return 0; //TODO: ECHO or zero?
     }
     else if(offset <= 0xFE9F) {
@@ -109,7 +109,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        std::cerr << "call to ECHO RAM" << std::endl;
+        std::cerr << "write to ECHO RAM" << std::endl;
         return;
     }
     else if(offset <= 0xFE9F) {

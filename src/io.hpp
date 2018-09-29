@@ -82,7 +82,6 @@ private:
         u8 WX;
 /* GBC Registers
         u8 KEY1;
-        u8 VBK;
         u8 HDMA1;
         u8 HDMA2;
         u8 HDMA3;

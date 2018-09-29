@@ -201,11 +201,17 @@
 #define WX_REG           0x4B
 
 // #define KEY1_REG         0x4D
-// #define VBK_REG          0x4F
+
+// GBC: VRAM Bank Switcher
+#define VBK_REG          0x4F
+#define VBK_WRITE_MASK   0x01
+#define VBK_READ_MASK    VBK_WRITE_MASK
+#define VBK_DAT          __ARR(VBK)
 
 #define ROMEN_REG        0x50 //defined by me, disables the DMG bootstrap
 #define ROMEN_WRITE_MASK 0x00
 #define ROMEN_READ_MASK  ROMEN_WRITE_MASK
+#define ROMEN_DAT        __ARR(ROMEN)
 
 // #define HDMA1_REG        0x51
 // #define HDMA2_REG        0x52
