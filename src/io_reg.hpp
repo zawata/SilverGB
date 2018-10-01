@@ -186,21 +186,83 @@
 #define NR52_READ_MASK   0xFF
 #define NR52_DAT         __ARR(NR52)
 
-//TODO: these
+// LCD Control
 #define LCDC_REG         0x40
-#define STAT_REG         0x41
-#define SCY_REG          0x42
-#define SCX_REG          0x43
-#define LY_REG           0x44
-#define LYC_REG          0x45
-#define DMA_REG          0x46
-#define BGP_REG          0x47
-#define OBP0_REG         0x48
-#define OPB1_REG         0x49
-#define WY_REG           0x4A
-#define WX_REG           0x4B
+#define LCDC_WRITE_MASK  0xFF
+#define LCDC_READ_MASK   LCDC_WRITE_MASK
+#define LCDC_DAT         __ARR(LCDC)
 
-// #define KEY1_REG         0x4D
+// LCDC Status
+#define STAT_REG         0x41
+#define LCDC_WRITE_MASK  0xF8
+#define LCDC_READ_MASK   0xFF
+#define LCDC_DAT         __ARR(LCDC)
+
+// Scroll Y
+#define SCY_REG          0x42
+#define SCY_WRITE_MASK   0xFF
+#define SCY_READ_MASK    LCDC_WRITE_MASK
+#define SCY_DAT          __ARR(SCY)
+
+// Scroll X
+#define SCX_REG          0x43
+#define SCX_WRITE_MASK   0xFF
+#define SCX_READ_MASK    LCDC_WRITE_MASK
+#define SCX_DAT          __ARR(SCX)
+
+// LCDC Y-Coordinate
+#define LY_REG           0x44
+#define LY_WRTE_MASK     0x00
+#define LY_READ_MASK     0xFF
+#define LY_DAT           __ARR(LY)
+
+// LY Compare
+#define LYC_REG          0x45
+#define LYC_WRTE_MASK    0xFF
+#define LYC_READ_MASK    LYC_WRTE_MASK
+#define LYC_DAT          __ARR(LYC)
+
+// DMA Transfer and Start Address
+#define DMA_REG          0x46
+#define DMA_WRTE_MASK    0xFF
+#define DMA_READ_MASK    DMA_WRTE_MASK
+#define DMA_DAT          __ARR(DMA)
+
+// BG Palette Data
+#define BGP_REG          0x47
+#define BGP_WRITE_MASK   0xFF
+#define BGP_READ_MASK    BGP_WRITE_MASK
+#define BGP_DAT          __ARR(BGP)
+
+// Object Palette 0 Data
+#define OBP0_REG         0x48
+#define OBP0_WRTE_MASK   0xFF
+#define OBP0_READ_MASK   OBP0_WRTE_MASK
+#define OBP0_DAT         __ARR(OBP0)
+
+// Object Palette 1 Data
+#define OPB1_REG         0x49
+#define OBP1_WRTE_MASK   0xFF
+#define OBP1_READ_MASK   OBP1_WRTE_MASK
+#define OBP1_DAT         __ARR(OBP1)
+
+// Window Y
+#define WY_REG           0x4A
+#define WY_WRITE_MASK    0xFF
+#define WY_READ_MASK     WY_WRITE_MASK
+#define WY_DAT           __ARR(WY)
+
+// Window X
+#define WX_REG           0x4B
+#define WX_WRITE_MASK    0xFF
+#define WX_READ_MASK     WX_WRITE_MASK
+#define WX_DAT           __ARR(WX)
+
+// GBC: Prepare Speed Switch
+#define KEY1_REG         0x4D
+#define KEY1_WRITE_MASK  0x01
+#define KEY1_READ_MASK   0x81
+#define KEY1_DAT         __ARR(KEY1)
 
 // GBC: VRAM Bank Switcher
 #define VBK_REG          0x4F
@@ -208,11 +270,13 @@
 #define VBK_READ_MASK    VBK_WRITE_MASK
 #define VBK_DAT          __ARR(VBK)
 
-#define ROMEN_REG        0x50 //defined by me, disables the DMG bootstrap
+// hidden: Bootstrap Enable
+#define ROMEN_REG        0x50
 #define ROMEN_WRITE_MASK 0x00
 #define ROMEN_READ_MASK  ROMEN_WRITE_MASK
 #define ROMEN_DAT        __ARR(ROMEN)
 
+//TODO: these
 // #define HDMA1_REG        0x51
 // #define HDMA2_REG        0x52
 // #define HDMA3_REG        0x53
@@ -225,6 +289,8 @@
 // #define OCPD_REG         0x6B
 // #define SVBK_REG         0x70
 
+// Interrupt Enable
 #define IE_REG           0xFF
 #define IE_WRITE_MASK    0x1F
 #define IE_READ_MASK     IE_WRITE_MASK
+#define IE_DAT           _ARR(IE)
