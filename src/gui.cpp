@@ -1,6 +1,91 @@
+//#include <assert.h>
+
 #include "gui.hpp"
 
 #include "util/bit.hpp"
+
+/**
+ *  A small shortcut handler built in the image of ImGui.
+ *
+ * ImGui works on a technical basis by combining gui logic and construction.
+ * Any call to a GUI component will display that GUI component as well as checking
+ * if it's particular logic has been met. it does this with internal static
+ * variables to handle the rendering process and assertions to handle logical
+ * errors(making them rather easy to catch)
+ *
+ * We can build a small shortcut handler in the same image.
+
+ * At the beginning of every frame we can process the key events and build a key combination
+ * then every component we want to have a shortcut just creates it's GUI Component and 
+ * checks it's shortcut in it't `if` statement.
+ * not very complex but effective.
+ *
+ * This does pose issues with using keyboard events and shortcuts simultaneously as we
+ * might accidentally attempt to use keyboard events as shortcuts unintentionally.
+ *
+ * We can overcome this by checking if a keyevent has a modifier on it and denying all
+ * shortcut requests without a modifier key.
+ *
+ **/
+bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
+    if(     key->keysym.sym >= 32 &&  //if ascii
+            key->keysym.sym <= 122 &&
+            key->keysym.mod &&        //if it has a modifier
+            key->state == SDL_PRESSED) { //if it's pressed(not released)
+        if(     key->keysym.mod & KMOD_CTRL ||
+                key->keysym.mod & KMOD_ALT ||
+                key->keysym.mod & KMOD_SHIFT)
+            this->current_shortcut = {
+                .valid     = true,
+                .ctrl_mod  = key->keysym.mod & KMOD_CTRL,
+                .alt_mod   = key->keysym.mod & KMOD_ALT,
+                .shift_mod = key->keysym.mod & KMOD_SHIFT,
+                .key       = key->keysym.sym,
+            };
+    }
+}
+
+void GUI::clear_shortcut() {
+    this->current_shortcut = {
+        .valid = false,
+    };
+}
+
+bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
+    assert(mods.size() <= 3);
+    assert(mods[0] != 0);
+
+    if(!this->current_shortcut.valid) return false;
+
+    bool ctrl_repeated = false,
+         alt_repeated = false,
+         shift_repeated = false;
+
+    shortcut_t current = this->current_shortcut;
+
+    for(int i = 0; i < 3; i++) {
+        switch(mods[i]) {
+        case 0:
+            break;
+        case CTRL_MOD:
+            assert(!ctrl_repeated);
+            if(!current.ctrl_mod) return false;
+            ctrl_repeated = true;
+            break;
+        case ALT_MOD:
+            assert(!alt_repeated);
+            if(!current.alt_mod) return false;
+            alt_repeated = true;
+            break;
+        case SHIFT_MOD:
+            assert(!shift_repeated);
+            if(!current.shift_mod) return false;
+            shift_repeated = true;
+            break;
+        }
+    }
+    return key == current.key;
+}
 
 GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
 window(w),
@@ -89,10 +174,21 @@ GUI::loop_return_code_t GUI::mainLoop() {
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL2_ProcessEvent(&event);
-        if (event.type == SDL_QUIT)
+        switch(event.type) {
+        case SDL_QUIT:
             state_flags.done = true;
-        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
-            state_flags.done = true;
+        case SDL_WINDOWEVENT:
+            if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
+                state_flags.done = true;
+            }
+        case SDL_KEYDOWN:
+        case SDL_KEYUP:
+            if(!io.WantCaptureKeyboard) {
+                if(!build_shortcut(&event.key)) {
+                    //do other stuff with the key event
+                }
+            }
+        }
     }
 
     // Start the ImGui frame
@@ -103,7 +199,7 @@ GUI::loop_return_code_t GUI::mainLoop() {
     //build the UI
     buildUI();
 
-    if(state_flags.opening_file) {
+    if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
             std::cout << "Starting Core" <<std::endl;
@@ -114,6 +210,12 @@ GUI::loop_return_code_t GUI::mainLoop() {
             free(file);
         }
         state_flags.opening_file = false;
+    }
+
+    if(shortcut_pressed({CTRL_MOD}, 't')) core->tick();
+    if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
+        for(int i = 0; i < 0x80; i++)
+        core->tick();
     }
 
     if(state_flags.opening_bios) {
@@ -161,6 +263,8 @@ GUI::loop_return_code_t GUI::mainLoop() {
         SDL_SetWindowResizable(this->window, SDL_FALSE);
         state_flags.debug_mode = false;
     }
+
+    clear_shortcut();
 
     // Rendering
     ImGui::Render();

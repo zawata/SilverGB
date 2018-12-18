@@ -47,6 +47,21 @@ private:
         bool game_loaded      = false;
     } state_flags;
 
+    typedef struct __shortcut {
+        bool valid; //actually initialized
+
+        bool ctrl_mod;
+        bool alt_mod;
+        bool shift_mod;
+        char key;
+    } shortcut_t;
+
+    typedef enum {
+        CTRL_MOD = 1,
+        ALT_MOD,
+        SHIFT_MOD,
+    } key_mods;
+
     GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io);
 
     void buildUI();
@@ -54,10 +69,16 @@ private:
     void buildRegisterUI();
     void buildDisassemblyUI();
 
+    bool build_shortcut(SDL_KeyboardEvent *key);
+    void clear_shortcut();
+    bool shortcut_pressed(std::vector<key_mods> mods, char key);
+
     SDL_Window* window;
     SDL_GLContext gl_context;
 
     ImGuiIO& io;
+
+    shortcut_t current_shortcut;
 
     Configuration *config;
     File_Interface *rom_file;
