@@ -15,6 +15,13 @@
 #define SERIAL_INT_OFFSET   0x58
 #define JOYPAD_INT_OFFSET   0x60
 
+#define HIGH_RAM_SIZE 0x7f
+
+#define WORK_RAM_BANK_SIZE 0x1000
+#define WORK_RAM_BASE_SIZE 0x1000
+#define DMG_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + WORK_RAM_BANK_SIZE)
+#define GBC_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + (WORK_RAM_BANK_SIZE * 7))
+
 class IO_Bus {
 public:
     enum Interrupt {
@@ -25,7 +32,7 @@ public:
         JOYPAD_INT   = 1<<4,
     };
 
-    IO_Bus(Cartridge *cart, Configuration *config);
+    IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode);
     ~IO_Bus();
 
     u8   read(u16 offset);
@@ -34,11 +41,11 @@ public:
     u8   read_reg(u8 loc);
     void write_reg(u8 loc, u8 data);
 
-    u8 read_ram(u8 loc);
-    u8 write_ram(u8 loc, u8 data);
+    u8   read_ram(u8 loc);
+    void write_ram(u8 loc, u8 data);
 
-    u8 read_hram(u8 loc);
-    u8 write_hram(u8 loc, u8 data);
+    u8   read_hram(u8 loc);
+    void write_hram(u8 loc, u8 data);
 
     void      cpu_inc_DIV();
     void      cpu_inc_TIMA();
@@ -52,12 +59,17 @@ private:
     File_Interface *boot_rom_file;
     Configuration *config;
 
+    bool gbc_mode;
+    bool bootrom_mode;
+
     Video_Controller *vpu;
     Sound_Controller *snd;
     Input_Manager    *input;
 
+    u16 bank_offset;
 
-    bool bootrom_mode;
+    std::vector<u8> work_ram;
+    std::vector<u8> high_ram;
 
     struct __registers {
         u8 P1;
@@ -92,8 +104,8 @@ private:
         u8 BCPD;
         u8 OCPS;
         u8 OCPD;
-        u8 SVBK;
 */
+        u8 SVBK;
         u8 IE;
     } registers;
 };

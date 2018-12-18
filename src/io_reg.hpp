@@ -1,6 +1,6 @@
 #pragma once
 
-//this macro will convert the register name into an scalar of it's data
+//This macro will convert the register name into an array initializer of it's data
 //ie. P1_DAT = __ARR(P1) = { P1_REG, P1_WRITE_MASK, P1_READ_MASK } = { 0x00, 0x30, 0x30 }
 //it can be used to populate a struct for a register.
 #define __ARR(X) { X##_REG, X##_WRITE_MASK, X##_READ_MASK }
@@ -194,9 +194,9 @@
 
 // LCDC Status
 #define STAT_REG         0x41
-#define LCDC_WRITE_MASK  0xF8
-#define LCDC_READ_MASK   0xFF
-#define LCDC_DAT         __ARR(LCDC)
+#define STAT_WRITE_MASK  0xF8
+#define STAT_READ_MASK   0xFF
+#define STAT_DAT         __ARR(STAT)
 
 // Scroll Y
 #define SCY_REG          0x42
@@ -212,20 +212,20 @@
 
 // LCDC Y-Coordinate
 #define LY_REG           0x44
-#define LY_WRTE_MASK     0x00
+#define LY_WRITE_MASK     0x00
 #define LY_READ_MASK     0xFF
 #define LY_DAT           __ARR(LY)
 
 // LY Compare
 #define LYC_REG          0x45
-#define LYC_WRTE_MASK    0xFF
-#define LYC_READ_MASK    LYC_WRTE_MASK
+#define LYC_WRITE_MASK    0xFF
+#define LYC_READ_MASK    LYC_WRITE_MASK
 #define LYC_DAT          __ARR(LYC)
 
 // DMA Transfer and Start Address
 #define DMA_REG          0x46
-#define DMA_WRTE_MASK    0xFF
-#define DMA_READ_MASK    DMA_WRTE_MASK
+#define DMA_WRITE_MASK    0xFF
+#define DMA_READ_MASK    DMA_WRITE_MASK
 #define DMA_DAT          __ARR(DMA)
 
 // BG Palette Data
@@ -236,14 +236,14 @@
 
 // Object Palette 0 Data
 #define OBP0_REG         0x48
-#define OBP0_WRTE_MASK   0xFF
-#define OBP0_READ_MASK   OBP0_WRTE_MASK
+#define OBP0_WRITE_MASK   0xFF
+#define OBP0_READ_MASK   OBP0_WRITE_MASK
 #define OBP0_DAT         __ARR(OBP0)
 
 // Object Palette 1 Data
-#define OPB1_REG         0x49
-#define OBP1_WRTE_MASK   0xFF
-#define OBP1_READ_MASK   OBP1_WRTE_MASK
+#define OBP1_REG         0x49
+#define OBP1_WRITE_MASK   0xFF
+#define OBP1_READ_MASK   OBP1_WRITE_MASK
 #define OBP1_DAT         __ARR(OBP1)
 
 // Window Y
@@ -287,7 +287,11 @@
 // #define BCPD_REG         0x69
 // #define OCPS_REG         0x6A
 // #define OCPD_REG         0x6B
-// #define SVBK_REG         0x70
+
+#define SVBK_REG        0x70
+#define SVBK_WRITE_MASK 0x07
+#define SVBK_READ_MASK  SVBK_WRITE_MASK
+#define SVBK_DAT        __ARR(SVBK)
 
 // Interrupt Enable
 #define IE_REG           0xFF

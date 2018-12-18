@@ -2,19 +2,26 @@
 
 #include "io_reg.hpp"
 
-IO_Bus::IO_Bus(Cartridge *cart, Configuration *config) :
+IO_Bus::IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode) :
 cart(cart),
 config(config),
-vpu(new Video_Controller()),
+gbc_mode(gbc_mode),
+vpu(new Video_Controller(gbc_mode)),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
     if(config->config_data.bin_enabled) {
         boot_rom_file = File_Interface::openFile(config->config_data.bin_file);
+        std::cout << "Boot Rom enabled" << std::endl;
     }
     else {
+        //TODO: cleaner exit
         std::cerr << "BIOS Emulation not supported yet..." << std::endl;
         exit(-1);
     }
+
+    high_ram.reserve(HIGH_RAM_SIZE);
+    if(gbc_mode) work_ram.reserve(GBC_WORK_RAM_SIZE);
+    else         work_ram.reserve(DMG_WORK_RAM_SIZE);
 }
 
 IO_Bus::~IO_Bus() {
@@ -26,6 +33,7 @@ IO_Bus::~IO_Bus() {
 u8 IO_Bus::read(u16 offset) {
     if(offset <= 0x100) {
         if(bootrom_mode) {
+            std::cout << "Boot rom read" << std::endl;
             return boot_rom_file->getByte(offset);
         } else {
             return cart->read_rom(offset);
@@ -37,7 +45,7 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0x7FFF) {
     // 16KB ROM Bank 01~NN
-        return cart->read_rom(offset);//DMG
+        return cart->read_rom(offset); //cart will handle banking
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
@@ -53,7 +61,7 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
-        return read_ram(offset-0xC000);//DMG
+        return read_ram(offset-0xC000);
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
@@ -152,28 +160,12 @@ u8  IO_Bus::read_reg(u8 loc) {
     case IF_REG:
         return registers.IF & IF_READ_MASK;
 
-    //TODO: this is horrendous
-    case NR10_REG:
-    case NR11_REG:
-    case NR12_REG:
-    case NR13_REG:
-    case NR14_REG:
-    case NR21_REG:
-    case NR22_REG:
-    case NR23_REG:
-    case NR24_REG:
-    case NR30_REG:
-    case NR31_REG:
-    case NR32_REG:
-    case NR33_REG:
-    case NR34_REG:
-    case NR41_REG:
-    case NR42_REG:
-    case NR43_REG:
-    case NR44_REG:
-    case NR50_REG:
-    case NR51_REG:
-    case NR52_REG:
+    //Sound Registers
+    case NR10_REG: case NR11_REG: case NR12_REG: case NR13_REG: case NR14_REG:
+                   case NR21_REG: case NR22_REG: case NR23_REG: case NR24_REG:
+    case NR30_REG: case NR31_REG: case NR32_REG: case NR33_REG: case NR34_REG:
+                   case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
+    case NR50_REG: case NR51_REG: case NR52_REG:
         return snd->read_reg(loc);
 
     case LCDC_REG:
@@ -185,13 +177,13 @@ u8  IO_Bus::read_reg(u8 loc) {
     case DMA_REG:
     case BGP_REG:
     case OBP0_REG:
-    case OPB1_REG:
+    case OBP1_REG:
     case WY_REG:
     case WX_REG:
+    case VBK_REG:
         return vpu->read_reg(loc);
 /*
     case KEY1_REG :
-    case VBK_REG  :
 */
     case ROMEN_REG:
         return 0;
@@ -206,8 +198,9 @@ u8  IO_Bus::read_reg(u8 loc) {
     case BCPD_REG:
     case OCPS_REG:
     case OCPD_REG:
-    case SVBK_REG:
 */
+    case SVBK_REG:
+        return registers.SVBK & SVBK_READ_MASK;
     case IE_REG:
         return registers.IF;
     default:
@@ -242,29 +235,14 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         this->registers.IF = data & IF_WRITE_MASK;
         return;
 
-    //TODO: this is horrendous. redo
-    case NR10_REG:
-    case NR11_REG:
-    case NR12_REG:
-    case NR13_REG:
-    case NR14_REG:
-    case NR21_REG:
-    case NR22_REG:
-    case NR23_REG:
-    case NR24_REG:
-    case NR30_REG:
-    case NR31_REG:
-    case NR32_REG:
-    case NR33_REG:
-    case NR34_REG:
-    case NR41_REG:
-    case NR42_REG:
-    case NR43_REG:
-    case NR44_REG:
-    case NR50_REG:
-    case NR51_REG:
-    case NR52_REG:
+    //Sound Registers
+    case NR10_REG: case NR11_REG: case NR12_REG: case NR13_REG: case NR14_REG:
+                   case NR21_REG: case NR22_REG: case NR23_REG: case NR24_REG:
+    case NR30_REG: case NR31_REG: case NR32_REG: case NR33_REG: case NR34_REG:
+                   case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
+    case NR50_REG: case NR51_REG: case NR52_REG:
         return snd->write_reg(loc, data);
+
 #if _MSC_VER && !__INTEL_COMPILER
     case 0x30: case 0x31: case 0x32: case 0x33:
     case 0x34: case 0x35: case 0x36: case 0x37:
@@ -272,7 +250,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case 0x3C: case 0x3D: case 0x3E: case 0x3F:
 #else
     //this seems to be supported on CLANG and GCC but not MSVC
-    // if MSVC does support this I'll keep it
+    // if MSVC does support this I'll keep it because it's so much cleaner
     case 0x30 ... 0x3F:
 #endif
         return snd->write_wavram(loc, data);
@@ -285,13 +263,14 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case DMA_REG  :
     case BGP_REG  :
     case OBP0_REG :
-    case OPB1_REG :
+    case OBP1_REG :
     case WY_REG   :
     case WX_REG   :
         return vpu->write_reg(loc, data);
     // case KEY1_REG :
     // case VBK_REG  :
     case ROMEN_REG:
+        std::cout << "Boot rom disabled" << std::endl;
         bootrom_mode = false;
         return;
     // case HDMA1_REG:
@@ -304,7 +283,15 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     // case BCPD_REG :
     // case OCPS_REG :
     // case OCPD_REG :
-    // case SVBK_REG :
+
+    case SVBK_REG:
+        registers.SVBK = data & SVBK_WRITE_MASK;
+        //value 1-7 is bank 1-7
+        //value 0   is bank 1
+        if(data & SVBK_WRITE_MASK)
+            bank_offset = registers.SVBK * WORK_RAM_BANK_SIZE;
+        else
+            bank_offset = WORK_RAM_BANK_SIZE;
     case IE_REG   :
         this->registers.IE = data & IE_WRITE_MASK;
         return;
@@ -314,21 +301,36 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     }
 }
 
-//TODO:
 u8 IO_Bus::read_ram(u8 loc) {
-
+    if(loc <= 0x0FFF) {
+        return work_ram[loc];
+    } else {
+        if(gbc_mode) {
+            return work_ram[loc + bank_offset];
+        } else {
+            return work_ram[loc];
+        }
+    }
 }
 
-u8 IO_Bus::write_ram(u8 loc, u8 data) {
-
+void IO_Bus::write_ram(u8 loc, u8 data) {
+    if(loc <= 0x0FFF) {
+        work_ram[loc] = data;
+    } else {
+        if(gbc_mode) {
+            work_ram[loc + bank_offset] = data;
+        } else {
+            work_ram[loc] = data;
+        }
+    }
 }
 
 u8 IO_Bus::read_hram(u8 loc) {
-
+    return high_ram[loc];
 }
 
-u8 IO_Bus::write_hram(u8 loc, u8 data) {
-
+void IO_Bus::write_hram(u8 loc, u8 data) {
+    high_ram[loc] = data;
 }
 
 void IO_Bus::cpu_inc_DIV() {
