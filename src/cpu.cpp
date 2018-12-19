@@ -1551,16 +1551,19 @@ u8 CPU::jump_rel_cond_n(bool cond) {
 // Call
 //====================
 u8 CPU::call_nn() {
+    //PC should be instruction after the call
+    u16 new_pc = fetch_16();
     stack_push(PC);
-    PC = fetch_16();
+    PC = new_pc;
     return 24;
 }
 
 u8 CPU::call_cond_nn(bool cond) {
-    u16 t = fetch_16();
+    //PC should be instruction after the call
+    u16 new_pc = fetch_16(); //fetch icrements the PC
     if(cond) {
         stack_push(PC);
-        PC = t;
+        PC = new_pc;
         return 24;
     } else {
         return 12;
