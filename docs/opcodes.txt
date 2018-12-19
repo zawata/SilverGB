@@ -14,7 +14,7 @@
  - 0d   4  DEC C
  - 0e   8  LD C, xx
  - 0f   4  RRCA
- * 10  ??  STOP
+ * 10  --  STOP
  - 11  12  LD DE, yyxx
  - 12   8  LD (DE), A
  - 13   8  INC DE
@@ -116,7 +116,7 @@
  - 73   8  LD (HL), E
  - 74   8  LD (HL), H
  - 75   8  LD (HL), L
- - 76   *  HALT
+ - 76   -  HALT
  - 77   8  LD (HL), A
  - 78   4  LD A, B
  - 79   4  LD A, C
@@ -202,6 +202,70 @@
  - c9  16  RET
  - ca  ??  JP Z yyxx
  - cb
+     00   8  RLC B
+ - - 01   8  RLC C
+ - - 02   8  RLC D
+ - - 03   8  RLC E
+ - - 04   8  RLC H
+ - - 05   8  RLC L
+ - - 06  16  RLC (HL)
+ - - 07   8  RLC A
+ - - 08   8  RRC B
+ - - 09   8  RRC C
+ - - 0A   8  RRC D
+ - - 0B   8  RRC E
+ - - 0C   8  RRC H
+ - - 0D   8  RRC L
+ - - 0E  16  RRC (HL)
+ - - 0F   8  RRC A
+ - - 10   8  RL B
+ - - 11   8  RL C
+ - - 12   8  RL D
+ - - 13   8  RL E
+ - - 14   8  RL H
+ - - 15   8  RL L
+ - - 16  16  RL (HL)
+ - - 17   8  RL A
+ - - 18   8  RR B
+ - - 19   8  RR C
+ - - 1A   8  RR D
+ - - 1B   8  RR E
+ - - 1C   8  RR H
+ - - 1D   8  RR L
+ - - 1E  16  RR (HL)
+ - - 1F   8  RR A
+ - - 20   8  SLA B
+ - - 21   8  SLA C
+ - - 22   8  SLA D
+ - - 23   8  SLA E
+ - - 24   8  SLA H
+ - - 25   8  SLA L
+ - - 26  16  SLA (HL)
+ - - 27   8  SLA A
+ - - 28   8  SRA B
+ - - 29   8  SRA C
+ - - 2A   8  SRA D
+ - - 2B   8  SRA E
+ - - 2C   8  SRA H
+ - - 2D   8  SRA L
+ - - 2E  16  SRA (HL)
+ - - 2F   8  SRA A
+ - - 30   8  SWAP B
+ - - 31   8  SWAP C
+ - - 32   8  SWAP D
+ - - 33   8  SWAP E
+ - - 34   8  SWAP H
+ - - 35   8  SWAP L
+ - - 36  16  SWAP (HL)
+ - - 37   8  SWAP A
+ - - 38   8  SRL B
+ - - 39   8  SRL C
+ - - 3A   8  SRL D
+ - - 3B   8  SRL E
+ - - 3C   8  SRL H
+ - - 3D   8  SRL L
+ - - 3E  16  SRL (HL)
+ - - 3F   8  SRL A
  - - 40   8  BIT 0, B
  - - 41   8  BIT 0, C
  - - 42   8  BIT 0, D
