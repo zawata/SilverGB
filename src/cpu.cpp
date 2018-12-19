@@ -1029,7 +1029,7 @@ u8 CPU::rla_r(u8 *r1) {
 //CHNZ
     u8 old_c = C_FLAG;
 
-    C_FLAG = *r1 & 0x80;
+    C_FLAG = (*r1 & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
     Z_FLAG = 0;
@@ -1055,7 +1055,7 @@ u8 CPU::rra_r(u8 *r1) {
 
 u8 CPU::rlca_r(u8 *r1) {
 //CHNZ
-    C_FLAG = *r1 & 0x80;
+    C_FLAG = (*r1 & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
     Z_FLAG = 0;
@@ -1079,7 +1079,7 @@ u8 CPU::rrca_r(u8 *r1) {
 
 u8 CPU::rlc_r(u8 *r1) {
 //CHNZ
-    C_FLAG = *r1 & 0x80;
+    C_FLAG = (*r1 & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
     *r1 <<= 1;
@@ -1094,7 +1094,7 @@ u8 CPU::rlc_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = r & 0x80;
+    C_FLAG = (r & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1143,12 +1143,12 @@ u8 CPU::rl_r(u8 *r1) {
 //CHNZ
     u8 old_c = C_FLAG;
 
-    C_FLAG = *r1 & 0x80;
+    C_FLAG = (*r1 & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
 
     *r1 <<= 1;
-    *r1 += old_c;
+    *r1 |= old_c;
 
     Z_FLAG = !*r1;
 
@@ -1160,7 +1160,7 @@ u8 CPU::rl_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 old_c = C_FLAG;
 
-    C_FLAG = r & 0x80;
+    C_FLAG = (r & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1214,7 +1214,7 @@ u8 CPU::rr_ll(u16 loc) {
 //====================
 u8 CPU::sla_r(u8 *r1) {
 //CHNZ
-    C_FLAG = *r1 & 0x80;
+    C_FLAG = (*r1 & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1229,7 +1229,7 @@ u8 CPU::sla_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = r & 0x80;
+    C_FLAG = (r & 0x80) ? 1 : 0;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1246,7 +1246,7 @@ u8 CPU::sra_r(u8 *r1) {
 //CHNZ
     u8 a = *r1 & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = *r1 & 0x01;
+    C_FLAG = *r1 & 1;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1263,7 +1263,7 @@ u8 CPU::sra_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 a = r & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = r & 0x01;
+    C_FLAG = r & 1;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1280,7 +1280,7 @@ u8 CPU::sra_ll(u16 loc) {
 u8 CPU::srl_r(u8 *r1) {
 //CHNZ
 
-    C_FLAG = *r1 & 0x01;
+    C_FLAG = *r1 & 1;
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1296,7 +1296,7 @@ u8 CPU::srl_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = r & 0x01;
+    C_FLAG = r & 1;
     H_FLAG = 0;
     N_FLAG = 0;
 
