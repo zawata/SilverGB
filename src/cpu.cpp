@@ -470,8 +470,8 @@ u8 CPU::decode(u8 op) {
     }
 }
 
-u8 CPU::fetch_8()   { return io->read(PC++); }
-u16 CPU::fetch_16() { return (io->read(PC++) | (io->read(PC++) << 8)); }
+u8 CPU::fetch_8()   { return io->read(PC_REG++); }
+u16 CPU::fetch_16() { return (io->read(PC_REG++) | (io->read(PC_REG++) << 8)); }
 
 void CPU::stack_push(u16 n) {
     io->write(SP_REG--, n >> 8);
@@ -479,8 +479,8 @@ void CPU::stack_push(u16 n) {
 }
 
 u16  CPU::stack_pop() {
-    u8 q1 = io->read(SP_REG++);
-    u8 q2 = io->read(SP_REG++);
+    u8 q1 = io->read(++SP_REG);
+    u8 q2 = io->read(++SP_REG);
     return (u16)q2 << 8 | q1;
 }
 
