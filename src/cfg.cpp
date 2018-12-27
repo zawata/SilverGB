@@ -31,9 +31,11 @@ bool Configuration::saveConfigFile(std::string filepath) {
     File_Interface *f;
     if(f=File_Interface::createFile(filepath)) {
         f->setBuffer(0,(u8 *)&config_data, sizeof(__config_data));
+        delete f;
         return true;
     } else if(f=File_Interface::openFile(filepath, true)) {
         f->setBuffer(0,(u8 *)&config_data, sizeof(__config_data));
+        delete f;
         return true;
     }
     std::cerr << "Error saving config file" << std::endl;
