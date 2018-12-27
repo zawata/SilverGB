@@ -27,24 +27,52 @@ LIB_DIRS := \
 	$(ROOT_DIR)/lib/nfd/build/lib/Release/x64
 
 LIBS := dl pthread SDL2 SDL2_ttf nfd z
+DEBUG_LIBS :=
+DEBUG_FLAGS :=
+
+ifeq ($(m), asan)
+DEBUG_LIBS := asan
+DEBUG_FLAGS := -fsanitize=address -fno-omit-frame-pointer
+endif
+
+ifeq ($(m), tsan)
+DEBUG_LIBS := tsan
+DEBUG_FLAGS := -fsanitize=thread
+endif
+
+ifeq ($(m), lsan)
+DEBUG_LIBS := lsan
+DEBUG_FLAGS := -fsanitize=leak
+endif
+
+ifeq ($(m), msan)
+DEBUG_LIBS := msan
+DEBUG_FLAGS := -fsanitize=memory
+endif
+
 
 SRCS := $(shell find $(SRC_DIRS) -name '*.cpp' -or -name '*.c')
 OBJS := $(SRCS:%=$(BLD_DIRS)/%.o)
 DEPS := $(OBJS:.o=.d)
 
-INC_FLAGS := $(addprefix -I,$(INC_DIRS))
-LIB_FLAGS := $(addprefix -L,$(LIB_DIRS))
-LIB_FLAGS += $(addprefix -l,$(LIBS))
+INC_FLAGS       := $(addprefix -I,$(INC_DIRS))
+LIB_FLAGS       := $(addprefix -L,$(LIB_DIRS))
+LIB_STD_FLAGS   := $(addprefix -l,$(LIBS))
+DEBUG_LIB_FLAGS := $(addprefix -l,$(DEBUG_LIBS))
 
 CFLAGS   += -MMD -MP -Wall $(shell pkg-config --cflags gtk+-3.0)
 CXXFLAGS += -std=c++11
 LDFLAGS  += $(shell pkg-config --libs gtk+-3.0)
 
-#package tool configs
-
-
 .PHONY: all
+all: LIB_FLAGS += $(LIB_STD_FLAGS)
 all: libraries $(BLD_DIRS)/$(TARGET_EXEC_APP)
+
+.PHONY: debug
+debug: clean libraries
+debug: CFLAGS += -ggdb $(DEBUG_FLAGS)
+debug: LIB_FLAGS += $(DEBUG_LIB_FLAGS) $(LIB_STD_FLAGS)
+debug: $(BLD_DIRS)/$(TARGET_EXEC_APP)
 
 # Output App
 $(BLD_DIRS)/$(TARGET_EXEC_APP): $(OBJS)
@@ -88,6 +116,6 @@ clobber: clean
 
 .PHONY: count
 count:
-	find $(SRC_DIRS) $(INC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.hpp' -or -name '*.h' | xargs wc -l
+	find $(SRC_DIRS) $(INC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.hpp' -or -name '*.h' | grep -v "imgui\|GL\|KHR" | xargs wc -l
 
 -include $(DEPS)
