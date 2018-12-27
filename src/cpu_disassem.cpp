@@ -3,10 +3,10 @@
 #include "util/util.hpp"
 
 std::string CPU::i8() {
-    return itoh(io->read(PC+1), 2);
+    return itoh(io->read(PC), 2);
 }
 std::string CPU::i16() {
-    return itoh((u16)(io->read(PC+1) | (u16)(io->read(PC+2) << 8)), 4);
+    return itoh((u16)(io->read(PC) | (u16)(io->read(PC+1) << 8)), 4);
 }
 
 std::string CPU::format(std::string fmt) {
@@ -14,7 +14,7 @@ std::string CPU::format(std::string fmt) {
         if(fmt[i] == '%') {
             fmt.erase(i, 1);
             fmt.insert(i, i8());
-        } else if(fmt[i] == '#') {
+        } else if(fmt[i] == '\\') {
             fmt.erase(i, 1);
             fmt.insert(i, i16());
         }
@@ -24,17 +24,16 @@ std::string CPU::format(std::string fmt) {
 }
 
 std::string CPU::getOpString(u8 op) {
-    std::cout << std::hex << (int)op << std::dec << std::endl;
     switch(op) {
         case 0x00: return format("NOP");
-        case 0x01: return format("LD BC, #");
+        case 0x01: return format("LD BC, \\");
         case 0x02: return format("LD (BC), A");
         case 0x03: return format("INC BC");
         case 0x04: return format("INC B");
         case 0x05: return format("DEC B");
-        case 0x06: return format("LD B, %%");
+        case 0x06: return format("LD B, %");
         case 0x07: return format("RLCA");
-        case 0x08: return format("LD (#), SP");
+        case 0x08: return format("LD (\\), SP");
         case 0x09: return format("ADD HL, BC");
         case 0x0a: return format("LD A, (BC)");
         case 0x0b: return format("DEC BC ");
@@ -43,52 +42,52 @@ std::string CPU::getOpString(u8 op) {
         case 0x0e: return format("DEC C");
         case 0x0f: return format("RRCA");
         case 0x10: return format("STOP");
-        case 0x11: return format("LD DE, #");
+        case 0x11: return format("LD DE, \\");
         case 0x12: return format("LD (DE), A");
         case 0x13: return format("INC DE");
         case 0x14: return format("INC D");
         case 0x15: return format("DEC D");
-        case 0x16: return format("LD D, %%");
+        case 0x16: return format("LD D, %");
         case 0x17: return format("RLA");
-        case 0x18: return format("JR %%");
+        case 0x18: return format("JR %");
         case 0x19: return format("ADD HL, DE");
         case 0x1a: return format("LD A,(DE)");
         case 0x1b: return format("DEC DE");
         case 0x1c: return format("INC E");
         case 0x1d: return format("DEC E");
-        case 0x1e: return format("LD E, %%");
+        case 0x1e: return format("LD E, %");
         case 0x1f: return format("RRA");
-        case 0x20: return format("JR NZ, %%");
-        case 0x21: return format("LD HL, #");
+        case 0x20: return format("JR NZ, %");
+        case 0x21: return format("LD HL, \\");
         case 0x22: return format("LDI (HL),A");
         case 0x23: return format("INC HL");
         case 0x24: return format("INC H");
         case 0x25: return format("DEC H");
-        case 0x26: return format("LD H, %%");
+        case 0x26: return format("LD H, %");
         case 0x27: return format("DAA");
-        case 0x28: return format("JR Z, %%");
+        case 0x28: return format("JR Z, %");
         case 0x29: return format("ADD HL, HL");
         case 0x2a: return format("LDI A, (HL)");
         case 0x2b: return format("DEC HL");
         case 0x2c: return format("INC L");
         case 0x2d: return format("DEC L");
-        case 0x2e: return format("LD L, %%");
+        case 0x2e: return format("LD L, %");
         case 0x2f: return format("CPL");
-        case 0x30: return format("JR NC, %%");
-        case 0x31: return format("LD SP, #");
+        case 0x30: return format("JR NC, %");
+        case 0x31: return format("LD SP, \\");
         case 0x32: return format("LDD (HL), A");
         case 0x33: return format("INC SP");
         case 0x34: return format("INC (HL)");
         case 0x35: return format("DEC (HL)");
-        case 0x36: return format("LD (HL), %%");
+        case 0x36: return format("LD (HL), %");
         case 0x37: return format("SCF");
-        case 0x38: return format("JR C, %%");
+        case 0x38: return format("JR C, %");
         case 0x39: return format("ADD HL, SP");
         case 0x3a: return format("LDD A, (HL)");
         case 0x3b: return format("DEC SP");
         case 0x3c: return format("INC A");
         case 0x3d: return format("DEC A");
-        case 0x3e: return format("LD A, %%");
+        case 0x3e: return format("LD A, %");
         case 0x3f: return format("CCF");
         case 0x40: return format("LD B, B");
         case 0x41: return format("LD B, C");
@@ -220,64 +219,62 @@ std::string CPU::getOpString(u8 op) {
         case 0xbf: return format("CP A");
         case 0xc0: return format("RET NC");
         case 0xc1: return format("POP BC");
-        case 0xc2: return format("JP NZ #");
-        case 0xc3: return format("JP #");
-        case 0xc4: return format("CALL NZ, #");
+        case 0xc2: return format("JP NZ \\");
+        case 0xc3: return format("JP \\");
+        case 0xc4: return format("CALL NZ, \\");
         case 0xc5: return format("PUSH BC");
-        case 0xc6: return format("ADD A, %%");
+        case 0xc6: return format("ADD A, %");
         case 0xc7: return format("RST 00h");
-        case 0xc8: return format("CALL Z, #");
+        case 0xc8: return format("CALL Z, \\");
         case 0xc9: return format("RET");
-        case 0xca: return format("JP Z, #");
+        case 0xca: return format("JP Z, \\");
         case 0xcb: return getCBOpString(io->read(PC));
-        case 0xcc: return format("CALL Z, #");
-        case 0xcd: return format("CALL #");
-        case 0xce: return format("ADC A, %%");
+        case 0xcc: return format("CALL Z, \\");
+        case 0xcd: return format("CALL \\");
+        case 0xce: return format("ADC A, %");
         case 0xcf: return format("RST 08h");
-        case 0xd0: return format("CALL NC, #");
+        case 0xd0: return format("CALL NC, \\");
         case 0xd1: return format("POP DE");
-        case 0xd2: return format("JP NC, #");
-        case 0xd4: return format("CALL NC #");
+        case 0xd2: return format("JP NC, \\");
+        case 0xd4: return format("CALL NC \\");
         case 0xd5: return format("PUSH DE");
-        case 0xd6: return format("SUB %%");
+        case 0xd6: return format("SUB %");
         case 0xd7: return format("RST 10h");
-        case 0xd8: return format("CALL C #");
+        case 0xd8: return format("CALL C \\");
         case 0xd9: return format("RETI");
-        case 0xda: return format("JP C #");
-        case 0xdc: return format("CALL C #");
-        case 0xde: return format("SBC A, %%");
+        case 0xda: return format("JP C \\");
+        case 0xdc: return format("CALL C \\");
+        case 0xde: return format("SBC A, %");
         case 0xdf: return format("RST 18h");
-        case 0xe0: return format("LD ($FF00 + %%), A");
+        case 0xe0: return format("LD ($FF00 + %), A");
         case 0xe1: return format("POP HL");
         case 0xe2: return format("LD ($FF00 + C), A");
         case 0xe5: return format("PUSH HL");
-        case 0xe6: return format("AND %%");
+        case 0xe6: return format("AND %");
         case 0xe7: return format("RST 20h");
-        case 0xe8: return format("ADD  SP, %%");
+        case 0xe8: return format("ADD  SP, %");
         case 0xe9: return format("JP (HL)");
-        case 0xea: return format("LD (#), A");
-        case 0xee: return format("XOR %%");
+        case 0xea: return format("LD (\\), A");
+        case 0xee: return format("XOR %");
         case 0xef: return format("RST 28h");
-        case 0xf0: return format("LD A, ($FF00 + %%)");
+        case 0xf0: return format("LD A, ($FF00 + %)");
         case 0xf1: return format("POP AF");
         case 0xf2: return format("LD A, (FF00 + C)");
         case 0xf3: return format("DI");
         case 0xf5: return format("PUSH AF");
-        case 0xf6: return format("OR %%");
+        case 0xf6: return format("OR %");
         case 0xf7: return format("RST 30h");
-        case 0xf8: return format("LD HL, SP + %%");
+        case 0xf8: return format("LD HL, SP + %");
         case 0xf9: return format("LD SP, HL");
-        case 0xfa: return format("LD A, (%%)");
+        case 0xfa: return format("LD A, (%)");
         case 0xfb: return format("EI");
-        case 0xfe: return format("CP %%");
+        case 0xfe: return format("CP %");
         case 0xff: return format("RST 38h");
         default:   return "Invalid Op";
     }
 }
 
 std::string CPU::getCBOpString(u8 op) {
-    std::cout << std::hex << (int)op << std::dec << std::endl;
-
     switch (op){
     case 0x00: return "RLC B";
     case 0x01: return "RLC C";
