@@ -536,3 +536,145 @@ void GUI::buildDisassemblyUI() {
     Begin("Disassembly", nullptr, ImGuiWindowFlags_NoResize);
     End();
 }
+
+void GUI::buildMemoryViewUI() {
+    //NOTE: broken. I'm just tired of looking at it ATM.
+    using namespace ImGui;
+
+    //disable the window grip in the bottom left corner
+    //TODO: find a cleaner way to do this, I've contacted the dev for suggestions
+    PushStyleColor(ImGuiCol_ResizeGrip,        GetColorU32(ImGuiCol_WindowBg));
+    PushStyleColor(ImGuiCol_ResizeGripActive,  GetColorU32(ImGuiCol_WindowBg));
+    PushStyleColor(ImGuiCol_ResizeGripHovered, GetColorU32(ImGuiCol_WindowBg));
+
+    SetNextWindowSizeConstraints({410, 202}, {410, FLT_MAX});
+    Begin("Memory View", nullptr, ImGuiWindowFlags_NoScrollWithMouse);
+    static char start_buf[5] = { 0 };
+    static char end_buf[5] = { 0 };
+    int start_int, end_int;
+
+    ImGuiInputTextCallback text_func =
+            [](ImGuiInputTextCallbackData *data) -> int {
+                switch(data->EventChar) {
+                case '0' ... '9':
+                    break;
+                case 'a' ... 'f':
+                    data->EventChar -= ('a' - 'A');
+                    break;
+                case 'A' ... 'F':
+                    break;
+                default:
+                    return 1;
+                    break;
+                }
+                return 0;
+            };
+
+    if(BeginChild("##")) {
+        PushItemWidth(50);
+        InputText("Start",
+                start_buf,
+                5,
+                ImGuiInputTextFlags_CallbackCharFilter,
+                text_func,
+                nullptr);
+        InputText("End",
+                end_buf,
+                5,
+                ImGuiInputTextFlags_CallbackCharFilter,
+                text_func,
+                nullptr);
+        PopItemWidth();
+
+        start_int = htoi(start_buf);
+        end_int   = htoi(end_buf);
+    }
+    EndChild();
+
+    if(BeginChild("##")) {
+        //TODO:
+        /**the listbox works by creating it's a customized child window.
+         * since the listbox doesn't take an "additional flags" parameter I can't control
+         * how the scrollbar shows up.
+         *
+         * Ideally I force it to be omni-present and design the
+         * sizing of the window around it. for now this isn't an option so heres a hack to
+         * remove it entirely.
+         *
+         * The section is still scrollable with the mouse-wheel which is good enough for now
+         **/
+        PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0f);
+        if(ListBoxHeader("##", {-1,-1})) {
+            Columns(2);
+            SetColumnWidth(-1, 57);
+                TextUnformatted("");
+            for(int i = 0; i < ((end_int+0x10)&0xFFF0) - (start_int&0xFFF0); i+= 0x10) {
+                Text("0x%04X", i+(start_int & 0xFFF0));
+            }
+            NextColumn();
+            TextUnformatted("00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+            Separator();
+
+            //TODO: optimize this code with ImGUI list clipper
+            if(core && start_int < end_int) {
+                int start_floor      = start_int     & 0xFFF0,
+                    start_floor_diff = start_int     & 0xF,
+                    end_floor        = (end_int)     & 0xFFF0,
+                    end_floor_diff   = end_int       & 0xF,
+                    end_ceiling      = (end_int+0xF) & 0xFFF0;
+
+                if(start_floor != start_int) {
+                    char  c[48] = { 0 };
+                    char *c_index = c;
+                    for(int i = 0; i < start_floor_diff; i++) {
+                        *c_index++ = *c_index++ = *c_index++ = ' ';
+                    }
+
+                    if(start_floor + 0x10 < end_int) {
+                        for(int i = start_floor_diff; i < 0x10; i++) {
+                            memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+                            *++c_index = ' ';
+                            c_index++;
+                        }
+                    } else {
+                        for(int i = start_floor_diff; i < end_int; i++) {
+                            memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+                            *++c_index = ' ';
+                            c_index++;
+                        }
+                    }
+                    TextUnformatted(c);
+                }
+
+                if(start_floor + 0x10 < end_int) {
+                    for(int i = start_floor + 0x10; i < end_ceiling-0x10; i+=0x10) {
+                        char  c[48] = { 0 };
+                        char *c_index = c;
+                        for(int j = i; j < i+0x10; j++) {
+                            memcpy(c_index++, itoh(core->getByteFromIO(i+j), 2, true).c_str(), 3);
+                            *++c_index = ' ';
+                            c_index++;
+                        }
+                        TextUnformatted(c);
+                    }
+
+                    if(end_floor != end_ceiling) {
+                        char  c[48] = { 0 };
+                        char *c_index = c;
+                        for(int i = end_floor; i < end_int; i++) {
+                            memcpy(c_index++, itoh(core->getByteFromIO(i), 2, true).c_str(), 3);
+                            *++c_index = ' ';
+                            c_index++;
+                        }
+                        TextUnformatted(c);
+                    }
+                }
+            }
+            ListBoxFooter();
+        }
+        PopStyleVar();
+    }
+    EndChild();
+    End();
+    PopStyleColor(3);
+}
