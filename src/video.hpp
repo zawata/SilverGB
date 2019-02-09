@@ -5,6 +5,8 @@
 #include "cfg.hpp"
 #include "util/ints.hpp"
 
+#include "util/CircularQueue.hpp"
+
 #define VRAM_BANK_SIZE      0x1800
 #define DMG_VRAM_CHAR_SIZE  VRAM_BANK_SIZE
 #define GBC_VRAM_CHAR_SIZE  (VRAM_BANK_SIZE + VRAM_BANK_SIZE)
@@ -12,25 +14,86 @@
 
 #define OAM_RAM_SIZE   0x9F
 
+#define OBG_ATTR_BG_PRIORITY   7
+#define OBG_ATTR_Y_FLIP        6
+#define OBG_ATTR_X_FLIP        5
+#define OBG_ATTR_GB_PALLETTE   4
+#define OBG_ATTR_GBC_TILE_BANK 3
+#define OBG_ATTR_GBC_PALLETTE  0x7
+
+#define STAT_COIN_INT_BIT   6
+#define STAT_MODE_2_INT_BIT 5
+#define STAT_MODE_1_INT_BIT 4
+#define STAT_MODE_0_INT_BIT 3
+#define STAT_COIN_BIT       2
+#define STAT_MODE_FLAG      0x3
+
 class Video_Controller {
 public:
+    enum {
+        SCANLINE_OAM  = 2,
+        SCANLINE_VRAM = 3,
+        HBLANK        = 0,
+        VBLANK        = 1,
+    } v_mode_t;
+
+    enum {
+        TILE_MAP_1 = 0, //9800h-9BFFh
+        TILE_MAP_2,     //9C00h-9FFFh
+    } bg_tile_map_t;
+
+    enum {
+        MODE_0_1 = 1, //8000 method
+        MODE_2_1 = 0, //8800 method
+    } tile_addr_mode;
+
+    typedef struct {
+        u8 pos_y;
+        u8 pos_x;
+        u8 tile_num;
+        u8 attrs;
+    } obj_sprite_t;
+
+
+    const u8 pixel_colors[4][3] = { //using html codes for now
+        {0x00, 0x00, 0x00}, // white
+        {0xD3, 0xD3, 0xD3}, // lightgrey
+        {0x69, 0x69, 0x69}, // dimgrey
+        {0xFF, 0xFF, 0xFF}  // white
+    };
+
     Video_Controller(bool gbc_mode);
     ~Video_Controller();
+
+    bool Video_Controller::tick();
 
     u8 read_reg(u8 loc);
     void write_reg(u8 loc, u8 data);
 
-    u8 read_ram(u16 loc);
-    void write_ram(u16 loc, u8 data);
+    u8 read_vram(u16 loc, bool bypass = false);
+    void write_vram(u16 loc, u8 data);
 
-    u8 read_oam(u16 loc);
+    u8 read_oam(u16 loc, bool bypass = false);
     void write_oam(u16 loc, u8 data);
+
+    obj_sprite_t oam_fetch_sprite(int index);
+    bool ppu_tick();
 
 private:
     bool gbc_mode;
-    struct __registers {
-        u8 VBK;
+    u8 *screen_buffer; //buffer for the screen, passed from core
 
+    int curr_mode;
+
+    bool lcd_enabled;
+    int  window_tile_map;
+    bool window_enabled;
+    bool bg_wnd_tile_data;
+    int  bg_tile_map;
+    bool big_sprites;
+    bool obj_enabled;
+    bool bg_wnd_blank;
+    struct __registers {
         u8 LCDC;
         u8 STAT;
         u8 SCY;
@@ -43,9 +106,62 @@ private:
         u8 OBP1;
         u8 WY;
         u8 WX;
+
+        u8 VBK;
     } registers;
 
     std::vector<u8> video_ram_char;
     std::vector<u8> video_ram_back;
     std::vector<u8> oam_ram;
+
+
+    /**
+     * PPU Variables
+     */
+    CircularQueue<u8> *pix_fifo = new CircularQueue<u8>(160);
+    u8 process_step;
+
+    int frame_clock_count; // count of clocks in a frame
+    int line_clock_count;  // count of clocks in a line
+
+    enum __OAM_fetch_steps {
+        OAM_1,
+        OAM_2
+    } oam_fetch_step;
+
+    enum __VRAM_fetch_steps {
+        BM_1, //Background Map clk 1
+        BM_2, //Background Map clk 2
+
+        WM_1, //Window Map clk 1
+        WM_2, //Window Map clk 2;
+
+        //TODO: Sprite fetch
+
+        TD_0_0, //Tile Data byte 1 clk 1
+        TD_0_1, //Tile Data byte 1 clk 2
+
+        TD_1_0, //Tile Data byte 2 clk 1
+        TD_1_1, //Tile Data byte 2 clk 2
+    } vram_fetch_step;
+
+    int ybase;
+
+    u16 bg_map_addr,  //addr of the current tile in the bg  tile map;
+        wnd_map_addr, //addr of the current tile in the wnd tile map
+        tile_addr;    //addr of the current tile data to fetch
+    u8  bg_map_byte,  //byte from the current tile in the bg  tile map
+        wnd_map_byte, //byte from the current tile in the wnd tile map
+        tile_byte;    //byte from the current tile fetched
+
+    u16 y_line, x_line; //counters for current pixel
+    u16 x_sc, y_sc;
+    bool new_frame, new_line;
+
+    int sprite_counter = 0;
+    Video_Controller::obj_sprite_t current_sprite;
+    std::vector<Video_Controller::obj_sprite_t> displayed_sprites;
+
+    u8 screen_buffer[160 * 144 * 3] = { 0 };
+    u32 current_byte = 0;
 };

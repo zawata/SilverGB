@@ -1,81 +1,96 @@
 #include "core.hpp"
 
 #include <thread>
+#include <condition_variable>
 #include <chrono>
 
-static std::atomic<bool> loop_paused;
+static std::atomic<bool> pause_loop = ATOMIC_VAR_INIT(true);
+static std::atomic<bool> loop_paused = ATOMIC_VAR_INIT(true);
+static std::atomic<bool> kill_thread = ATOMIC_VAR_INIT(true);
+static std::condition_variable cond;
+static std::mutex m_lock;
 
-GB_Core::GB_Core(File_Interface *rom, Configuration *cfg) {
-    cart = new Cartridge(rom);
-    io = new IO_Bus(cart, cfg);
-    cpu = new CPU(io, cfg);
-}
+GB_Core::GB_Core(File_Interface *rom, Configuration *cfg):
+cart(new Cartridge(rom)),
+io(new IO_Bus(cart, cfg, false)),
+cpu(new CPU(io, cfg)),
+//pointer only valid for lifetime of io.
+//does not need to be deleted.
+vpu(io->vpu) {}
 
 GB_Core::~GB_Core() {
+    //we didn't create vpu so we don't need to delete it.
     delete cpu;
     delete io;
     delete cart;
 }
 
-// void GB_Core::fetch_registers() {
-//     thread_paused = true;
-//     //check the "mutex"
-//     while(loop_paused);
-//     cpu->fetch_registers();
-//     thread_paused = false;;
-// }
-
 void GB_Core::start(bool paused) {
-    thread_killed = false;
-    if(paused) thread_paused = false;
+    kill_thread = false;
+    pause_loop = paused;
     core_thread = std::thread(&GB_Core::loop, this);
 }
 
 void GB_Core::pause() {
-    thread_paused = true;
+    pause_loop = true;
+    while(!loop_paused);
 }
 
 bool GB_Core::paused() {
-    return thread_paused || thread_killed; }
+    return loop_paused;
+}
 
 void GB_Core::resume() {
-    thread_paused = false;
+    pause_loop = false;
+
+    std::lock_guard<std::mutex> guard(m_lock);
+    cond.notify_one();
 }
 
 void GB_Core::stop() {
-    thread_killed = true;
+    kill_thread = true;
+    if(paused()) resume();
     core_thread.join();
 }
 
-void GB_Core::tick() {
-    if(!paused()) return;
+// void GB_Core::next_instruction() {
+//     //we can only work if the thread is paused
+//     if(!paused()) return;
 
-    //check the "mutex"
-    while(loop_paused);
+//     while(!cpu->tick());
+// }
 
-    cpu->clock_pulse();
-}
 
 void GB_Core::loop() {
-    while(!thread_killed) {
-        // a "mutex" designed to make sure I don't execute the clock_pulse function from 2 different threads
-        // ie. the GB_Core::tick()
-        loop_paused = true;
-        while(thread_paused) if(thread_killed) return;
-        loop_paused = false;
+    while(!kill_thread) {
+        if(pause_loop) {
+            loop_paused = true;
+            std::unique_lock<std::mutex> l(m_lock);
+            cond.wait(l);
+            loop_paused = false;
+        }
+
+        int v_step;
 
         auto start = std::chrono::high_resolution_clock::now();
-
-        //every tick should take exactly 238 nanoseconds
-        cpu->clock_pulse();
-
+        do {
+            cpu->tick();
+        } while(!vpu->tick());
         auto stop = std::chrono::high_resolution_clock::now();
+
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-        std::this_thread::sleep_for(std::chrono::nanoseconds(238)-duration);
+        std::cout << duration.count() << std::endl;
+        std::this_thread::sleep_for(std::chrono::microseconds(16666)-duration);
     }
 }
+
+
 
 CPU::registers_t GB_Core::getRegistersFromCPU() {
     CPU::registers_t r = cpu->getRegisters();
     return r;
+}
+
+u8 GB_Core::getByteFromIO(u16 addr) {
+    return io->read(addr);
 }

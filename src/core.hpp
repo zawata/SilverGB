@@ -20,16 +20,16 @@ public:
     void stop();
     void tick();
 
+    void core_tick();
+
     CPU::registers_t getRegistersFromCPU();
+    u8 getByteFromIO(u16 addr);
+
 private:
     Cartridge *cart;
     IO_Bus *io;
     CPU *cpu;
-
-
-    std::atomic<bool>
-            thread_killed = ATOMIC_VAR_INIT(true),
-            thread_paused = ATOMIC_VAR_INIT(false);
+    Video_Controller *vpu;
 
     std::thread core_thread;
 
