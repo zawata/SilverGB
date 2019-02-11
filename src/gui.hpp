@@ -14,9 +14,9 @@
 
 #define IMAGE_FORMAT_SIZE 3 //because RGB...for now
 
-#define GB_S_W 160                           //screen width
-#define GB_S_H 144                           //screen height
-#define GB_S_P 23040                         //screen pixel count
+#define GB_S_W    160                        //screen width
+#define GB_S_H    144                        //screen height
+#define GB_S_P    23040                      //screen pixel count
 #define GB_S_P_SZ GB_S_P * IMAGE_FORMAT_SIZE //screen pixel buffer size
 
 #define DMG_BIOS_CRC 0x59c8598e
@@ -57,10 +57,16 @@ private:
     } shortcut_t;
 
     typedef enum {
-        CTRL_MOD = 1,
-        ALT_MOD,
-        SHIFT_MOD,
-    } key_mods;
+        CTRL  = 1,
+        ALT   = 2,
+        SHIFT = 3,
+    } mod_key;
+
+    typedef struct __mod_arg {
+        mod_key mod0;
+        mod_key mod1;
+        mod_key mod2;
+    } mod_arg;
 
     GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io);
 
@@ -68,10 +74,11 @@ private:
     void buildRenderUI();
     void buildRegisterUI();
     void buildDisassemblyUI();
+    void buildMemoryViewUI();
 
     bool build_shortcut(SDL_KeyboardEvent *key);
     void clear_shortcut();
-    bool shortcut_pressed(std::vector<key_mods> mods, char key);
+    bool shortcut_pressed(const mod_arg mods, char key);
 
     SDL_Window* window;
     SDL_GLContext gl_context;

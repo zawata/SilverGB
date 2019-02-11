@@ -9,15 +9,15 @@
  *
  * ImGui works on a technical basis by combining gui logic and construction.
  * Any call to a GUI component will display that GUI component as well as checking
- * if it's particular logic has been met. it does this with internal static
+ * if it's particular logic has been met. It does this with internal static
  * variables to handle the rendering process and assertions to handle logical
- * errors(making them rather easy to catch)
+ * errors(making them rather easy to find)
  *
  * We can build a small shortcut handler in the same image.
 
  * At the beginning of every frame we can process the key events and build a key combination
- * then every component we want to have a shortcut just creates it's GUI Component and 
- * checks it's shortcut in it't `if` statement.
+ * then every component we want to have a shortcut just creates it's GUI Component and
+ * checks it's shortcut in an `if` statement.
  * not very complex but effective.
  *
  * This does pose issues with using keyboard events and shortcuts simultaneously as we
@@ -34,15 +34,18 @@ bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
             key->state == SDL_PRESSED) { //if it's pressed(not released)
         if(     key->keysym.mod & KMOD_CTRL ||
                 key->keysym.mod & KMOD_ALT ||
-                key->keysym.mod & KMOD_SHIFT)
+                key->keysym.mod & KMOD_SHIFT) {
             this->current_shortcut = {
                 .valid     = true,
                 .ctrl_mod  = key->keysym.mod & KMOD_CTRL,
                 .alt_mod   = key->keysym.mod & KMOD_ALT,
                 .shift_mod = key->keysym.mod & KMOD_SHIFT,
-                .key       = key->keysym.sym,
+                .key       = (char)key->keysym.sym,
             };
+            return true;
+        }
     }
+    return false;
 }
 
 void GUI::clear_shortcut() {
@@ -51,48 +54,102 @@ void GUI::clear_shortcut() {
     };
 }
 
-bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
-    assert(mods.size() <= 3);
-    assert(mods[0] != 0);
+/**
+ * Creating a struct for the modifier keys allows us to use initializer lists
+ * to pass in modifiers.
+ *
+ * so instead of doing seomthign like:
+ *
+ *    bool shortcut_pressed(bool ctrl_key, bool alt_key, bool shift_key, char key);
+ *
+ *    shortcut_pressed(true, false, true, 'c'); // CTRL+SHIFT+C
+ *
+ * we can do:
+ *
+ *    bool shortcut_pressed(mod_arg mods, char key);
+ *
+ *    shortcut_pressed({ CTRL, SHIFT }, 'c'); // CTRL+SHIFT+C
+ *
+ * Which I think looks cleaner.
+ *
+ * The processing for doing this is a little wierder though.
+ *
+ * As it is designed:
+ *      3 conditions have to be created. the conditions being each of
+ *      the modifier keys
+ *
+ *      if the current shortcut doesn't need a particular modifier, then the
+ *      condition is marked as fulfilled.
+ *
+ *      then we "loop" through the variable sin the modifier struct
+ *      and mark each condition they match as fulfilled
+ *
+ *      if a condition is already fulfilled and we match it,
+ *      then the current shortcut wasn't using this modifier and
+ *      we don't match the shortcut
+ *
+ *      after each field is processed, we check that all conditions are
+ *      marked as fulfilled to make sure the shortcut doesn't require additional
+ *      modifiers that we don't have.
+ *
+ *      lastly the base key is checked to see if it matches.
+ *
+ */
+bool GUI::shortcut_pressed(const mod_arg mods, char key) {
+    assert(mods.mod0 != 0); //all shortcuts require a modifier
 
+    //check if the shortcut is valid before processing it
     if(!this->current_shortcut.valid) return false;
 
-    bool ctrl_repeated = false,
-         alt_repeated = false,
-         shift_repeated = false;
-
-    shortcut_t current = this->current_shortcut;
+    //setup condition flags.
+    bool mod_ctrl_handled  = !current_shortcut.ctrl_mod,
+         mod_alt_handled   = !current_shortcut.alt_mod,
+         mod_shift_handled = !current_shortcut.shift_mod;
 
     for(int i = 0; i < 3; i++) {
-        switch(mods[i]) {
+        u8 mod;
+        //iterate over the struct fields
+        switch(i) {
+            case 0: mod = mods.mod0; break;
+            case 1: mod = mods.mod1; break;
+            case 2: mod = mods.mod2; break;
+        }
+
+        switch(mod) {
         case 0:
             break;
-        case CTRL_MOD:
-            assert(!ctrl_repeated);
-            if(!current.ctrl_mod) return false;
-            ctrl_repeated = true;
+        case mod_key::CTRL:
+            if(mod_ctrl_handled) return false;
+            else mod_ctrl_handled = true;
             break;
-        case ALT_MOD:
-            assert(!alt_repeated);
-            if(!current.alt_mod) return false;
-            alt_repeated = true;
+        case mod_key::ALT:
+            if(mod_alt_handled) return false;
+            else mod_alt_handled = true;
             break;
-        case SHIFT_MOD:
-            assert(!shift_repeated);
-            if(!current.shift_mod) return false;
-            shift_repeated = true;
+        case mod_key::SHIFT:
+            if(mod_shift_handled) return false;
+            else mod_shift_handled = true;
             break;
+        default:
+            return false;
         }
     }
-    return key == current.key;
+
+    return key == current_shortcut.key &&
+        mod_ctrl_handled &&
+        mod_alt_handled  &&
+        mod_shift_handled;
 }
 
 GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
 window(w),
 gl_context(g),
 io(io),
+rom_file(nullptr),
 core(nullptr), //if this isn't here, the core will break wildly.
 screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
+
+    io.IniFilename = nullptr; //disable IMGUI ini file. //TODO: re-evaluate later
 
     config = Configuration::loadConfigFile("config.cfg");
     if(!config) {
@@ -111,6 +168,10 @@ screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
 GUI::~GUI() {
     //Save Configuration
     config->saveConfigFile("config.cfg");
+
+    delete config;
+    if(rom_file) delete rom_file;
+    if(core)     delete core;
 
     //delete custom textures
     glDeleteTextures(1, &screen_texture);
@@ -199,23 +260,26 @@ GUI::loop_return_code_t GUI::mainLoop() {
     //build the UI
     buildUI();
 
-    if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
+    if(state_flags.opening_file || shortcut_pressed({ CTRL },'f')) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
-            std::cout << "Starting Core" <<std::endl;
+            std::cout << "Starting Core" << std::endl;
             rom_file = File_Interface::openFile(std::string(file));
             core = new GB_Core(rom_file, config);
-            //core->start(true);
+            core->start(true);
             state_flags.game_loaded = true;
             free(file);
         }
         state_flags.opening_file = false;
     }
 
-    if(shortcut_pressed({CTRL_MOD}, 't')) core->tick();
-    if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
-        for(int i = 0; i < 0x80; i++)
-        core->tick();
+    if(core) {
+        if(shortcut_pressed({CTRL}, 't')) {
+            //core->tick();
+        }
+        if(shortcut_pressed({CTRL, SHIFT}, 't')) {
+            //for(int i = 0; i < 0x80; i++) core->tick();
+        }
     }
 
     if(state_flags.opening_bios) {
@@ -247,6 +311,9 @@ GUI::loop_return_code_t GUI::mainLoop() {
                     }
                 }
             }
+            //the bios is opened here to check and save it.
+            // the actual loading and reading is done by the core.
+            delete bios;
             free(file);
         }
         state_flags.opening_bios = false;
@@ -284,9 +351,10 @@ void GUI::buildUI() {
     using namespace ImGui;
 
     static struct {
+        bool render_window = true;
         bool register_window = false;
         bool disassemble_window = false;
-        bool render_window = true;
+        bool VRAMview_window = false;
     } window_flags;
 
     if(BeginMainMenuBar()) {
@@ -300,7 +368,7 @@ void GUI::buildUI() {
             if(BeginMenu("Emulation")) {
                 if(core->paused()) {
                     if(MenuItem("Unpause")) core->resume();
-                    if(MenuItem("tick")) core->tick();
+                    //if(MenuItem("tick")) core->tick();
                 }
                 else {
                     if(MenuItem("Pause")) core->pause();
@@ -330,6 +398,12 @@ void GUI::buildUI() {
                     if(MenuItem("Show Disassembly Window")) window_flags.disassemble_window = true;
                 }
 
+                if(window_flags.VRAMview_window) {
+                    if(MenuItem("Hide Memory View Window")) window_flags.VRAMview_window = false;
+                } else {
+                    if(MenuItem("Show Memory View Window")) window_flags.VRAMview_window = true;
+                }
+
                 EndMenu();
             }
         }
@@ -339,6 +413,7 @@ void GUI::buildUI() {
     if(window_flags.register_window) buildRegisterUI();
     if(window_flags.disassemble_window) buildDisassemblyUI();
     if(window_flags.render_window) buildRenderUI();
+    if(window_flags.VRAMview_window) buildMemoryViewUI();
 }
 
 void GUI::buildRenderUI() {
@@ -390,6 +465,37 @@ void GUI::buildRenderUI() {
     glBindTexture(GL_TEXTURE_2D, 0);
     ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
     End();
+
+    //auto screen sizing and placement code
+    // if(window.w > window.h) {
+    //     //more wide than tall
+    //     pixel_size = (window.h/144);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = (window.w/2) - (image.w/2);
+    //     image.y = 0;
+
+    // } else if(window.w < window.h) {
+    //     //more wide than tall
+    //     pixel_size = (window.w/160);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = 0;
+    //     image.y = (window.h/2) - (image.h/2);
+    // } else {
+    //     //perfect square
+    //     pixel_size = (window.h/144);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = 0;
+    //     image.y = 0;
+    // }
 
     if(!state_flags.debug_mode) {
         PopStyleVar(4);
@@ -538,14 +644,12 @@ void GUI::buildDisassemblyUI() {
 }
 
 void GUI::buildMemoryViewUI() {
-    //NOTE: broken. I'm just tired of looking at it ATM.
     using namespace ImGui;
 
     //disable the window grip in the bottom left corner
-    //TODO: find a cleaner way to do this, I've contacted the dev for suggestions
-    PushStyleColor(ImGuiCol_ResizeGrip,        GetColorU32(ImGuiCol_WindowBg));
-    PushStyleColor(ImGuiCol_ResizeGripActive,  GetColorU32(ImGuiCol_WindowBg));
-    PushStyleColor(ImGuiCol_ResizeGripHovered, GetColorU32(ImGuiCol_WindowBg));
+    PushStyleColor(ImGuiCol_ResizeGrip,        0);
+    PushStyleColor(ImGuiCol_ResizeGripActive,  0);
+    PushStyleColor(ImGuiCol_ResizeGripHovered, 0);
 
     SetNextWindowSizeConstraints({410, 202}, {410, FLT_MAX});
     Begin("Memory View", nullptr, ImGuiWindowFlags_NoScrollWithMouse);
@@ -593,7 +697,7 @@ void GUI::buildMemoryViewUI() {
 
     if(BeginChild("##")) {
         //TODO:
-        /**the listbox works by creating it's a customized child window.
+        /**the listbox works by creating a customized child window.
          * since the listbox doesn't take an "additional flags" parameter I can't control
          * how the scrollbar shows up.
          *
@@ -620,14 +724,16 @@ void GUI::buildMemoryViewUI() {
                 int start_floor      = start_int     & 0xFFF0,
                     start_floor_diff = start_int     & 0xF,
                     end_floor        = (end_int)     & 0xFFF0,
-                    end_floor_diff   = end_int       & 0xF,
+                    //end_floor_diff   = end_int       & 0xF,
                     end_ceiling      = (end_int+0xF) & 0xFFF0;
 
                 if(start_floor != start_int) {
                     char  c[48] = { 0 };
                     char *c_index = c;
                     for(int i = 0; i < start_floor_diff; i++) {
-                        *c_index++ = *c_index++ = *c_index++ = ' ';
+                        *c_index++ = ' ';
+                        *c_index++ = ' ';
+                        *c_index++ = ' ';
                     }
 
                     if(start_floor + 0x10 < end_int) {
@@ -675,6 +781,9 @@ void GUI::buildMemoryViewUI() {
         PopStyleVar();
     }
     EndChild();
+    //hide diagonal mouse cursors
+    if (GetMouseCursor() == ImGuiMouseCursor_ResizeNWSE || GetMouseCursor() == ImGuiMouseCursor_ResizeNESW)
+        SetMouseCursor(ImGuiMouseCursor_Arrow);
     End();
     PopStyleColor(3);
 }
