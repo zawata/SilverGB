@@ -52,6 +52,7 @@ but I'm developing and testing it on Linux so that is where it's "guaranteed" to
 &nbsp;&nbsp;&nbsp;&nbsp;➕(See the `sound_impl` branch)  
 🚫Video  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️VRAM  
+&nbsp;&nbsp;&nbsp;&nbsp;➕Pixel Fifo  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Display timing  
 &nbsp;&nbsp;&nbsp;&nbsp;➕DMA  
 🚫Input  
