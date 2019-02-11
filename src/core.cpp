@@ -4,6 +4,8 @@
 #include <condition_variable>
 #include <chrono>
 
+#include "video.hpp"
+
 static std::atomic<bool> pause_loop = ATOMIC_VAR_INIT(true);
 static std::atomic<bool> loop_paused = ATOMIC_VAR_INIT(true);
 static std::atomic<bool> kill_thread = ATOMIC_VAR_INIT(true);
@@ -14,9 +16,7 @@ GB_Core::GB_Core(File_Interface *rom, Configuration *cfg):
 cart(new Cartridge(rom)),
 io(new IO_Bus(cart, cfg, false)),
 cpu(new CPU(io, cfg)),
-//pointer only valid for lifetime of io.
-//does not need to be deleted.
-vpu(io->vpu) {}
+vpu(new Video_Controller(io, cfg)) {}
 
 GB_Core::~GB_Core() {
     //we didn't create vpu so we don't need to delete it.

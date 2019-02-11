@@ -1,5 +1,7 @@
 #include "cpu.hpp"
 
+#define as_hex(x) std::hex << (x) << std::dec
+
 #define C_FLAG (this->AF.b_AF.b_F.c)
 #define H_FLAG (this->AF.b_AF.b_F.h)
 #define N_FLAG (this->AF.b_AF.b_F.n)
@@ -31,10 +33,11 @@ inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
 inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
 inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
 
-CPU::CPU(IO_Bus *m, Configuration *config) :
-io(m),
+CPU::CPU(IO_Bus *io, Configuration *config) :
+io(io),
 cfg(config),
-inst_clocks(0) {
+inst_clocks(0),
+IME(true) {
     if(cfg->config_data.bin_enabled) {
         AF_REG = 0x0000;
         BC_REG = 0x0000;
@@ -43,6 +46,7 @@ inst_clocks(0) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
+        //thought not currently supported, this is trivial so add it anyways
         AF_REG = 0x01b0;
         BC_REG = 0x0013;
         DE_REG = 0x00D8;
@@ -65,11 +69,9 @@ CPU::registers_t CPU::getRegisters() {
     };
 }
 
-//TODO: rename to tick
 //TODO: make this execute 4 clock cycles properly timed. not one.
 //TODO: halt and stop
-void CPU::clock_pulse() {
-    std::cout << "cpu tick: " << (u32)inst_clocks << std::endl;
+bool CPU::tick() {
     //divider functions
     cpu_counter++;
     if(!(cpu_counter % 16))   on_div16();
@@ -79,8 +81,6 @@ void CPU::clock_pulse() {
     cpu_counter %= DIV_MAX;
 
     if(!inst_clocks) { //used to properly time the instruction execution
-        std::cout << "Fetching next Instruction: ";
-
         //flag for if an interrupt has been thrown
         bool int_set = false;
 
@@ -127,6 +127,9 @@ void CPU::clock_pulse() {
         else inst_clocks = 20; //ISR transfer takes 5 machine cycles
     }
     inst_clocks--;
+
+    //if inst_clocks is 0 here, then the next clock will execute an instruction
+    return inst_clocks == 0;
 }
 
 void CPU::on_div16() {
@@ -147,7 +150,7 @@ void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    std::cout << getOpString(op) << std::endl;
+    std::cout << "Instruction: " << getOpString(op) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -157,7 +160,7 @@ u8 CPU::decode(u8 op) {
         case 0x04: return inc_r(&B_REG);                 //   4  INC B
         case 0x05: return dec_r(&B_REG);                 //   4  DEC B
         case 0x06: return load_r_n(&B_REG);              //   8  LD B, xx
-        case 0x07: return rlca_r(&A_REG);                  //   4  RLCA
+        case 0x07: return rlca_r(&A_REG);                //   4  RLCA
         case 0x08: return load_llnn_rr(&SP_REG);         //  ??  LD (yyxx), SP  (?)
         case 0x09: return add_rr_rr(&HL_REG, &BC_REG);   //   8  ADD HL, BC
         case 0x0a: return load_r_ll(&A_REG, BC_REG);     //   8  LD A, (BC)
@@ -165,7 +168,7 @@ u8 CPU::decode(u8 op) {
         case 0x0c: return inc_r(&C_REG);                 //   4  INC C
         case 0x0d: return inc_r(&D_REG);                 //   4  DEC C
         case 0x0e: return load_r_n(&C_REG);              //   8  LD C, xx
-        case 0x0f: return rrca_r(&A_REG);                  //   4  RRCA
+        case 0x0f: return rrca_r(&A_REG);                //   4  RRCA
         case 0x10: return stop();                        //  ??  STOP
         case 0x11: return load_rr_nn(&DE_REG);           //  12  LD DE, yyxx
         case 0x12: return load_ll_r(DE_REG, &A_REG);     //   8  LD (DE), A
@@ -173,7 +176,7 @@ u8 CPU::decode(u8 op) {
         case 0x14: return inc_r(&D_REG);                 //   4  INC D
         case 0x15: return dec_r(&D_REG);                 //   4  DEC D
         case 0x16: return load_r_n(&D_REG);              //   8  LD D, xx
-        case 0x17: return rla_r(&A_REG);                   //   4  RLA
+        case 0x17: return rla_r(&A_REG);                 //   4  RLA
         case 0x18: return jump_rel_n();                  //  12  JR xx
         case 0x19: return add_rr_rr(&HL_REG, &DE_REG);   //   8  ADD HL, DE
         case 0x1a: return load_r_ll(&A_REG, DE_REG);     //   8  LD A,(DE)
@@ -181,7 +184,7 @@ u8 CPU::decode(u8 op) {
         case 0x1c: return inc_r(&E_REG);                 //   4  INC E
         case 0x1d: return inc_r(&E_REG);                 //   4  DEC E
         case 0x1e: return load_r_n(&E_REG);              //   8  LD E, xx
-        case 0x1f: return rra_r(&A_REG);                   //   4  RRA
+        case 0x1f: return rra_r(&A_REG);                 //   4  RRA
         case 0x20: return jump_rel_cond_n(NZ_COND);      //  ??  JR NZ, xx
         case 0x21: return load_rr_nn(&HL_REG);           //  12  LD HL, yyxx
         case 0x22: return loadi_rr_r(&HL_REG, &A_REG);   //   8  LDI (HL),A
@@ -189,7 +192,7 @@ u8 CPU::decode(u8 op) {
         case 0x24: return inc_r(&H_REG);                 //   4  INC H
         case 0x25: return dec_r(&H_REG);                 //   4  DEC H
         case 0x26: return load_r_n(&H_REG);              //   8  LD H, xx
-        case 0x27: return daa_r(&A_REG);                         //   4  DAA
+        case 0x27: return daa_r(&A_REG);                 //   4  DAA
         case 0x28: return jump_rel_cond_n(Z_COND);       //  ??  JR Z, xx
         case 0x29: return add_rr_rr(&HL_REG, &HL_REG);   //   8  ADD HL, HL
         case 0x2a: return loadi_r_rr(&A_REG, &HL_REG);   //   8  LDI A, (HL)
@@ -197,7 +200,7 @@ u8 CPU::decode(u8 op) {
         case 0x2c: return inc_r(&L_REG);                 //   4  INC L
         case 0x2d: return dec_r(&L_REG);                 //   4  DEC L
         case 0x2e: return load_r_n(&L_REG);              //   8  LD L, xx
-        case 0x2f: return cpl_r(&A_REG);                         //   4  CPL
+        case 0x2f: return cpl_r(&A_REG);                 //   4  CPL
         case 0x30: return jump_rel_cond_n(NC_COND);      //  ??  JR NC, xx
         case 0x31: return load_rr_nn(&SP_REG);           //  12  LD SP, yyxx
         case 0x32: return loadd_rr_r(&HL_REG, &A_REG);   //   8  LDD (HL), A

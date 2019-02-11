@@ -67,6 +67,7 @@ public:
                 return Cartridge_Constants::cart_type_t();
             }
         }
+
         operator std::string() const {
             std::string ret = std::to_string(code) + ": ";
             if (ROM)
@@ -103,7 +104,7 @@ public:
                 ret += "POCKET_CAMERA+";
             if (BANDAI_TAMA5)
                 ret += "BANDAI_TAMA5+";
-            ret.pop_back();
+            ret.pop_back(); //remove the last plus
             return ret;
         }
         bool ROM;

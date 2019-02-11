@@ -22,7 +22,7 @@ public:
     CPU(IO_Bus *m, Configuration *config);
     ~CPU();
 
-    void clock_pulse();
+    bool tick();
 
     u8 decode(u8 op);
     std::string getOpString(u8 op);

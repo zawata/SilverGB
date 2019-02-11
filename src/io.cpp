@@ -2,11 +2,16 @@
 
 #include "io_reg.hpp"
 
+#define as_hex(x) std::hex << (x) << std::dec
+
+#define check_mode(x) ((registers.STAT & 0x3) == x)
+
 IO_Bus::IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode) :
 cart(cart),
 config(config),
 gbc_mode(gbc_mode),
-vpu(new Video_Controller(gbc_mode)),
+registers({ 0 }),
+//vpu(new Video_Controller(gbc_mode)),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
     if(config->config_data.bin_enabled) {
@@ -19,13 +24,21 @@ input(new Input_Manager()) {
         exit(-1);
     }
 
+    if(gbc_mode) {
+        work_ram.reserve(GBC_WORK_RAM_SIZE);
+        video_ram_char.reserve(GBC_VRAM_CHAR_SIZE);
+    }
+    else {
+        work_ram.reserve(DMG_WORK_RAM_SIZE);
+        video_ram_char.reserve(DMG_VRAM_CHAR_SIZE);
+    }
+
     high_ram.reserve(HIGH_RAM_SIZE);
-    if(gbc_mode) work_ram.reserve(GBC_WORK_RAM_SIZE);
-    else         work_ram.reserve(DMG_WORK_RAM_SIZE);
+    video_ram_back.reserve(VRAM_BACK_SIZE);
+    oam_ram.reserve(OAM_RAM_SIZE);
 }
 
 IO_Bus::~IO_Bus() {
-    delete vpu;
     delete snd;
     delete input;
 }
@@ -33,7 +46,6 @@ IO_Bus::~IO_Bus() {
 u8 IO_Bus::read(u16 offset) {
     if(offset <= 0x100) {
         if(bootrom_mode) {
-            std::cout << "Boot rom read" << std::endl;
             return boot_rom_file->getByte(offset);
         } else {
             return cart->read_rom(offset);
@@ -49,7 +61,8 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
-        return vpu->read_ram(offset-0x8000);
+        std::cout << "read to VRAM" << std::endl;
+        return read_vram(offset-0x8000);
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
@@ -57,10 +70,12 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
+    std::cout << "read to work RAM" << std::endl;
         return read_ram(offset-0xC000);
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
+    std::cout << "read to work RAM" << std::endl;
         return read_ram(offset-0xC000);
     }
     else if(offset <= 0xFDFF) {
@@ -70,7 +85,8 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
-        return vpu->read_oam(offset-0xFE00);
+    std::cout << "read to OAM" << std::endl;
+        return read_oam(offset-0xFE00);
     }
     else if(offset <= 0xFEFF) {
     // Not Usable
@@ -78,10 +94,12 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xFF7F) {
     // I/O Registers
+        std::cout << "read to REG" << std::endl;
         return read_reg(offset-0xFF00);
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
+        std::cout << "read to HRAM" << std::endl;
         return read_hram(offset-0xFF80);
     }
     else if(offset <= 0xFFFF) {
@@ -101,7 +119,8 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
-        vpu->write_ram(offset-0x8000, data);
+        std::cout << "write to VRAM" << std::endl;
+        write_vram(offset-0x8000, data);
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
@@ -109,10 +128,12 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
+        std::cout << "write to work RAM" << std::endl;
         write_ram(offset-0xC000, data);
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
+        std::cout << "write to work RAM" << std::endl;
         write_ram(offset-0xC000, data);
     }
     else if(offset <= 0xFDFF) {
@@ -122,7 +143,8 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
-        vpu->write_oam(offset - 0xFE00, offset);
+        std::cout << "write to OAM" << std::endl;
+        write_oam(offset - 0xFE00, offset);
     }
     else if(offset <= 0xFEFF) {
     // Not Usable
@@ -130,11 +152,13 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFF7F) {
     // I/O Registers
+        std::cout << "write to REG" << std::endl;
         write_reg(offset - 0xFF00, data);
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
-
+        std::cout << "read to HRAM" << std::endl;
+        write_hram(offset - 0xFF80, data);
     }
     else if(offset <= 0xFFFF) {
     // Interrupts Enable Register (IE)
@@ -146,9 +170,15 @@ u8  IO_Bus::read_reg(u8 loc) {
     switch(loc) {
     case P1_REG   :
         //TODO: I don't think this is a good idea. should probably update on CPU clock
-        return input->read_inputs(this->registers.P1);
-    // case SB_REG   :
-    // case SC_REG   :
+        return input->read_inputs(registers.P1);
+
+    //Serial Registers
+    case SB_REG   :
+        return registers.SB & SB_READ_MASK;
+    case SC_REG   :
+        return registers.SC & SB_READ_MASK;
+
+    //Timer Registers
     case DIV_REG:
         return registers.DIV & DIV_READ_MASK;
     case TIMA_REG:
@@ -169,19 +199,31 @@ u8  IO_Bus::read_reg(u8 loc) {
         return snd->read_reg(loc);
 
     case LCDC_REG:
+        return registers.LCDC & LCDC_READ_MASK;
     case STAT_REG:
+        return registers.STAT & STAT_READ_MASK;
     case SCY_REG:
+        return registers.SCY  & SCY_READ_MASK;
     case SCX_REG:
+        return registers.SCX  & SCX_READ_MASK;
     case LY_REG:
+        return registers.LY   & LY_READ_MASK;
     case LYC_REG:
+        return registers.LYC  & LYC_READ_MASK;
     case DMA_REG:
+        return registers.DMA  & DMA_READ_MASK;
     case BGP_REG:
+        return registers.BGP  & BGP_READ_MASK;
     case OBP0_REG:
+        return registers.OBP0 & OBP0_READ_MASK;
     case OBP1_REG:
+        return registers.OBP1 & OBP1_READ_MASK;
     case WY_REG:
+        return registers.WY   & WY_READ_MASK;
     case WX_REG:
+        return registers.WX   & WX_READ_MASK;
     case VBK_REG:
-        return vpu->read_reg(loc);
+        return registers.VBK  | 0xFE; //all bits but bit0 one are set to 1
 /*
     case KEY1_REG :
 */
@@ -202,7 +244,7 @@ u8  IO_Bus::read_reg(u8 loc) {
     case SVBK_REG:
         return registers.SVBK & SVBK_READ_MASK;
     case IE_REG:
-        return registers.IF;
+        return registers.IE & IE_READ_MASK;
     default:
         std::cerr << "REG err at " << loc << std::endl;
     }
@@ -211,28 +253,28 @@ u8  IO_Bus::read_reg(u8 loc) {
 void IO_Bus::write_reg(u8 loc, u8 data) {
     switch(loc) {
     case P1_REG   :
-        this->registers.P1 = data & P1_WRITE_MASK;
+        registers.P1 = data & P1_WRITE_MASK;
         return;
     // case SB_REG   :
-    //     this->registers.SB = data & SB_WRITE_MASK;
+    //     registers.SB = data & SB_WRITE_MASK;
     //     return;
     // case SC_REG   :
-    //     this->registers.SC = data & SC_WRITE_MASK;
+    //     registers.SC = data & SC_WRITE_MASK;
     //     return;
     case DIV_REG  :
-        this->registers.DIV = data & DIV_WRITE_MASK;
+        registers.DIV = data & DIV_WRITE_MASK;
         return;
     case TIMA_REG :
-        this->registers.TIMA = data & TIMA_WRITE_MASK;
+        registers.TIMA = data & TIMA_WRITE_MASK;
         return;
     case TMA_REG  :
-        this->registers.TMA = data & TMA_WRITE_MASK;
+        registers.TMA = data & TMA_WRITE_MASK;
         return;
     case TAC_REG  :
-        this->registers.TAC = data & TAC_WRITE_MASK;
+        registers.TAC = data & TAC_WRITE_MASK;
         return;
     case IF_REG   :
-        this->registers.IF = data & IF_WRITE_MASK;
+        registers.IF = data & IF_WRITE_MASK;
         return;
 
     //Sound Registers
@@ -255,20 +297,45 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
 #endif
         return snd->write_wavram(loc, data);
     case LCDC_REG :
-    case STAT_REG :
-    case SCY_REG  :
-    case SCX_REG  :
-    case LY_REG   :
-    case LYC_REG  :
-    case DMA_REG  :
-    case BGP_REG  :
-    case OBP0_REG :
-    case OBP1_REG :
-    case WY_REG   :
-    case WX_REG   :
-        return vpu->write_reg(loc, data);
+    case STAT_REG:
+        registers.STAT = data & STAT_WRITE_MASK;
+        break;
+    case SCY_REG:
+        registers.SCY  = data & SCY_WRITE_MASK;
+        break;
+    case SCX_REG:
+        registers.SCX  = data & SCX_WRITE_MASK;
+        break;
+    case LY_REG:
+        registers.LY   = data & LY_WRITE_MASK;
+        break;
+    case LYC_REG:
+        registers.LYC  = data & LYC_WRITE_MASK;
+        break;
+    case DMA_REG:
+        registers.DMA  = data & DMA_WRITE_MASK;
+        break;
+    case BGP_REG:
+        registers.BGP  = data & BGP_WRITE_MASK;
+        break;
+    case OBP0_REG:
+        registers.OBP0 = data & OBP0_WRITE_MASK;
+        break;
+    case OBP1_REG:
+        registers.OBP1 = data & OBP1_WRITE_MASK;
+        break;
+    case WY_REG:
+        registers.WY   = data & WY_WRITE_MASK;
+        break;
+    case WX_REG:
+        registers.WX   = data & WX_WRITE_MASK;
+        break;
+    case VBK_REG:
+        if(gbc_mode) {
+            registers.VBK = data & VBK_WRITE_MASK;
+        }
+        break;
     // case KEY1_REG :
-    // case VBK_REG  :
     case ROMEN_REG:
         std::cout << "Boot rom disabled" << std::endl;
         bootrom_mode = false;
@@ -293,7 +360,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         else
             bank_offset = WORK_RAM_BANK_SIZE;
     case IE_REG   :
-        this->registers.IE = data & IE_WRITE_MASK;
+        registers.IE = data & IE_WRITE_MASK;
         return;
     default:
         std::cerr << "REG err at " << loc << std::endl;
@@ -301,7 +368,66 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     }
 }
 
-u8 IO_Bus::read_ram(u8 loc) {
+/**
+ * Only the first half of the vram is banked so the simplest way to
+ * store data and process requests to and from it IMO is to separate VRAM
+ * into 2 parts, character data and background data.
+ *
+ * The character data exists entirely in the VRAM banks while the background
+ * data is unbanked.
+ *
+ * If a request comes in less than the bank size then we check the vram bank vector
+ * and if it's higher then it goes to the unbanked background vector
+ *
+ * OAM is always unbanked and is just a simple read/write operation;
+ *
+ * ==============================================================================
+ * The bypass flag is used for debugging and allows checking OAM and VRAM outside
+ * of VBLANK and HBLANK
+ *
+ * TODO: do the writes need a bypass too?
+ **/
+u8 IO_Bus::read_vram(u16 loc, bool bypass) {
+    if(check_mode(3) && !bypass) return 0xFF;
+
+    if(loc < VRAM_BANK_SIZE) {
+        if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+            return video_ram_char[VRAM_BANK_SIZE + loc];
+        }
+        else {
+            return video_ram_char[loc];
+        }
+    }
+    else {
+        return video_ram_back[loc-VRAM_BANK_SIZE];
+    }
+}
+
+void IO_Bus::write_vram(u16 loc, u8 data) {
+    if(loc < VRAM_BANK_SIZE) {
+        if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+            video_ram_char[VRAM_BANK_SIZE + loc] = data;
+        }
+        else {
+            video_ram_char[loc] = data;
+        }
+    }
+    else {
+        video_ram_back[loc-VRAM_BANK_SIZE] = data;
+    }
+}
+
+u8 IO_Bus::read_oam(u16 loc, bool bypass) {
+    if((check_mode(2) || check_mode(3)) && !bypass) return 0xFF;
+
+    return oam_ram[loc];
+}
+
+void IO_Bus::write_oam(u16 loc, u8 data) {
+    oam_ram[loc] = data;
+}
+
+u8 IO_Bus::read_ram(u16 loc) {
     if(loc <= 0x0FFF) {
         return work_ram[loc];
     } else {
@@ -313,7 +439,7 @@ u8 IO_Bus::read_ram(u8 loc) {
     }
 }
 
-void IO_Bus::write_ram(u8 loc, u8 data) {
+void IO_Bus::write_ram(u16 loc, u8 data) {
     if(loc <= 0x0FFF) {
         work_ram[loc] = data;
     } else {
@@ -325,13 +451,25 @@ void IO_Bus::write_ram(u8 loc, u8 data) {
     }
 }
 
-u8 IO_Bus::read_hram(u8 loc) {
+u8 IO_Bus::read_hram(u16 loc) {
     return high_ram[loc];
 }
 
-void IO_Bus::write_hram(u8 loc, u8 data) {
+void IO_Bus::write_hram(u16 loc, u8 data) {
     high_ram[loc] = data;
 }
+
+/**
+ * Internal Routines
+ */
+
+void IO_Bus::request_interrupt(int i) {
+    registers.IF |= i;
+}
+
+/**
+ * CPU Routines
+ */
 
 void IO_Bus::cpu_inc_DIV() {
 // increment DIV
@@ -359,7 +497,8 @@ u16 IO_Bus::cpu_get_TAC_cs() {
 }
 
 IO_Bus::Interrupt IO_Bus::cpu_check_interrupts() {
-//return Interrupts that are both set and requested. The CPU will check the IME flag
+    //return Interrupts that are both set and requested.
+    //The CPU will check the IME flag
     return (Interrupt)(registers.IF & registers.IE);
 }
 

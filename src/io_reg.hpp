@@ -19,16 +19,16 @@
 #define P1_DAT           __ARR(P1)
 
 // Serial Data
-// #define SB_REG           0x01
-// #define SB_WRITE_MASK    0xFF
-// #define SB_READ_MASK     SB_WRITE_MASK
-// #define SB_DAT           __ARR(SB)
+#define SB_REG           0x01
+#define SB_WRITE_MASK    0xFF
+#define SB_READ_MASK     SB_WRITE_MASK
+#define SB_DAT           __ARR(SB)
 
-// Serial Clock
-// #define SC_REG           0x02
-// #define SC_WRITE_MASK    0x83
-// #define SC_READ_MASK     SC_WRITE_MASK
-// #define SC_DAT           __ARR(SC)
+//Serial Clock
+#define SC_REG           0x02
+#define SC_WRITE_MASK    0x83
+#define SC_READ_MASK     SC_WRITE_MASK
+#define SC_DAT           __ARR(SC)
 
 // Divider
 #define DIV_REG          0x04

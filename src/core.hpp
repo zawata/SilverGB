@@ -4,6 +4,7 @@
 #include "cfg.hpp"
 #include "cpu.hpp"
 #include "io.hpp"
+#include "video.hpp"
 
 #include <thread>
 #include <atomic>

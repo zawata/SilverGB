@@ -1,18 +1,12 @@
 #pragma once
 
-#include <vector>
 
 #include "cfg.hpp"
+#include "io.hpp"
+
 #include "util/ints.hpp"
 
 #include "util/CircularQueue.hpp"
-
-#define VRAM_BANK_SIZE      0x1800
-#define DMG_VRAM_CHAR_SIZE  VRAM_BANK_SIZE
-#define GBC_VRAM_CHAR_SIZE  (VRAM_BANK_SIZE + VRAM_BANK_SIZE)
-#define VRAM_BACK_SIZE      0x1800
-
-#define OAM_RAM_SIZE   0x9F
 
 #define OBG_ATTR_BG_PRIORITY   7
 #define OBG_ATTR_Y_FLIP        6
@@ -62,37 +56,31 @@ public:
         {0xFF, 0xFF, 0xFF}  // white
     };
 
-    Video_Controller(bool gbc_mode);
+    Video_Controller(IO_Bus *io, Configuration *cfg);
     ~Video_Controller();
 
-    bool Video_Controller::tick();
-
-    u8 read_reg(u8 loc);
-    void write_reg(u8 loc, u8 data);
-
-    u8 read_vram(u16 loc, bool bypass = false);
-    void write_vram(u16 loc, u8 data);
-
-    u8 read_oam(u16 loc, bool bypass = false);
-    void write_oam(u16 loc, u8 data);
+    bool tick();
 
     obj_sprite_t oam_fetch_sprite(int index);
     bool ppu_tick();
 
 private:
+    IO_Bus *io;
+    Configuration *cfg;
+
     bool gbc_mode;
     u8 *screen_buffer; //buffer for the screen, passed from core
 
     int curr_mode;
 
-    bool lcd_enabled;
-    int  window_tile_map;
-    bool window_enabled;
-    bool bg_wnd_tile_data;
-    int  bg_tile_map;
-    bool big_sprites;
-    bool obj_enabled;
-    bool bg_wnd_blank;
+    // bool lcd_enabled;
+    // int  window_tile_map;
+    // bool window_enabled;
+    // bool bg_wnd_tile_data;
+    // int  bg_tile_map;
+    // bool big_sprites;
+    // bool obj_enabled;
+    // bool bg_wnd_blank;
     struct __registers {
         u8 LCDC;
         u8 STAT;
@@ -109,10 +97,6 @@ private:
 
         u8 VBK;
     } registers;
-
-    std::vector<u8> video_ram_char;
-    std::vector<u8> video_ram_back;
-    std::vector<u8> oam_ram;
 
 
     /**
@@ -159,9 +143,8 @@ private:
     bool new_frame, new_line;
 
     int sprite_counter = 0;
-    Video_Controller::obj_sprite_t current_sprite;
-    std::vector<Video_Controller::obj_sprite_t> displayed_sprites;
+    obj_sprite_t current_sprite;
+    std::vector<obj_sprite_t> displayed_sprites;
 
-    u8 screen_buffer[160 * 144 * 3] = { 0 };
     u32 current_byte = 0;
 };
