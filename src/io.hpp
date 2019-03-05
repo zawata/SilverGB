@@ -10,7 +10,7 @@
 #include "util/ints.hpp"
 
 //Interupt Offsets
-#define V_BLANK_INT_OFFSET  0x40
+#define VBLANK_INT_OFFSET   0x40
 #define LCD_STAT_INT_OFFSET 0x48
 #define TIMER_INT_OFFSET    0x50
 #define SERIAL_INT_OFFSET   0x58
@@ -33,7 +33,7 @@
 class IO_Bus {
 public:
     enum Interrupt {
-        V_BLANK_INT  = 1<<0,
+        VBLANK_INT   = 1<<0,
         LCD_STAT_INT = 1<<1,
         TIMER_INT    = 1<<2,
         SERIAL_INT   = 1<<3,
@@ -73,7 +73,7 @@ public:
     Sound_Controller *snd;
     Input_Manager    *input;
 
-    struct __registers {
+    struct io_registers_t {
         //Input
         u8 P1;
 
@@ -123,11 +123,11 @@ public:
 
 private:
     Cartridge *cart;
-    File_Interface *boot_rom_file;
+    File_Interface *bootrom_file;
     Configuration *config;
 
     bool gbc_mode;
-    bool bootrom_mode;
+    bool bootrom_mode = false;
 
     u16 bank_offset;
 

@@ -1,8 +1,9 @@
 #pragma once
 
-
 #include "cfg.hpp"
 #include "io.hpp"
+
+#include "defs.hpp"
 
 #include "util/ints.hpp"
 
@@ -56,7 +57,7 @@ public:
         {0xFF, 0xFF, 0xFF}  // white
     };
 
-    Video_Controller(IO_Bus *io, Configuration *cfg);
+    Video_Controller(IO_Bus *io, Configuration *cfg, u8 *screen_buffer);
     ~Video_Controller();
 
     bool tick();
@@ -69,7 +70,7 @@ private:
     Configuration *cfg;
 
     bool gbc_mode;
-    u8 *screen_buffer; //buffer for the screen, passed from core
+    u8 *screen_buffer = NULL; //buffer for the screen, passed from core
 
     int curr_mode;
 
@@ -105,8 +106,8 @@ private:
     CircularQueue<u8> *pix_fifo = new CircularQueue<u8>(160);
     u8 process_step;
 
-    int frame_clock_count; // count of clocks in a frame
-    int line_clock_count;  // count of clocks in a line
+    int frame_clock_count = 0; // count of clocks in a frame
+    int line_clock_count = 0;  // count of clocks in a line
 
     enum __OAM_fetch_steps {
         OAM_1,
@@ -127,7 +128,7 @@ private:
 
         TD_1_0, //Tile Data byte 2 clk 1
         TD_1_1, //Tile Data byte 2 clk 2
-    } vram_fetch_step;
+    } vram_fetch_step = (__VRAM_fetch_steps)0;
 
     int ybase;
 
@@ -140,11 +141,20 @@ private:
 
     u16 y_line, x_line; //counters for current pixel
     u16 x_sc, y_sc;
-    bool new_frame, new_line;
+    bool
+        first_frame = false,   // first frame after lcd enable
+        frame_disable = false, // disable pixel output for current frame(used with first frame)
+        new_frame = false,     // the first clock tick of a new frame
+        first_line = false,    // the first clock tick of the first line
+        new_line = false;      // the first clock tick of a new line
+
 
     int sprite_counter = 0;
     obj_sprite_t current_sprite;
     std::vector<obj_sprite_t> displayed_sprites;
 
     u32 current_byte = 0;
+
+    //check that vblank int was requested this frame;
+    bool vblank_int_requested = false;
 };

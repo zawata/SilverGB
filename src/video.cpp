@@ -5,18 +5,21 @@
 
 #include <cstring>
 
-#define LCD_ENABLED      Bit.test(io->registers.LCDC, 7)
-#define WINDOW_TILE_MAP  Bit.test(io->registers.LCDC, 6)
-#define WINDOW_ENABLED   Bit.test(io->registers.LCDC, 5)
-#define BG_WND_TILE_DATA Bit.test(io->registers.LCDC, 4)
-#define BG_TILE_MAP      Bit.test(io->registers.LCDC, 3)
-#define BIG_SPRITES      Bit.test(io->registers.LCDC, 2)
-#define OBJ_ENABLED      Bit.test(io->registers.LCDC, 1)
-#define BG_WND_BLANK     Bit.test(io->registers.LCDC, 0) //TODO: DMG only
+#define reg(X) (io->registers.X)
 
-Video_Controller::Video_Controller(IO_Bus *io, Configuration *cfg) :
+#define LCD_ENABLED      Bit.test(reg(LCDC), 7)
+#define WINDOW_TILE_MAP  Bit.test(reg(LCDC), 6)
+#define WINDOW_ENABLED   Bit.test(reg(LCDC), 5)
+#define BG_WND_TILE_DATA Bit.test(reg(LCDC), 4)
+#define BG_TILE_MAP      Bit.test(reg(LCDC), 3)
+#define BIG_SPRITES      Bit.test(reg(LCDC), 2)
+#define OBJ_ENABLED      Bit.test(reg(LCDC), 1)
+#define BG_WND_BLANK     Bit.test(reg(LCDC), 0) //TODO: DMG only
+
+Video_Controller::Video_Controller(IO_Bus *io, Configuration *cfg, u8 *scrn_buf) :
 io(io),
-cfg(cfg) {}
+cfg(cfg),
+screen_buffer(scrn_buf) {}
 
 Video_Controller::~Video_Controller() {}
 
@@ -39,35 +42,69 @@ Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
 }
 
 bool Video_Controller::ppu_tick() {
+    // std::cout << "ppu_tick: " << frame_clock_count << ", ";
+    //TODO: How many of the PPU variables can we make static?
+
+    if(!LCD_ENABLED) {
+        // std::cout << "off" << std::endl;
+        //TODO: detail any further behavior?
+        //reset LY?
+
+        new_frame = true;
+        first_frame = true;
+
+        frame_clock_count = 0;
+
+        return false;
+    }
+
     /**
      * Occurs on Every Frame
      */
     if(new_frame) {
+        // std::cout << "new frame, ";
         new_frame = false;
 
+        if(first_frame) {
+            first_frame = false;
+            frame_disable = true;
+            memset(screen_buffer, 0xFF, GB_S_P_SZ);
+        } else {
+            frame_disable = false;
+        }
+
         bg_map_addr = 0x9800;
-        y_line = -1; //it will be incremeneted to 0 in the new_line block
+        y_line = 0;
         new_line = true;
+
+        vblank_int_requested = false;
     }
 
     /**
      * Occurs on Every line
      */
     if(new_line) {
+        // std::cout << "new line " << y_line << ", ";
         new_line = false;
+
+        if(!first_line) y_line++;
 
         x_line = 0;
         line_clock_count = 0;
 
-        registers.LY = y_line++; //set LY
-        if(registers.LY == registers.LYC) {
-            Bit.set(&registers.STAT, STAT_COIN_BIT);
+        sprite_counter = 0;
+
+        current_byte = 0;
+
+        reg(LY) = y_line; //set LY
+        if(reg(LY) == reg(LYC)) {
+            Bit.set(&reg(STAT), STAT_COIN_BIT);
         } else {
-            Bit.reset(&registers.STAT, STAT_COIN_BIT);
+            Bit.reset(&reg(STAT), STAT_COIN_BIT);
         }
 
-        x_sc = registers.SCX; //lock scx for the current line
-        y_sc = registers.SCY; //lock scy for the current line
+        x_sc = reg(SCX); //lock scx for the current line
+        y_sc = reg(SCY); //lock scy for the current line
         process_step = SCANLINE_OAM;
         oam_fetch_step = OAM_1;
 
@@ -81,27 +118,28 @@ bool Video_Controller::ppu_tick() {
     /**
      * Occurs on every clock
      */
-    registers.STAT = (registers.STAT & ~STAT_MODE_FLAG) | process_step; //set current mode
+    reg(STAT) = (reg(STAT) & ~STAT_MODE_FLAG) | process_step; //set current mode
 
     bool
-        coin_int =  (Bit.test(registers.STAT, STAT_COIN_INT_BIT) && Bit.test(registers.STAT, STAT_COIN_BIT)),
-        mode2_int = (Bit.test(registers.STAT, STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
-        mode1_int = (Bit.test(registers.STAT, STAT_MODE_1_INT_BIT) && process_step == VBLANK),
-        mode0_int = (Bit.test(registers.STAT, STAT_MODE_0_INT_BIT) && process_step == HBLANK);
+        coin_int =  (Bit.test(reg(STAT), STAT_COIN_INT_BIT) && Bit.test(reg(STAT), STAT_COIN_BIT)),
+        mode2_int = (Bit.test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
+        mode1_int = (Bit.test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
+        mode0_int = (Bit.test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK);
 
     if(coin_int || mode2_int || mode1_int || mode0_int) {
-        io->registers.IF |= IO_Bus::Interrupt::LCD_STAT_INT;
+        io->request_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
     }
 
     /**
      * OAM Fetch Mode
      */
     if(process_step == SCANLINE_OAM) {
+        // std::cout << "oam " << sprite_counter << ", " << std::endl;
         switch(oam_fetch_step) {
 
         // oam clk 1
         case OAM_1:
-            current_sprite = oam_fetch_sprite(sprite_counter++);
+            current_sprite = oam_fetch_sprite(sprite_counter);
 
             oam_fetch_step = OAM_2;
             break;
@@ -120,6 +158,7 @@ bool Video_Controller::ppu_tick() {
         }
 
         //quit after scanning all 40 sprites
+        sprite_counter++;
         if(sprite_counter == 40) {
             process_step = SCANLINE_VRAM;
         }
@@ -128,6 +167,7 @@ bool Video_Controller::ppu_tick() {
      * VRAM Fetch Mode
      */
     } else if(process_step == SCANLINE_VRAM) {
+        // std::cout << "vram " << vram_fetch_step << ", " << std::endl;
         /**
          * VRAM fetches take 2 cycles to occur.
          *
@@ -157,8 +197,8 @@ bool Video_Controller::ppu_tick() {
             vram_fetch_step = TD_0_0;
             break;
 
-        case WM_1:
-        case WM_2:
+        case WM_1: //TODO
+        case WM_2: //TODO
 
         case TD_0_0:
             tile_byte = io->read_vram(tile_addr++);
@@ -192,25 +232,29 @@ bool Video_Controller::ppu_tick() {
         }
 
         if(pix_fifo->size() > 0) {
-            u8 pallette = registers.BGP;
-            u8 color = (pallette >> pix_fifo->dequeue()) && 0x3;
+            u8 pallette = reg(BGP);
+            u8 color = (pallette >> pix_fifo->dequeue()) & 0x3;
 
-            memcpy(&screen_buffer[current_byte], pixel_colors[color], 3);
+            if(!frame_disable) {
+                // std::cout << (int)color << ", " << current_byte << std::endl;
+                memcpy(&screen_buffer[current_byte], pixel_colors[color], 3);
+            }
             current_byte += 3;
 
             x_line++;
             if(x_line == 160) {
-                process_step == HBLANK;
+                process_step = HBLANK;
             }
         }
         else {
-            std::cout << "FIFO Empty" << std::endl;
+            //std::cout << "FIFO Empty" << std::endl;
         }
 
     /**
      * HBLANK
      */
     } else if(process_step == HBLANK) {
+        // std::cout << "hblank" << std::endl;
         if(line_clock_count >= 456) {
             new_line = true;
         }
@@ -219,20 +263,25 @@ bool Video_Controller::ppu_tick() {
      * VBLANK
      */
     } else if(process_step == VBLANK) {
-        //do nothing as the clock_count checker below will reset the frame
+        // std::cout << "vblank" << std::endl;
+        if(!vblank_int_requested) {
+            vblank_int_requested = true;
+            io->request_interrupt(IO_Bus::VBLANK_INT);
+        }
+        //clock_count checker below will reset the frame
 
     /**
      * ERROR
      */
     } else {
-        std::cout << "process_step error: " << vram_fetch_step << std::endl;
+        std::cerr << "process_step error: " << vram_fetch_step << std::endl;
     }
 
     line_clock_count++; //used to find end of HBLANK
 
     frame_clock_count++;
-    if(frame_clock_count >= 70223) {
-        std::cout << "end frame" << std::endl;
+    if(frame_clock_count >= 70223) { //70224 clks per frame
+        // std::cout << "end frame" << std::endl;
         frame_clock_count = 0;
         new_frame = true;
         return true;

@@ -2,7 +2,9 @@
 
 #include "io_reg.hpp"
 
-#define as_hex(x) std::hex << (x) << std::dec
+#include "util/bit.hpp"
+
+#include "defs.hpp"
 
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
@@ -17,6 +19,8 @@ input(new Input_Manager()) {
     if(config->config_data.bin_enabled) {
         boot_rom_file = File_Interface::openFile(config->config_data.bin_file);
         std::cout << "Boot Rom enabled" << std::endl;
+
+        registers = { 0 };
     }
     else {
         //TODO: cleaner exit
@@ -297,6 +301,9 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
 #endif
         return snd->write_wavram(loc, data);
     case LCDC_REG :
+        if(!Bit.test(data, 7) && !check_mode(1))
+            std::cerr << "LCD Disable outside VBLANK" << std::endl;
+        registers.LCDC = data & STAT_WRITE_MASK;
     case STAT_REG:
         registers.STAT = data & STAT_WRITE_MASK;
         break;
