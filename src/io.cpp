@@ -12,8 +12,6 @@ IO_Bus::IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode) :
 cart(cart),
 config(config),
 gbc_mode(gbc_mode),
-registers({ 0 }),
-//vpu(new Video_Controller(gbc_mode)),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
     if(config->BIOS.get_bios_loaded()) {
@@ -51,7 +49,7 @@ IO_Bus::~IO_Bus() {
 u8 IO_Bus::read(u16 offset) {
     if(offset <= 0x100) {
         if(bootrom_mode) {
-            return boot_rom_file->getByte(offset);
+            return bootrom_file->getByte(offset);
         } else {
             return cart->read_rom(offset);
         }
@@ -116,11 +114,11 @@ u8 IO_Bus::read(u16 offset) {
 void IO_Bus::write(u16 offset, u8 data) {
     if(offset <= 0x3FFF) {
     // 16KB ROM bank 00
-        return; //can't write to the rom
+        cart->write_rom(offset, data);
     }
     else if(offset <= 0x7FFF) {
     // 16KB ROM Bank 01~NN
-        return; //can't write to the rom
+        cart->write_rom(offset, data);
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
