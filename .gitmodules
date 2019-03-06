@@ -1,3 +1,9 @@
 [submodule "lib/nfd"]
 	path = lib/nfd
 	url = https://github.com/mlabbe/nativefiledialog
+[submodule "docs/gb-ctr"]
+	path = docs/gb-ctr
+	url = https://github.com/Gekkio/gb-ctr
+[submodule "lib/argparse"]
+	path = lib/argparse
+	url = https://github.com/cofyc/argparse

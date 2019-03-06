@@ -21,12 +21,15 @@ SRC_DIRS := \
 	$(ROOT_DIR)/src
 INC_DIRS := \
 	$(ROOT_DIR)/src \
-	$(ROOT_DIR)/lib/nfd/src/include
+	$(ROOT_DIR)/lib/nfd/src/include \
+	$(ROOT_DIR)/lib/argparse
 LIB_DIRS := \
 	$(ROOT_DIR)/lib \
-	$(ROOT_DIR)/lib/nfd/build/lib/Release/x64
+	$(ROOT_DIR)/lib/nfd/build/lib/Release/x64 \
+	$(ROOT_DIR)/lib/argparse
 
 LIBS := dl pthread SDL2 SDL2_ttf nfd z
+NAMED_LIBS := libnfd.a libargparse.a
 DEBUG_LIBS :=
 DEBUG_FLAGS :=
 
@@ -58,6 +61,7 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS       := $(addprefix -I,$(INC_DIRS))
 LIB_FLAGS       := $(addprefix -L,$(LIB_DIRS))
 LIB_STD_FLAGS   := $(addprefix -l,$(LIBS))
+LIB_STD_FLAGS   += $(addprefix -l:,$(NAMED_LIBS))
 DEBUG_LIB_FLAGS := $(addprefix -l,$(DEBUG_LIBS))
 
 CFLAGS   += -MMD -MP -Wall $(shell pkg-config --cflags gtk+-3.0)
@@ -105,6 +109,7 @@ endif
 .PHONY: libraries
 libraries:
 	$(MAKE) -C lib/nfd/build/gmake_$(NFD_OS_NAME) nfd
+	$(MAKE) -C lib/argparse libargparse.a
 
 .PHONY: clean
 clean:
@@ -113,9 +118,11 @@ clean:
 .PHONY: clobber
 clobber: clean
 	$(MAKE) -C lib/nfd/build/gmake_$(NFD_OS_NAME) clean
+	$(MAKE) -C lib/argparse clean
 
+# Miscellaneous
 .PHONY: count
 count:
-	find $(SRC_DIRS) $(INC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.hpp' -or -name '*.h' | grep -v "imgui\|GL\|KHR" | xargs wc -l
+	find $(SRC_DIRS) $(INC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.hpp' -or -name '*.h' | grep -v "imgui\|GL\|KHR\|argparse\|nfd" | xargs wc -l
 
 -include $(DEPS)

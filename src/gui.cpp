@@ -164,6 +164,15 @@ GUI *GUI::createGUI() {
     return new GUI(window, gl_context, ImGui::GetIO());
 }
 
+void GUI::open_file(std::string file) {
+    std::cout << "Starting Core" <<std::endl;
+    rom_file = File_Interface::openFile(file);
+    core = new GB_Core(rom_file, config);
+    //core->start_thread(true);
+    state_flags.game_loaded = true;
+    core->set_breakpoint(0xf1);
+}
+
 GUI::loop_return_code_t GUI::mainLoop() {
     // Poll and handle events (inputs, window resize, etc.)
     // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
@@ -202,11 +211,7 @@ GUI::loop_return_code_t GUI::mainLoop() {
     if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
-            std::cout << "Starting Core" <<std::endl;
-            rom_file = File_Interface::openFile(std::string(file));
-            core = new GB_Core(rom_file, config);
-            //core->start(true);
-            state_flags.game_loaded = true;
+            this->open_file(file);
             free(file);
         }
         state_flags.opening_file = false;

@@ -34,6 +34,8 @@ public:
     static bool preInitialize();
     static GUI *createGUI();
 
+    void open_file(std::string file);
+
     ~GUI();
 
     loop_return_code_t mainLoop();
