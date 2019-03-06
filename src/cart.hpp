@@ -2,67 +2,100 @@
 
 #include "file.hpp"
 
+#include "util/ints.hpp"
+#include <string>
+
+struct MemoryBankController;
+
 class Cartridge_Constants {
 public:
     typedef struct __cart_type_t {
-        static struct __cart_type_t determineCartType(u8 cart_type) {
+        static struct __cart_type_t getCartType(u8 cart_type) {
             switch(cart_type) {
             case 0x00: //00h  ROM ONLY
-                return Cartridge_Constants::cart_type_t({1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x01: //01h  MBC1
-                return Cartridge_Constants::cart_type_t({0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x02: //02h  MBC1+RAM
-                return Cartridge_Constants::cart_type_t({0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
             case 0x03: //03h  MBC1+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,1,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
             case 0x05: //05h  MBC2
-                return Cartridge_Constants::cart_type_t({0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x06: //06h  MBC2+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,cart_type});
             case 0x08: //08h  ROM+RAM
-                return Cartridge_Constants::cart_type_t({1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){1,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
             case 0x09: //09h  ROM+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
             case 0x0B: //0Bh  MMM01
-                return Cartridge_Constants::cart_type_t({0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x0C: //0Ch  MMM01+RAM
-                return Cartridge_Constants::cart_type_t({0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
             case 0x0D: //0Dh  MMM01+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
             case 0x0F: //0Fh  MBC3+TIMER+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,cart_type});
             case 0x10: //10h  MBC3+TIMER+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,1,0,0,0,1,0,0,0,0,1,1,0,0,cart_type});
             case 0x11: //11h  MBC3
-                return Cartridge_Constants::cart_type_t({0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x12: //12h  MBC3+RAM
-                return Cartridge_Constants::cart_type_t({0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0,cart_type});
             case 0x13: //13h  MBC3+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,cart_type});
             case 0x19: //19h  MBC5
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x1A: //1Ah  MBC5+RAM
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,cart_type});
             case 0x1B: //1Bh  MBC5+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,0,1,1,0,0,cart_type});
             case 0x1C: //1Ch  MBC5+RUMBLE
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,cart_type});
             case 0x1D: //1Dh  MBC5+RUMBLE+RAM
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,1,1,0,0,0,cart_type});
             case 0x1E: //1Eh  MBC5+RUMBLE+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,1,0,0,0,0,0,0,1,1,1,0,0,cart_type});
             case 0x20: //20h  MBC6
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,cart_type});
             case 0x22: //22h  MBC7+SENSOR+RUMBLE+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,0,1,0,0,0,1,1,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,0,1,0,0,0,1,1,1,1,0,0,cart_type});
             case 0xFC: //FCh  POCKET CAMERA
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,cart_type});
             case 0xFD: //FDh  BANDAI TAMA5
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,cart_type});
             case 0xFE: //FEh  HuC3
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,cart_type});
             case 0xFF: //FFh  HuC1+RAM+BATTERY
-                return Cartridge_Constants::cart_type_t({0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,cart_type});
+                return Cartridge_Constants::cart_type_t(
+                    (cart_type_t){0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,cart_type});
             default:
                 return Cartridge_Constants::cart_type_t();
             }
@@ -141,7 +174,7 @@ public:
     static const u16 CGB_FLAG                       = 0x0143;
 
     static const u16 SGB_LICENSEE_CODE_BYTE1_OFFSET = 0x014B;
-    static const u16 SGB_LICENSEE_CODE_BYTE2_OFFSET = 0x014B;
+    static const u16 SGB_LICENSEE_CODE_BYTE2_OFFSET = 0x014B; //TODO: FIXME
 
     static const u16 SGB_FLAG                       = 0x0146;
 
@@ -186,15 +219,17 @@ public:
     bool checkHeaderChecksum();
     bool checkGlobalChecksum();
 
-    u8   read_rom(u16 loc);
-    //void write_rom(u16 loc, u8 data);
+    u8 read_rom(u16 loc);
+    void write_rom(u16 loc, u8 data);
 
-    u8   read_ram(u16 loc);
+    u8 read_ram(u16 loc);
     void write_ram(u16 loc, u8 data);
 
 private:
     File_Interface *rom_file;
     File_Interface *ram_file;
+
+    MemoryBankController *controller;
 
     Cartridge_Constants::cart_type_t cart_type;
 };

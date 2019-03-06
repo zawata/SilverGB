@@ -1,6 +1,206 @@
 #include "cart.hpp"
 
 #include "util/util.hpp"
+#include "util/ints.hpp"
+
+#include "file.hpp"
+
+#include <vector>
+
+/**
+ * MBC Interface
+ */
+struct MemoryBankController {
+    virtual u8 read_rom(u16 offset) = 0;
+    virtual void write_rom(u16 offset, u8 data) = 0;
+    virtual u8 read_ram(u16 offset) = 0;
+    virtual void write_ram(u16 offset, u8 data) = 0;
+protected:
+    MemoryBankController(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type) :
+    rom_file(rom_file),
+    cart_type(cart_type) {}
+
+    File_Interface *rom_file;
+    Cartridge_Constants::cart_type_t cart_type;
+};
+
+/**
+ * ROM with optional RAM
+ */
+struct ROM_Controller : public MemoryBankController {
+    ROM_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MemoryBankController(rom_file, cart_type) {
+        if(cart_type.RAM)
+            this->ram = ram;
+    }
+
+    u8 read_rom(u16 offset) override {
+        if(offset <= 0x7FFF) {
+            return rom_file->getByte(offset);
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+        }
+    }
+
+    void write_rom(u16 offset, u8 data) override {
+        //We don't write to the ROM in the ROM Controller
+        std::cerr << "write out of bounds" << std::endl;
+    }
+
+    u8 read_ram(u16 offset) override {
+        if(offset >= 0xA000 && offset <= 0xBFFF) {
+            if(cart_type.RAM)
+                return ram[offset - 0xA000];
+            else
+                return 0;
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+            return 0;
+        }
+    }
+
+    void write_ram(u16 offset, u8 data) override {
+        if(offset >= 0xA000 && offset <= 0xBFFF) {
+            if(cart_type.RAM)
+                ram[offset - 0xA000] = data;
+        } else {
+            std::cerr << "write out of bounds" << std::endl;
+        }
+    }
+
+private:
+    std::vector<u8> ram;
+};
+
+/**
+ * MBC1
+ *
+ * TODO: do MBC's always have ram?
+ */
+struct MBC1_Controller : public MemoryBankController {
+    MBC1_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MemoryBankController(rom_file, cart_type) {
+        if(cart_type.RAM)
+            this->ram = ram;
+    }
+
+    u8 read_rom(u16 offset) override {
+        if(offset <= 0x3FFF) {
+            return rom_file->getByte(offset);
+        } else if(offset <= 0x7FFF) {
+            return rom_file->getByte(offset + (bank_num * ROM_BANK_SIZE));
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+        }
+    }
+
+    void write_rom(u16 offset, u8 data) override {
+        if(offset <= 0x1FFF) {
+            ram_enable = data & 0xf == 0xA;
+        } else if(offset <= 0x3FFF) {
+            rom_bank_num = data & 0x1F;
+            if(!rom_bank_num) rom_bank_num++; //correct rom bank from 0
+        } else if(offset <= 0x5FFF) {
+            bank_num = data & 0x03;
+        } else if(offset <= 0x7FFF) {
+            mode_select = data & 1;
+        } else {
+            std::cerr << "write out of bounds" << std::endl;
+        }
+    }
+
+    u8 read_ram(u16 offset) override {
+        if(offset >= 0xA000 && offset <= 0xBFFF) {
+            if(cart_type.RAM && ram_enable) {
+                offset -= 0xA000;
+                if(mode_select) ram[offset+(bank_num * RAM_BANK_SIZE)];
+                else            ram[offset];
+            }
+            else {
+                return 0;
+            }
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+            return 0;
+        }
+    }
+
+    void write_ram(u16 offset, u8 data) override {
+        if(offset >= 0xA000 && offset <= 0xBFFF) {
+            if(cart_type.RAM && ram_enable) {
+                offset -= 0xA000;
+                if(mode_select) ram[offset+(bank_num * RAM_BANK_SIZE)] = data;
+                else            ram[offset] = data;
+            }
+            else {
+                return;
+            }
+        } else {
+            std::cerr << "write out of bounds" << std::endl;
+            return;
+        }
+    }
+
+private:
+    std::vector<u8> ram;
+
+    bool ram_enable;
+    u8 rom_bank_num = 0;
+    u8 bank_num = 0;
+    //true = ram_banking, false = rom_banking
+    bool mode_select = false;
+
+    static const u16 ROM_BANK_SIZE = 0x4000;
+    static const u16 RAM_BANK_SIZE = 0x2000;
+};
+
+/**
+ * MBC2
+ *
+ * TODO: this
+ */
+struct MBC2_Controller : public MemoryBankController {
+    MBC2_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MemoryBankController(rom_file, cart_type) {
+        if(cart_type.RAM)
+            this->ram = ram;
+    }
+
+    u8 read_rom(u16 offset) override {}
+
+    void write_rom(u16 offset, u8 data) override {}
+
+    u8 read_ram(u16 offset) override {}
+
+    void write_ram(u16 offset, u8 data) override {}
+
+private:
+    std::vector<u8> ram;
+};
+
+/**
+ * MBC2
+ *
+ * TODO: this
+ */
+struct MBC3_Controller : public MemoryBankController {
+    MBC3_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MemoryBankController(rom_file, cart_type) {
+        if(cart_type.RAM)
+            this->ram = ram;
+    }
+
+    u8 read_rom(u16 offset) override {}
+
+    void write_rom(u16 offset, u8 data) override {}
+
+    u8 read_ram(u16 offset) override {}
+
+    void write_ram(u16 offset, u8 data) override {}
+
+private:
+    std::vector<u8> ram;
+};
 
 const u8 Cartridge_Constants::MAGIC_NUM[Cartridge_Constants::MAGIC_NUM_LENGTH] = {
         0xCE,0xED,0x66,0x66,0xCC,0x0D,0x00,0x0B,
@@ -12,9 +212,25 @@ const u8 Cartridge_Constants::MAGIC_NUM[Cartridge_Constants::MAGIC_NUM_LENGTH] =
 
 Cartridge::Cartridge(File_Interface *f) :
 rom_file(f),
-cart_type(Cartridge_Constants::cart_type_t::determineCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {}
+cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
+    std::vector<u8> ram;
 
-Cartridge::~Cartridge() {}
+    if(cart_type.RAM) {
+        ram.reserve(getRAMSize());
+    }
+
+    if(cart_type.ROM) {
+        controller = new ROM_Controller(f, cart_type, ram);
+    } else if (cart_type.MBC1) {
+        controller = new MBC1_Controller(f, cart_type, ram);
+    // } else if (cart_type.MBC2) {
+    //     controller = new MBC2_Controller(f, cart_type, ram);
+    // } else if (cart_type.MBC3) {
+    //     controller = new MBC3_Controller(f, cart_type, ram);
+    }
+}
+
+Cartridge::~Cartridge() = default;
 
 u16 Cartridge::getCodeOffset() {
     return
@@ -75,7 +291,7 @@ u32 Cartridge::getROMSize() {
     case 0x53:
     case 0x54:
     default:
-        return -1;
+        return (u32)-1;
     }
 }
 
@@ -95,12 +311,12 @@ u32 Cartridge::getRAMSize() {
     case 0x05:
         return 65536;
     default:
-        return -1;
+        return (u32)-1;
     }
 }
 
 bool Cartridge::isCGBCart() {
-    return rom_file->getByte(Cartridge_Constants::CGB_FLAG) & 0x80;
+    return (bool)(rom_file->getByte(Cartridge_Constants::CGB_FLAG) & 0x80);
 }
 
 bool Cartridge::isCGBOnlyCart() {
@@ -127,24 +343,9 @@ bool Cartridge::checkGlobalChecksum() {
     return false;
 }
 
-u8 Cartridge::read_rom(u16 offset) {
-    if(cart_type.ROM) {
-        if(offset <= 0x7FFF) {
-            return rom_file->getByte(offset);
-        } else if(cart_type.RAM && offset >= 0xA000 && offset <= 0xBFFF) {
-            return ram_file->getByte(offset - 0xA000);
-        } else {
-            std::cout << "read out of bounds" << std::endl;
-        }
-    } else {
-        std::cerr << "cart not supported yet" << std::endl;
-    }
-}
+//forward IO calls to controller interface
+u8   Cartridge::read_rom(u16 offset)  { return controller->read_rom(offset); }
+void Cartridge::write_rom(u16 offset, u8 data) {  controller->write_rom(offset, data); }
 
-u8   Cartridge::read_ram(u16 loc) {
-
-}
-
-void Cartridge::write_ram(u16 loc, u8 data) {
-
-}
+u8   Cartridge::read_ram(u16 offset) { return controller->read_rom(offset); }
+void Cartridge::write_ram(u16 offset, u8 data) { controller->write_ram(offset, data); }
