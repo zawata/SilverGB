@@ -16,7 +16,7 @@
  * We can build a small shortcut handler in the same image.
 
  * At the beginning of every frame we can process the key events and build a key combination
- * then every component we want to have a shortcut just creates it's GUI Component and 
+ * then every component we want to have a shortcut just creates it's GUI Component and
  * checks it's shortcut in it't `if` statement.
  * not very complex but effective.
  *
@@ -27,11 +27,12 @@
  * shortcut requests without a modifier key.
  *
  **/
+
 bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
     if(     key->keysym.sym >= 32 &&  //if ascii
             key->keysym.sym <= 122 &&
             key->keysym.mod &&        //if it has a modifier
-            key->state == SDL_PRESSED) { //if it's pressed(not released)
+            key->state == SDL_PRESSED) { //if key was pressed
         if(     key->keysym.mod & KMOD_CTRL ||
                 key->keysym.mod & KMOD_ALT ||
                 key->keysym.mod & KMOD_SHIFT)
@@ -63,7 +64,7 @@ bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
 
     shortcut_t current = this->current_shortcut;
 
-    for(int i = 0; i < 3; i++) {
+    for(int i = 0; i < mods.size(); i++) {
         switch(mods[i]) {
         case 0:
             break;
@@ -84,21 +85,23 @@ bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
             break;
         }
     }
-    return key == current.key;
+    return key            == current.key &&
+           ctrl_repeated  == current.ctrl_mod &&
+           alt_repeated   == current.alt_mod &&
+           shift_repeated == current.shift_mod;
 }
 
 GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
 window(w),
 gl_context(g),
 io(io),
-core(nullptr), //if this isn't here, the core will break wildly.
-screen_buffer((u8 *)malloc(GB_S_P_SZ)) {
+core(nullptr) {
 
     config = Configuration::loadConfigFile("config.cfg");
     if(!config) {
         std::cout << "creating new Config" << std::endl;
         //the config doesn't exist so lets just start a new one
-        config = new Configuration();
+        config = Configuration::newConfigFile("config.cfg");
     }
 
     glGenTextures(1, &screen_texture);
@@ -124,8 +127,6 @@ GUI::~GUI() {
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-
-    free(screen_buffer);
 }
 
 bool GUI::preInitialize() {
@@ -217,10 +218,19 @@ GUI::loop_return_code_t GUI::mainLoop() {
         state_flags.opening_file = false;
     }
 
-    if(shortcut_pressed({CTRL_MOD}, 't')) core->tick();
-    if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
-        for(int i = 0; i < 0x80; i++)
-        core->tick();
+    try {
+        if(shortcut_pressed({CTRL_MOD}, 't')) core->tick_instr();
+        if(shortcut_pressed({CTRL_MOD, ALT_MOD}, 'f')) core->tick_frame();
+        if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
+            for(int i = 0; i < 0x100; i++)
+            core->tick_instr();
+        }
+    } catch(breakpoint_exception &e) {
+        SDL_ShowSimpleMessageBox(
+            SDL_MESSAGEBOX_ERROR ,
+            "Breakpoint",
+            "You've Hit a breakpoint!",
+            nullptr);
     }
 
     if(state_flags.opening_bios) {
@@ -228,7 +238,8 @@ GUI::loop_return_code_t GUI::mainLoop() {
         if(NFD_OpenDialog("bin", nullptr, &file) == NFD_OKAY) {
             File_Interface *bios = File_Interface::openFile(file);
 
-            if(!bios) std::cerr << "bios file could not be opened" << std::endl;
+            if(!bios)
+                std::cerr << "bios file could not be opened" << std::endl;
             else {
                 if(bios->getCRC() != DMG_BIOS_CRC) {
                     std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
@@ -241,8 +252,8 @@ GUI::loop_return_code_t GUI::mainLoop() {
                     int file_len = std::string(file).size();
                     if(file_len <= 255) {
                         std::cout << "File loaded" << std::endl;
-                        config->config_data.bin_enabled = true;
-                        memcpy(config->config_data.bin_file, file, file_len);
+                        config->BIOS.set_bios_loaded(true);
+                        config->BIOS.set_bios_filepath(file);
                     } else {
                         SDL_ShowSimpleMessageBox(
                             SDL_MESSAGEBOX_ERROR,
@@ -289,7 +300,8 @@ void GUI::buildUI() {
     using namespace ImGui;
 
     static struct {
-        bool register_window = false;
+        bool cpu_register_window = false;
+        bool io_register_window = false;
         bool disassemble_window = false;
         bool render_window = true;
     } window_flags;
@@ -303,19 +315,19 @@ void GUI::buildUI() {
 
         if(state_flags.game_loaded) {
             if(BeginMenu("Emulation")) {
-                if(core->paused()) {
-                    if(MenuItem("Unpause")) core->resume();
-                    if(MenuItem("tick")) core->tick();
-                }
-                else {
-                    if(MenuItem("Pause")) core->pause();
-                }
+                //if(MenuItem("Unpause")) core->resume_thread();
+                if(MenuItem("Pause")) state_flags.run_game = true;
+                if(MenuItem("Unpause")) state_flags.run_game = true;
+                if(MenuItem("tick")) core->tick_once();
+                if(MenuItem("Next Instruction")) core->tick_instr();
+                if(MenuItem("Next Frame")) core->tick_frame();
                 EndMenu();
             }
         }
 
         if(BeginMenu("Options")) {
-            MenuItem("BIOS File", nullptr, &config->config_data.bin_enabled, false);
+            bool bios_loaded = config->BIOS.get_bios_loaded();
+            MenuItem("BIOS File", nullptr, &bios_loaded, false);//should never need to modify directly so we don't care about writing it back
             MenuItem("Open BIOS File", NULL, &state_flags.opening_bios);
             MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
             EndMenu();
@@ -323,10 +335,16 @@ void GUI::buildUI() {
 
         if(state_flags.debug_mode) {
             if(BeginMenu("Debug")) {
-                if(window_flags.register_window) {
-                    if(MenuItem("Hide Register Window")) window_flags.register_window = false;
+                if(window_flags.cpu_register_window) {
+                    if(MenuItem("Hide CPU Register Window")) window_flags.cpu_register_window = false;
                 } else {
-                    if(MenuItem("Show Register Window")) window_flags.register_window = true;
+                    if(MenuItem("Show CPU Register Window")) window_flags.cpu_register_window = true;
+                }
+
+                if(window_flags.io_register_window) {
+                    if(MenuItem("Hide IO Register Window")) window_flags.io_register_window = false;
+                } else {
+                    if(MenuItem("Show IO Register Window")) window_flags.io_register_window = true;
                 }
 
                 if(window_flags.disassemble_window) {
@@ -341,7 +359,8 @@ void GUI::buildUI() {
         EndMainMenuBar();
     }
 
-    if(window_flags.register_window) buildRegisterUI();
+    if(window_flags.cpu_register_window) buildCPURegisterUI();
+    if(window_flags.io_register_window) buildIORegisterUI();
     if(window_flags.disassemble_window) buildDisassemblyUI();
     if(window_flags.render_window) buildRenderUI();
 }
@@ -373,27 +392,22 @@ void GUI::buildRenderUI() {
                 ImGuiWindowFlags_NoScrollWithMouse);
     }
 
-    //TODO: update screen_buffer with pixel data from VPU
-    memset(screen_buffer, 00, GB_S_P_SZ);
-    for(int i = 0; i < GB_S_P_SZ; i+=3) {
-        //for now just draw red.
-        screen_buffer[i] = 0xFF;
-        screen_buffer[i+1] = 0x00;
-        screen_buffer[i+2] = 0x00;
+    if(core) {
+        u8 *screen_buffer = core->getScreenBuffer();
+        glBindTexture(GL_TEXTURE_2D, screen_texture);
+        glTexImage2D(
+                GL_TEXTURE_2D,          //target
+                0,                      //level
+                GL_RGB8,                //base_format
+                GB_S_W,                 //width
+                GB_S_H,                 //height
+                0,                      //border
+                GL_RGB,                 //color_format
+                GL_UNSIGNED_BYTE,       //data_format
+                (void *)screen_buffer); //pixel_buffer
+        glBindTexture(GL_TEXTURE_2D, 0);
+        ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
     }
-    glBindTexture(GL_TEXTURE_2D, screen_texture);
-    glTexImage2D(
-            GL_TEXTURE_2D,          //target
-            0,                      //level
-            GL_RGB8,                //base_format
-            GB_S_W,                 //width
-            GB_S_H,                 //height
-            0,                      //border
-            GL_RGB,                 //color_format
-            GL_UNSIGNED_BYTE,       //data_format
-            (void *)screen_buffer); //pixel_buffer
-    glBindTexture(GL_TEXTURE_2D, 0);
-    ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
     End();
 
     if(!state_flags.debug_mode) {
@@ -403,7 +417,7 @@ void GUI::buildRenderUI() {
     }
 }
 
-void GUI::buildRegisterUI() {
+void GUI::buildCPURegisterUI() {
     using namespace ImGui;
 
     static struct {
@@ -534,6 +548,71 @@ void GUI::buildRegisterUI() {
     End();
 }
 
+void GUI::buildIORegisterUI() {
+    using namespace ImGui;
+
+    IO_Bus::io_registers_t regs = { 0 };
+    if(core) regs = core->getregistersfromIO();
+    else     regs = { 0 };
+
+    //The Indentation on this window is very sensitive...
+    SetNextWindowSize({120,0});
+    Begin("IO Registers", nullptr, ImGuiWindowFlags_NoResize);
+    Columns(2, nullptr, true);
+    SetColumnWidth(-1, 60);
+
+    Text("P1");
+    Text("SB");
+    Text("SC");
+    Text("DIV");
+    Text("TIMA");
+    Text("TMA");
+    Text("TAC");
+    Text("IF");
+    Text("LCDC");
+    Text("STAT");
+    Text("SCY");
+    Text("SCX");
+    Text("LY");
+    Text("LYC");
+    Text("DMA");
+    Text("BGP");
+    Text("OBP0");
+    Text("OBP1");
+    Text("WY");
+    Text("WX");
+    Text("VBK");
+    Text("SVBK");
+    Text("IE");
+    NextColumn();
+    SetColumnWidth(-1, 50);
+
+    Text("0x%s", itoh(regs.P1, 4).c_str());
+    Text("0x%s", itoh(regs.SB, 4).c_str());
+    Text("0x%s", itoh(regs.SC, 4).c_str());
+    Text("0x%s", itoh(regs.DIV, 4).c_str());
+    Text("0x%s", itoh(regs.TIMA, 4).c_str());
+    Text("0x%s", itoh(regs.TMA, 4).c_str());
+    Text("0x%s", itoh(regs.TAC, 4).c_str());
+    Text("0x%s", itoh(regs.IF, 4).c_str());
+    Text("0x%s", itoh(regs.LCDC, 4).c_str());
+    Text("0x%s", itoh(regs.STAT, 4).c_str());
+    Text("0x%s", itoh(regs.SCY, 4).c_str());
+    Text("0x%s", itoh(regs.SCX, 4).c_str());
+    Text("0x%s", itoh(regs.LY, 4).c_str());
+    Text("0x%s", itoh(regs.LYC, 4).c_str());
+    Text("0x%s", itoh(regs.DMA, 4).c_str());
+    Text("0x%s", itoh(regs.BGP, 4).c_str());
+    Text("0x%s", itoh(regs.OBP0, 4).c_str());
+    Text("0x%s", itoh(regs.OBP1, 4).c_str());
+    Text("0x%s", itoh(regs.WY, 4).c_str());
+    Text("0x%s", itoh(regs.WX, 4).c_str());
+    Text("0x%s", itoh(regs.VBK, 4).c_str());
+    Text("0x%s", itoh(regs.SVBK, 4).c_str());
+    Text("0x%s", itoh(regs.IE, 4).c_str());
+    End();
+}
+
 void GUI::buildDisassemblyUI() {
     using namespace ImGui;
 
@@ -542,144 +621,144 @@ void GUI::buildDisassemblyUI() {
     End();
 }
 
-void GUI::buildMemoryViewUI() {
-    //NOTE: broken. I'm just tired of looking at it ATM.
-    using namespace ImGui;
+// void GUI::buildMemoryViewUI() {
+//     //NOTE: broken. I'm just tired of looking at it ATM.
+//     using namespace ImGui;
 
-    //disable the window grip in the bottom left corner
-    //TODO: find a cleaner way to do this, I've contacted the dev for suggestions
-    PushStyleColor(ImGuiCol_ResizeGrip,        GetColorU32(ImGuiCol_WindowBg));
-    PushStyleColor(ImGuiCol_ResizeGripActive,  GetColorU32(ImGuiCol_WindowBg));
-    PushStyleColor(ImGuiCol_ResizeGripHovered, GetColorU32(ImGuiCol_WindowBg));
+//     //disable the window grip in the bottom left corner
+//     //TODO: find a cleaner way to do this, I've contacted the dev for suggestions
+//     PushStyleColor(ImGuiCol_ResizeGrip,        GetColorU32(ImGuiCol_WindowBg));
+//     PushStyleColor(ImGuiCol_ResizeGripActive,  GetColorU32(ImGuiCol_WindowBg));
+//     PushStyleColor(ImGuiCol_ResizeGripHovered, GetColorU32(ImGuiCol_WindowBg));
 
-    SetNextWindowSizeConstraints({410, 202}, {410, FLT_MAX});
-    Begin("Memory View", nullptr, ImGuiWindowFlags_NoScrollWithMouse);
-    static char start_buf[5] = { 0 };
-    static char end_buf[5] = { 0 };
-    int start_int, end_int;
+//     SetNextWindowSizeConstraints({410, 202}, {410, FLT_MAX});
+//     Begin("Memory View", nullptr, ImGuiWindowFlags_NoScrollWithMouse);
+//     static char start_buf[5] = { 0 };
+//     static char end_buf[5] = { 0 };
+//     int start_int, end_int;
 
-    ImGuiInputTextCallback text_func =
-            [](ImGuiInputTextCallbackData *data) -> int {
-                switch(data->EventChar) {
-                case '0' ... '9':
-                    break;
-                case 'a' ... 'f':
-                    data->EventChar -= ('a' - 'A');
-                    break;
-                case 'A' ... 'F':
-                    break;
-                default:
-                    return 1;
-                    break;
-                }
-                return 0;
-            };
+//     ImGuiInputTextCallback text_func =
+//             [](ImGuiInputTextCallbackData *data) -> int {
+//                 switch(data->EventChar) {
+//                 case '0' ... '9':
+//                     break;
+//                 case 'a' ... 'f':
+//                     data->EventChar -= ('a' - 'A');
+//                     break;
+//                 case 'A' ... 'F':
+//                     break;
+//                 default:
+//                     return 1;
+//                     break;
+//                 }
+//                 return 0;
+//             };
 
-    if(BeginChild("##")) {
-        PushItemWidth(50);
-        InputText("Start",
-                start_buf,
-                5,
-                ImGuiInputTextFlags_CallbackCharFilter,
-                text_func,
-                nullptr);
-        InputText("End",
-                end_buf,
-                5,
-                ImGuiInputTextFlags_CallbackCharFilter,
-                text_func,
-                nullptr);
-        PopItemWidth();
+//     if(BeginChild("##")) {
+//         PushItemWidth(50);
+//         InputText("Start",
+//                 start_buf,
+//                 5,
+//                 ImGuiInputTextFlags_CallbackCharFilter,
+//                 text_func,
+//                 nullptr);
+//         InputText("End",
+//                 end_buf,
+//                 5,
+//                 ImGuiInputTextFlags_CallbackCharFilter,
+//                 text_func,
+//                 nullptr);
+//         PopItemWidth();
 
-        start_int = htoi(start_buf);
-        end_int   = htoi(end_buf);
-    }
-    EndChild();
+//         start_int = htoi(start_buf);
+//         end_int   = htoi(end_buf);
+//     }
+//     EndChild();
 
-    if(BeginChild("##")) {
-        //TODO:
-        /**the listbox works by creating it's a customized child window.
-         * since the listbox doesn't take an "additional flags" parameter I can't control
-         * how the scrollbar shows up.
-         *
-         * Ideally I force it to be omni-present and design the
-         * sizing of the window around it. for now this isn't an option so heres a hack to
-         * remove it entirely.
-         *
-         * The section is still scrollable with the mouse-wheel which is good enough for now
-         **/
-        PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0f);
-        if(ListBoxHeader("##", {-1,-1})) {
-            Columns(2);
-            SetColumnWidth(-1, 57);
-                TextUnformatted("");
-            for(int i = 0; i < ((end_int+0x10)&0xFFF0) - (start_int&0xFFF0); i+= 0x10) {
-                Text("0x%04X", i+(start_int & 0xFFF0));
-            }
-            NextColumn();
-            TextUnformatted("00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
-            Separator();
+//     if(BeginChild("##")) {
+//         //TODO:
+//         /**the listbox works by creating it's a customized child window.
+//          * since the listbox doesn't take an "additional flags" parameter I can't control
+//          * how the scrollbar shows up.
+//          *
+//          * Ideally I force it to be omni-present and design the
+//          * sizing of the window around it. for now this isn't an option so heres a hack to
+//          * remove it entirely.
+//          *
+//          * The section is still scrollable with the mouse-wheel which is good enough for now
+//          **/
+//         PushStyleVar(ImGuiStyleVar_ScrollbarSize, 0.0f);
+//         if(ListBoxHeader("##", {-1,-1})) {
+//             Columns(2);
+//             SetColumnWidth(-1, 57);
+//                 TextUnformatted("");
+//             for(int i = 0; i < ((end_int+0x10)&0xFFF0) - (start_int&0xFFF0); i+= 0x10) {
+//                 Text("0x%04X", i+(start_int & 0xFFF0));
+//             }
+//             NextColumn();
+//             TextUnformatted("00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F");
+//             Separator();
 
-            //TODO: optimize this code with ImGUI list clipper
-            if(core && start_int < end_int) {
-                int start_floor      = start_int     & 0xFFF0,
-                    start_floor_diff = start_int     & 0xF,
-                    end_floor        = (end_int)     & 0xFFF0,
-                    end_floor_diff   = end_int       & 0xF,
-                    end_ceiling      = (end_int+0xF) & 0xFFF0;
+//             //TODO: optimize this code with ImGUI list clipper
+//             if(core && start_int < end_int) {
+//                 int start_floor      = start_int     & 0xFFF0,
+//                     start_floor_diff = start_int     & 0xF,
+//                     end_floor        = (end_int)     & 0xFFF0,
+//                     end_floor_diff   = end_int       & 0xF,
+//                     end_ceiling      = (end_int+0xF) & 0xFFF0;
 
-                if(start_floor != start_int) {
-                    char  c[48] = { 0 };
-                    char *c_index = c;
-                    for(int i = 0; i < start_floor_diff; i++) {
-                        *c_index++ = *c_index++ = *c_index++ = ' ';
-                    }
+//                 if(start_floor != start_int) {
+//                     char  c[48] = { 0 };
+//                     char *c_index = c;
+//                     for(int i = 0; i < start_floor_diff; i++) {
+//                         *c_index++ = *c_index++ = *c_index++ = ' ';
+//                     }
 
-                    if(start_floor + 0x10 < end_int) {
-                        for(int i = start_floor_diff; i < 0x10; i++) {
-                            memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
-                            *++c_index = ' ';
-                            c_index++;
-                        }
-                    } else {
-                        for(int i = start_floor_diff; i < end_int; i++) {
-                            memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
-                            *++c_index = ' ';
-                            c_index++;
-                        }
-                    }
-                    TextUnformatted(c);
-                }
+//                     if(start_floor + 0x10 < end_int) {
+//                         for(int i = start_floor_diff; i < 0x10; i++) {
+//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+//                             *++c_index = ' ';
+//                             c_index++;
+//                         }
+//                     } else {
+//                         for(int i = start_floor_diff; i < end_int; i++) {
+//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+//                             *++c_index = ' ';
+//                             c_index++;
+//                         }
+//                     }
+//                     TextUnformatted(c);
+//                 }
 
-                if(start_floor + 0x10 < end_int) {
-                    for(int i = start_floor + 0x10; i < end_ceiling-0x10; i+=0x10) {
-                        char  c[48] = { 0 };
-                        char *c_index = c;
-                        for(int j = i; j < i+0x10; j++) {
-                            memcpy(c_index++, itoh(core->getByteFromIO(i+j), 2, true).c_str(), 3);
-                            *++c_index = ' ';
-                            c_index++;
-                        }
-                        TextUnformatted(c);
-                    }
+//                 if(start_floor + 0x10 < end_int) {
+//                     for(int i = start_floor + 0x10; i < end_ceiling-0x10; i+=0x10) {
+//                         char  c[48] = { 0 };
+//                         char *c_index = c;
+//                         for(int j = i; j < i+0x10; j++) {
+//                             memcpy(c_index++, itoh(core->getByteFromIO(i+j), 2, true).c_str(), 3);
+//                             *++c_index = ' ';
+//                             c_index++;
+//                         }
+//                         TextUnformatted(c);
+//                     }
 
-                    if(end_floor != end_ceiling) {
-                        char  c[48] = { 0 };
-                        char *c_index = c;
-                        for(int i = end_floor; i < end_int; i++) {
-                            memcpy(c_index++, itoh(core->getByteFromIO(i), 2, true).c_str(), 3);
-                            *++c_index = ' ';
-                            c_index++;
-                        }
-                        TextUnformatted(c);
-                    }
-                }
-            }
-            ListBoxFooter();
-        }
-        PopStyleVar();
-    }
-    EndChild();
-    End();
-    PopStyleColor(3);
-}
+//                     if(end_floor != end_ceiling) {
+//                         char  c[48] = { 0 };
+//                         char *c_index = c;
+//                         for(int i = end_floor; i < end_int; i++) {
+//                             memcpy(c_index++, itoh(core->getByteFromIO(i), 2, true).c_str(), 3);
+//                             *++c_index = ' ';
+//                             c_index++;
+//                         }
+//                         TextUnformatted(c);
+//                     }
+//                 }
+//             }
+//             ListBoxFooter();
+//         }
+//         PopStyleVar();
+//     }
+//     EndChild();
+//     End();
+//     PopStyleColor(3);
+// }
