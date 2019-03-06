@@ -38,7 +38,7 @@ io(io),
 cfg(config),
 inst_clocks(0),
 IME(true) {
-    if(cfg->config_data.bin_enabled) {
+    if(cfg->BIOS.get_bios_loaded()) {
         AF_REG = 0x0000;
         BC_REG = 0x0000;
         DE_REG = 0x0000;
@@ -46,7 +46,7 @@ IME(true) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
-        //thought not currently supported, this is trivial so add it anyways
+        //though not currently supported, this is trivial so add it anyways
         AF_REG = 0x01b0;
         BC_REG = 0x0013;
         DE_REG = 0x00D8;
@@ -90,31 +90,40 @@ bool CPU::tick() {
         // set the PC to the interrupt offset
         // unset the interrupt flag
         if(IME) {
-            if(io->cpu_check_interrupts() & IO_Bus::Interrupt::V_BLANK_INT) {
+            if(io->cpu_check_interrupts()) {
+                std::cout << "Interrupt: ";
+            }
+
+            if(io->cpu_check_interrupts() & IO_Bus::Interrupt::VBLANK_INT) {
+                std::cout << "VBLANK" << std::endl;
                 IME=false;
                 stack_push(PC);
-                PC = V_BLANK_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::V_BLANK_INT);
+                PC = VBLANK_INT_OFFSET;
+                io->cpu_unset_interrupt(IO_Bus::Interrupt::VBLANK_INT);
                 int_set = true;
             } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::LCD_STAT_INT) {
+                std::cout << "STAT" << std::endl;
                 IME=false;
                 stack_push(PC);
                 PC = LCD_STAT_INT_OFFSET;
                 io->cpu_unset_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
                 int_set = true;
             } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::TIMER_INT) {
+                std::cout << "TIMER" << std::endl;
                 IME=false;
                 stack_push(PC);
                 PC = TIMER_INT_OFFSET;
                 io->cpu_unset_interrupt(IO_Bus::Interrupt::TIMER_INT);
                 int_set = true;
             } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::SERIAL_INT) {
+                std::cout << "SERIAL" << std::endl;
                 IME=false;
                 stack_push(PC);
                 PC = SERIAL_INT_OFFSET;
                 io->cpu_unset_interrupt(IO_Bus::Interrupt::SERIAL_INT);
                 int_set = true;
             } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::JOYPAD_INT) {
+                std::cout << "JOYPAD" << std::endl;
                 IME=false;
                 stack_push(PC);
                 PC = JOYPAD_INT_OFFSET;
@@ -124,7 +133,7 @@ bool CPU::tick() {
         }
         //if an interupt was just set, set the instruction delay, then execute once it's done
         if(!int_set) inst_clocks = decode(fetch_8());
-        else inst_clocks = 20; //ISR transfer takes 5 machine cycles
+        else         inst_clocks = 20; //ISR transfer takes 5 machine cycles
     }
     inst_clocks--;
 
@@ -412,6 +421,8 @@ u8 CPU::decode(u8 op) {
             case 0x03:
                 if(reg) return set_b_r(bit, reg);
                 else    return set_b_ll(bit, HL_REG);
+            default:
+                return 0;
             }
             // wat...
             std::cerr << "CB end of case: " << data << std::endl;

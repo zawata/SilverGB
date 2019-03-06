@@ -1,20 +1,22 @@
 #pragma once
 
-#include "file.hpp"
+#include <file.hpp>
+#include <cfg_fields.hpp>
 
-class Configuration {
+#include <glib-2.0/glib.h>
+
+class Configuration : public Configuration_Fields {
 public:
     static Configuration *loadConfigFile(std::string filepath);
+    static Configuration *newConfigFile(std::string filepath);
 
-    Configuration();
     ~Configuration();
 
+    bool saveConfigFile();
     bool saveConfigFile(std::string filepath);
+private:
+    Configuration(GKeyFile *cfg_file, std::string filepath);
 
-    struct __config_data {
-        __config_data() = default;
-
-        bool bin_enabled;
-        char bin_file[256];
-    } config_data;
+    GKeyFile *cfg_file;
+    std::string default_filepath;
 };

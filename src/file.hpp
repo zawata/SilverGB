@@ -14,6 +14,7 @@ public:
     static File_Interface *createFile(std::string filename);
 
     u32 getCRC();
+    u32 getSize();
 
     u8 getByte(u32 offset);
     size_t getBuffer(u32 offset, u8 *buf, size_t len);

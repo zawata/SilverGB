@@ -3,6 +3,8 @@
 #include "util/crc.hpp"
 #include "util/util.hpp"
 
+#include "defs.hpp"
+
 File_Interface::File_Interface() {}
 
 File_Interface::~File_Interface() {}
@@ -28,14 +30,6 @@ File_Interface *File_Interface::openFile(std::string filename, bool write) {
     }
 }
 
-void File_Interface::seekFile_g(u32 offset) {
-    file.seekg(offset, std::ios_base::beg);
-}
-
-void File_Interface::seekFile_p(u32 offset) {
-    file.seekp(offset, std::ios_base::beg);
-}
-
 u32 File_Interface::getCRC() {
     const int buf_size = 1024;
     u32 file_crc = crc.begin(), pos;
@@ -50,6 +44,11 @@ u32 File_Interface::getCRC() {
     } while(retrieved == buf_size);
 
     return file_crc;
+}
+
+u32 File_Interface::getSize() {
+    file.seekg(0, std::ios_base::end);
+    return file.tellg();
 }
 
 u8 File_Interface::getByte(u32 offset) {
@@ -73,4 +72,15 @@ void File_Interface::setBuffer(u32 offset, u8 *buf, size_t len) {
     seekFile_g(offset);
     file.write((char *)buf, len);
     file.flush();
+}
+
+/**
+ * Private
+ */
+void File_Interface::seekFile_g(u32 offset) {
+    file.seekg(offset, std::ios_base::beg);
+}
+
+void File_Interface::seekFile_p(u32 offset) {
+    file.seekp(offset, std::ios_base::beg);
 }

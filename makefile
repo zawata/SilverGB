@@ -125,4 +125,8 @@ clobber: clean
 count:
 	find $(SRC_DIRS) $(INC_DIRS) -name '*.cpp' -or -name '*.c' -or -name '*.hpp' -or -name '*.h' | grep -v "imgui\|GL\|KHR\|argparse\|nfd" | xargs wc -l
 
+.PHONY: regen_config
+regen_config:
+	./misc/cfg_class_gen.py
+
 -include $(DEPS)

@@ -16,8 +16,9 @@ registers({ 0 }),
 //vpu(new Video_Controller(gbc_mode)),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
-    if(config->config_data.bin_enabled) {
-        boot_rom_file = File_Interface::openFile(config->config_data.bin_file);
+    if(config->BIOS.get_bios_loaded()) {
+        bootrom_mode = config->BIOS.get_bios_loaded();
+        bootrom_file = File_Interface::openFile(config->BIOS.get_bios_filepath());
         std::cout << "Boot Rom enabled" << std::endl;
 
         registers = { 0 };
