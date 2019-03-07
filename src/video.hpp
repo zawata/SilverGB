@@ -51,10 +51,10 @@ public:
 
 
     const u8 pixel_colors[4][3] = { //using html codes for now
-        {0x00, 0x00, 0x00}, // white
+        {0xFF, 0xFF, 0xFF}, // white
         {0xD3, 0xD3, 0xD3}, // lightgrey
         {0x69, 0x69, 0x69}, // dimgrey
-        {0xFF, 0xFF, 0xFF}  // white
+        {0x00, 0x00, 0x00}  // black
     };
 
     Video_Controller(IO_Bus *io, Configuration *cfg, u8 *screen_buffer);
@@ -128,25 +128,38 @@ private:
 
         TD_1_0, //Tile Data byte 2 clk 1
         TD_1_1, //Tile Data byte 2 clk 2
+
+        SP_0,   //Sprite 1
+        SP_1,   //Sprite 2
     } vram_fetch_step = (__VRAM_fetch_steps)0;
 
     int ybase;
 
-    u16 bg_map_addr,  //addr of the current tile in the bg  tile map;
-        wnd_map_addr, //addr of the current tile in the wnd tile map
-        tile_addr;    //addr of the current tile data to fetch
-    u8  bg_map_byte,  //byte from the current tile in the bg  tile map
-        wnd_map_byte, //byte from the current tile in the wnd tile map
-        tile_byte;    //byte from the current tile fetched
+    u16
+        bg_map_addr,    // addr of the current tile in the bg  tile map;
+        wnd_map_addr,   // addr of the current tile in the wnd tile map
+        tile_addr_base; // base of the relative address
+    s16
+        tile_addr;      // relative addr of the current tile data to fetch
+    u8
+        bg_map_byte,    // byte from the current tile in the bg  tile map
+        wnd_map_byte,   // byte from the current tile in the wnd tile map
+        tile_byte_1,    // 1st byte from the current tile fetched
+        tile_byte_2;    // 1st byte from the current tile fetched
 
-    u16 y_line, x_line; //counters for current pixel
-    u16 x_sc, y_sc;
+    u16
+        y_line, // y counter for current_pixel
+        x_line; // x counter for current pixel
+    u16
+        x_sc,   // x_scroll locked at beginning of line
+        y_sc;   // y_scroll locked as beginning of line
     bool
         first_frame = false,   // first frame after lcd enable
         frame_disable = false, // disable pixel output for current frame(used with first frame)
         new_frame = false,     // the first clock tick of a new frame
         first_line = false,    // the first clock tick of the first line
-        new_line = false;      // the first clock tick of a new line
+        new_line = false,      // the first clock tick of a new line
+        start_of_line = false;  // the first VRAM access of a new line
 
 
     int sprite_counter = 0;

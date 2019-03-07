@@ -1,20 +1,21 @@
+#include <cstring>
+
+#include "defs.hpp"
+#include "io_reg.hpp"
 #include "video.hpp"
 
-#include "io_reg.hpp"
 #include "util/bit.hpp"
-
-#include <cstring>
 
 #define reg(X) (io->registers.X)
 
-#define LCD_ENABLED      Bit.test(reg(LCDC), 7)
-#define WINDOW_TILE_MAP  Bit.test(reg(LCDC), 6)
-#define WINDOW_ENABLED   Bit.test(reg(LCDC), 5)
-#define BG_WND_TILE_DATA Bit.test(reg(LCDC), 4)
-#define BG_TILE_MAP      Bit.test(reg(LCDC), 3)
-#define BIG_SPRITES      Bit.test(reg(LCDC), 2)
-#define OBJ_ENABLED      Bit.test(reg(LCDC), 1)
-#define BG_WND_BLANK     Bit.test(reg(LCDC), 0) //TODO: DMG only
+#define LCD_ENABLED      (Bit.test(reg(LCDC), 7))
+#define WINDOW_TILE_MAP  (Bit.test(reg(LCDC), 6))
+#define WINDOW_ENABLED   (Bit.test(reg(LCDC), 5))
+#define BG_WND_TILE_DATA (Bit.test(reg(LCDC), 4))
+#define BG_TILE_MAP      (Bit.test(reg(LCDC), 3))
+#define BIG_SPRITES      (Bit.test(reg(LCDC), 2))
+#define OBJ_ENABLED      (Bit.test(reg(LCDC), 1))
+#define BG_WND_BLANK     (Bit.test(reg(LCDC), 0)) //TODO: DMG only
 
 Video_Controller::Video_Controller(IO_Bus *io, Configuration *cfg, u8 *scrn_buf) :
 io(io),
@@ -33,7 +34,7 @@ bool Video_Controller::tick() {
  */
 
 Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
-    int loc = index*4;
+    int loc = 0xFE00 + (index * 4);
     return (Video_Controller::obj_sprite_t){
         io->read_oam(loc + 0, true),
         io->read_oam(loc + 1, true),
@@ -73,6 +74,8 @@ bool Video_Controller::ppu_tick() {
             frame_disable = false;
         }
 
+        current_byte = 0;
+
         bg_map_addr = 0x9800;
         y_line = 0;
         new_line = true;
@@ -84,8 +87,9 @@ bool Video_Controller::ppu_tick() {
      * Occurs on Every line
      */
     if(new_line) {
-        // std::cout << "new line " << y_line << ", ";
+        //std::cout << "new line " << y_line+1 << " " << y_line * 160 * 3 << " " << current_byte << std::endl;;
         new_line = false;
+        start_of_line = true;
 
         if(!first_line) y_line++;
 
@@ -94,8 +98,6 @@ bool Video_Controller::ppu_tick() {
 
         sprite_counter = 0;
 
-        current_byte = 0;
-
         reg(LY) = y_line; //set LY
         if(reg(LY) == reg(LYC)) {
             Bit.set(&reg(STAT), STAT_COIN_BIT);
@@ -103,16 +105,23 @@ bool Video_Controller::ppu_tick() {
             Bit.reset(&reg(STAT), STAT_COIN_BIT);
         }
 
-        x_sc = reg(SCX); //lock scx for the current line
-        y_sc = reg(SCY); //lock scy for the current line
-        process_step = SCANLINE_OAM;
-        oam_fetch_step = OAM_1;
+        if(y_line < 145) {
+            x_sc = reg(SCX); //lock scx for the current line
+            y_sc = reg(SCY); //lock scy for the current line
+            process_step = SCANLINE_OAM;
+            oam_fetch_step = OAM_1;
 
-        bg_map_addr =
+            bg_map_addr =
                 (0x9800) |
                 ((BG_TILE_MAP == TILE_MAP_1) ? 0 : 0x0400) |
-                ((u16)(y_line & 0xf8) << 2) |
+                ((u16)((y_line+y_sc) & 0xf8) << 2) |
                 (x_sc >> 3);
+        } else if(y_line < 155) {
+            process_step = VBLANK;
+            //TODO: anything else?
+        } else {
+            std::cerr << "y_line OOB: " << y_line << std::endl;
+        }
     }
 
     /**
@@ -134,7 +143,6 @@ bool Video_Controller::ppu_tick() {
      * OAM Fetch Mode
      */
     if(process_step == SCANLINE_OAM) {
-        // std::cout << "oam " << sprite_counter << ", " << std::endl;
         switch(oam_fetch_step) {
 
         // oam clk 1
@@ -146,6 +154,7 @@ bool Video_Controller::ppu_tick() {
 
         // oam clk 2
         case OAM_2:
+            sprite_counter++;
             if(displayed_sprites.size() < 10 && current_sprite.pos_x &&
                y_line + 16 >= current_sprite.pos_y &&
                y_line + 16 < current_sprite.pos_y + ((BIG_SPRITES) ? 16 : 8))
@@ -158,7 +167,6 @@ bool Video_Controller::ppu_tick() {
         }
 
         //quit after scanning all 40 sprites
-        sprite_counter++;
         if(sprite_counter == 40) {
             process_step = SCANLINE_VRAM;
         }
@@ -167,7 +175,7 @@ bool Video_Controller::ppu_tick() {
      * VRAM Fetch Mode
      */
     } else if(process_step == SCANLINE_VRAM) {
-        // std::cout << "vram " << vram_fetch_step << ", " << std::endl;
+        //std::cout << "vram " << vram_fetch_step << ", ";
         /**
          * VRAM fetches take 2 cycles to occur.
          *
@@ -177,69 +185,87 @@ bool Video_Controller::ppu_tick() {
          */
         switch(vram_fetch_step) {
         case BM_1:
-            bg_map_byte = io->read_vram(bg_map_addr);
+            bg_map_byte = io->read_vram(bg_map_addr, true);
 
-            bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
+            if(!start_of_line) {
+                bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
+            }
 
             vram_fetch_step = BM_2;
             break;
         case BM_2:
-            if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
-                tile_addr =
-                    (bg_map_byte << 4) |
-                    ((ybase & 0x7) << 1);
-            } else {
-                tile_addr =
-                    (0x1000 - (bg_map_byte << 4)) |
-                    ((ybase & 0x7) << 1);
+            //std::cout << "B";
+            tile_addr_base = 0x8000;
+            tile_addr = (bg_map_byte << 4) | ((ybase & 0x7) << 1);
+
+            if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) {
+                tile_addr_base = 0x9000;
+                tile_addr = (0x1000 - tile_addr);
             }
 
             vram_fetch_step = TD_0_0;
             break;
 
         case WM_1: //TODO
+
+            vram_fetch_step = WM_2;
         case WM_2: //TODO
 
+            vram_fetch_step = TD_0_0;
+
         case TD_0_0:
-            tile_byte = io->read_vram(tile_addr++);
+            tile_byte_1 = io->read_vram(tile_addr_base + tile_addr, true);
+            tile_addr++;
 
             vram_fetch_step = TD_0_1;
             break;
         case TD_0_1:
-            //TODO: check if this is backwards
-            pix_fifo->enqueue(tile_byte & 0x03);
-            pix_fifo->enqueue((tile_byte & 0x0c) >> 2);
-            pix_fifo->enqueue((tile_byte & 0x30) >> 4);
-            pix_fifo->enqueue((tile_byte & 0xc0) >> 6);
-
+            //std::cout << "0";
             vram_fetch_step = TD_1_0;
             break;
         case TD_1_0:
-            tile_byte = io->read_vram(tile_addr++);
+            tile_byte_2 = io->read_vram(tile_addr_base + tile_addr, true);
+            tile_addr++;
 
             vram_fetch_step = TD_1_1;
             break;
         case TD_1_1:
-            //TODO: check if this is backwards
-            pix_fifo->enqueue(tile_byte & 0x03);
-            pix_fifo->enqueue((tile_byte & 0x0c) >> 2);
-            pix_fifo->enqueue((tile_byte & 0x30) >> 4);
-            pix_fifo->enqueue((tile_byte & 0xc0) >> 6);
+            //std::cout << "1";
+            for(int i = 0; i < 8; i++) {
+                u8 out_color = ((tile_byte_1 >> (7 - i)) & 1) << 1;
+                out_color   |= ((tile_byte_2 >> (7 - i)) & 1);
 
-            //TODO: logic for which step to go back to.
-            vram_fetch_step = BM_1;
+                if(start_of_line) {
+                    start_of_line = false;
+
+                    vram_fetch_step = BM_1;
+                } else {
+                    pix_fifo->enqueue(out_color);
+
+                    vram_fetch_step = SP_0;
+                }
+            }
+
+        case SP_0: //TODO
+            vram_fetch_step = SP_0;
+        case SP_1: //TODO
+            //std::cout << "S" <<std::endl;
+
+            vram_fetch_step = BM_1; //TODO: logic for which step to go back to.
             break;
         }
 
         if(pix_fifo->size() > 0) {
             u8 pallette = reg(BGP);
-            u8 color = (pallette >> pix_fifo->dequeue()) & 0x3;
+            u8 pallette_index = pix_fifo->dequeue() * 2;
+            u8 color = (pallette >> pallette_index) & 0x3;
 
             if(!frame_disable) {
-                // std::cout << (int)color << ", " << current_byte << std::endl;
-                memcpy(&screen_buffer[current_byte], pixel_colors[color], 3);
+                //if(color != 0) std::cout << (int)color << " " << x_line << "," << y_line << std::endl;
+                // std::cout << "byte " << current_byte << " " << x_line << "," << y_line << std::endl;
+                memcpy(screen_buffer + current_byte, pixel_colors[color], 3);
+                current_byte += 3;
             }
-            current_byte += 3;
 
             x_line++;
             if(x_line == 160) {
