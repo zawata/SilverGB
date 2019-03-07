@@ -28,7 +28,7 @@
 #define GBC_VRAM_CHAR_SIZE  (VRAM_BANK_SIZE + VRAM_BANK_SIZE)
 #define VRAM_BACK_SIZE      0x1800
 
-#define OAM_RAM_SIZE   0x9F
+#define OAM_RAM_SIZE   0xA0
 
 class IO_Bus {
 public:

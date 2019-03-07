@@ -6,6 +6,10 @@
 
 #include "defs.hpp"
 
+#define MODE_HBLANK 0
+#define MODE_VBLANK 1
+#define MODE_OAM    2
+#define MODE_VRAM   3
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
 IO_Bus::IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode) :
@@ -64,8 +68,7 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
-        std::cout << "read to VRAM" << std::endl;
-        return read_vram(offset-0x8000);
+        return read_vram(offset);
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
@@ -73,23 +76,19 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
-    std::cout << "read to work RAM" << std::endl;
         return read_ram(offset-0xC000);
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
-    std::cout << "read to work RAM" << std::endl;
         return read_ram(offset-0xC000);
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        std::cerr << "read to ECHO RAM" << std::endl;
         return 0; //TODO: ECHO or zero?
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
-    std::cout << "read to OAM" << std::endl;
-        return read_oam(offset-0xFE00);
+        return read_oam(offset);
     }
     else if(offset <= 0xFEFF) {
     // Not Usable
@@ -97,12 +96,10 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xFF7F) {
     // I/O Registers
-        std::cout << "read to REG" << std::endl;
         return read_reg(offset-0xFF00);
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
-        std::cout << "read to HRAM" << std::endl;
         return read_hram(offset-0xFF80);
     }
     else if(offset <= 0xFFFF) {
@@ -122,32 +119,28 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
-        std::cout << "write to VRAM" << std::endl;
-        write_vram(offset-0x8000, data);
+        write_vram(offset, data);
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
-        cart->write_ram(offset-0xA000, data);
+        cart->write_ram(offset, data);
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
-        std::cout << "write to work RAM" << std::endl;
-        write_ram(offset-0xC000, data);
+        write_ram(offset, data);
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
-        std::cout << "write to work RAM" << std::endl;
-        write_ram(offset-0xC000, data);
+        write_ram(offset, data);
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        std::cerr << "write to ECHO RAM" << std::endl;
+        std::cerr << "write to ECHO RAM?" << std::endl;
         return;
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
-        std::cout << "write to OAM" << std::endl;
-        write_oam(offset - 0xFE00, offset);
+        write_oam(offset, offset);
     }
     else if(offset <= 0xFEFF) {
     // Not Usable
@@ -155,12 +148,10 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFF7F) {
     // I/O Registers
-        std::cout << "write to REG" << std::endl;
         write_reg(offset - 0xFF00, data);
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
-        std::cout << "read to HRAM" << std::endl;
         write_hram(offset - 0xFF80, data);
     }
     else if(offset <= 0xFFFF) {
@@ -258,12 +249,13 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case P1_REG   :
         registers.P1 = data & P1_WRITE_MASK;
         return;
-    // case SB_REG   :
-    //     registers.SB = data & SB_WRITE_MASK;
-    //     return;
-    // case SC_REG   :
-    //     registers.SC = data & SC_WRITE_MASK;
-    //     return;
+    case SB_REG   :
+        //std::cerr << data << std::endl;
+        registers.SB = data & SB_WRITE_MASK;
+        return;
+    case SC_REG   :
+        registers.SC = data & SC_WRITE_MASK;
+        return;
     case DIV_REG  :
         registers.DIV = data & DIV_WRITE_MASK;
         return;
@@ -300,7 +292,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
 #endif
         return snd->write_wavram(loc, data);
     case LCDC_REG :
-        if(!Bit.test(data, 7) && !check_mode(1))
+        if(!Bit.test(data, 7) && !check_mode(MODE_VBLANK))
             std::cerr << "LCD Disable outside VBLANK" << std::endl;
         registers.LCDC = data & STAT_WRITE_MASK;
     case STAT_REG:
@@ -393,44 +385,78 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
  *
  * TODO: do the writes need a bypass too?
  **/
-u8 IO_Bus::read_vram(u16 loc, bool bypass) {
-    if(check_mode(3) && !bypass) return 0xFF;
+u8 IO_Bus::read_vram(u16 offset, bool bypass) {
+    if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
-    if(loc < VRAM_BANK_SIZE) {
-        if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
-            return video_ram_char[VRAM_BANK_SIZE + loc];
+    u8 ret = 0;
+    if(offset >= 0x8000 && offset <= 0x9FFF) {
+        offset -= 0x8000;
+
+        if(offset < VRAM_BANK_SIZE) {
+            if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+                ret = video_ram_char[VRAM_BANK_SIZE + offset];
+            }
+            else {
+                ret = video_ram_char[offset];
+            }
         }
         else {
-            return video_ram_char[loc];
+            ret = video_ram_back[offset-VRAM_BANK_SIZE];
         }
     }
     else {
-        return video_ram_back[loc-VRAM_BANK_SIZE];
+        std::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
     }
+
+    //std::cout << "read to VRAM: " << as_hex(offset+ 0x8000) << " : " << as_hex(ret) << std::endl;
+    return ret;
 }
 
-void IO_Bus::write_vram(u16 loc, u8 data) {
-    if(loc < VRAM_BANK_SIZE) {
-        if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
-            video_ram_char[VRAM_BANK_SIZE + loc] = data;
+void IO_Bus::write_vram(u16 offset, u8 data) {
+    if(offset >= 0x8000 && offset <= 0x9FFF) {
+        offset -= 0x8000;
+
+        if(offset < VRAM_BANK_SIZE) {
+            if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+                video_ram_char[VRAM_BANK_SIZE + offset] = data;
+            }
+            else {
+                video_ram_char[offset] = data;
+            }
         }
         else {
-            video_ram_char[loc] = data;
+            video_ram_back[offset-VRAM_BANK_SIZE] = data;
         }
     }
     else {
-        video_ram_back[loc-VRAM_BANK_SIZE] = data;
+        std::cerr << "vram write OOB: " << as_hex(offset) << std::endl;
+    }
+
+    //std::cout << "write to VRAM: " << as_hex(offset+ 0x8000) << " : " << as_hex(data) << std::endl;
+}
+
+u8 IO_Bus::read_oam(u16 offset, bool bypass) {
+    if((check_mode(MODE_OAM) || check_mode(MODE_VRAM)) && !bypass) return 0xFF;
+
+    if(offset >= 0xFE00 && offset <= 0xFE9F) {
+        offset -= 0xFE00;
+
+        return oam_ram[offset];
+    }
+    else {
+        std::cerr << "oam read OOB: " << as_hex(offset) << std::endl;
     }
 }
 
-u8 IO_Bus::read_oam(u16 loc, bool bypass) {
-    if((check_mode(2) || check_mode(3)) && !bypass) return 0xFF;
+void IO_Bus::write_oam(u16 offset, u8 data) {
+    if(offset >= 0xFE00 && offset <= 0xFE9F) {
+        offset -= 0xFE00;
 
-    return oam_ram[loc];
-}
-
-void IO_Bus::write_oam(u16 loc, u8 data) {
-    oam_ram[loc] = data;
+        oam_ram[offset] = data;
+    }
+    else {
+        std::cerr << "oam write OOB: " << as_hex(offset) << std::endl;
+    }
 }
 
 u8 IO_Bus::read_ram(u16 loc) {
