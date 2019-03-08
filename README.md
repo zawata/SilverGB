@@ -2,14 +2,14 @@
 Because it's not quite gold!
 
 ## Summary
-SilverBoy is gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year 
-class regarding CPU execution piplines, and my general knowledge of embedded development.
+SilverGB is gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year 
+class regarding CPU execution pipelines, and my general knowledge of embedded development.
 
 I'm writing this code(and commenting it with what I learn) to hopefully interest other people who 
 were like me about 6 years ago when I first tried to start this project(as a sophmore in highschool ha!): 
 minor knowledge of programming but major interest in doing something cool.
 
-The emulator features a GUI created with "Dear ImGui" which is an absolutely fantastic Gui Library.  
+The emulator features a GUI created with "Dear ImGui" which is an absolutely fantastic GUI Library.  
 It utilizes SDL for media interfaces(Input, Audio, Window Managment) and OpenGL for graphics.  
 It attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing)
 but I'm developing and testing it on Linux so that is where it's "guaranteed" to work.(note the quotes...)  
@@ -26,6 +26,7 @@ but I'm developing and testing it on Linux so that is where it's "guaranteed" to
 &nbsp;&nbsp;&nbsp;&nbsp;➕Debug Windows  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Debug Mode  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️CPU Registers Window  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️IO Registers Window  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Disassembly Window  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Stack Viewer Window  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Shortcuts  
@@ -47,12 +48,25 @@ but I'm developing and testing it on Linux so that is where it's "guaranteed" to
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Memory Layout  
 ➕Cartridge  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️Header Parsing  
-&nbsp;&nbsp;&nbsp;&nbsp;🚫Memory Block Controllers  
+&nbsp;&nbsp;&nbsp;&nbsp;➕Memory Bank Controllers  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️ROM(+RAM)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️MBC1
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️MBC2
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️MBC3
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Others
 ➕Sound  
 &nbsp;&nbsp;&nbsp;&nbsp;➕(See the `sound_impl` branch)  
 🚫Video  
 &nbsp;&nbsp;&nbsp;&nbsp;✔️VRAM  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Pixel Fifo  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️OAM Search  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕VRAM Process  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Background  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫Window  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️Tile Fetching  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️Tile Fetching  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;️✔️HBLANK  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;️✔️VBLANK  
 &nbsp;&nbsp;&nbsp;&nbsp;➕Display timing  
 &nbsp;&nbsp;&nbsp;&nbsp;➕DMA  
 🚫Input  
