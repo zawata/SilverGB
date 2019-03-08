@@ -72,15 +72,15 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
-        return cart->read_ram(offset-0xA000);
+        return cart->read_ram(offset);
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
-        return read_ram(offset-0xC000);
+        return read_ram(offset);
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
-        return read_ram(offset-0xC000);
+        return read_ram(offset);
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
@@ -100,7 +100,7 @@ u8 IO_Bus::read(u16 offset) {
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
-        return read_hram(offset-0xFF80);
+        return read_hram(offset);
     }
     else if(offset <= 0xFFFF) {
     // Interrupts Enable Register (IE)
@@ -152,7 +152,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
-        write_hram(offset - 0xFF80, data);
+        write_hram(offset, data);
     }
     else if(offset <= 0xFFFF) {
     // Interrupts Enable Register (IE)
@@ -245,12 +245,12 @@ u8  IO_Bus::read_reg(u8 loc) {
 }
 
 void IO_Bus::write_reg(u8 loc, u8 data) {
+    std::cout <<  "write reg: " << as_hex(loc) << std::endl;;
     switch(loc) {
     case P1_REG   :
         registers.P1 = data & P1_WRITE_MASK;
         return;
     case SB_REG   :
-        //std::cerr << data << std::endl;
         registers.SB = data & SB_WRITE_MASK;
         return;
     case SC_REG   :
@@ -311,6 +311,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.LYC  = data & LYC_WRITE_MASK;
         break;
     case DMA_REG:
+        std::cout << "DMA" << std::endl;
         registers.DMA  = data & DMA_WRITE_MASK;
         break;
     case BGP_REG:
@@ -353,7 +354,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.SVBK = data & SVBK_WRITE_MASK;
         //value 1-7 is bank 1-7
         //value 0   is bank 1
-        if(data & SVBK_WRITE_MASK)
+        if(registers.SVBK)
             bank_offset = registers.SVBK * WORK_RAM_BANK_SIZE;
         else
             bank_offset = WORK_RAM_BANK_SIZE;
@@ -388,28 +389,24 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
 u8 IO_Bus::read_vram(u16 offset, bool bypass) {
     if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
-    u8 ret = 0;
     if(offset >= 0x8000 && offset <= 0x9FFF) {
         offset -= 0x8000;
 
         if(offset < VRAM_BANK_SIZE) {
             if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
-                ret = video_ram_char[VRAM_BANK_SIZE + offset];
+                return video_ram_char[VRAM_BANK_SIZE + offset];
             }
             else {
-                ret = video_ram_char[offset];
+                return video_ram_char[offset];
             }
         }
         else {
-            ret = video_ram_back[offset-VRAM_BANK_SIZE];
+            return video_ram_back[offset-VRAM_BANK_SIZE];
         }
     }
     else {
         std::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
     }
-
-    //std::cout << "read to VRAM: " << as_hex(offset+ 0x8000) << " : " << as_hex(ret) << std::endl;
-    return ret;
 }
 
 void IO_Bus::write_vram(u16 offset, u8 data) {
@@ -431,8 +428,6 @@ void IO_Bus::write_vram(u16 offset, u8 data) {
     else {
         std::cerr << "vram write OOB: " << as_hex(offset) << std::endl;
     }
-
-    //std::cout << "write to VRAM: " << as_hex(offset+ 0x8000) << " : " << as_hex(data) << std::endl;
 }
 
 u8 IO_Bus::read_oam(u16 offset, bool bypass) {
@@ -459,36 +454,64 @@ void IO_Bus::write_oam(u16 offset, u8 data) {
     }
 }
 
-u8 IO_Bus::read_ram(u16 loc) {
-    if(loc <= 0x0FFF) {
-        return work_ram[loc];
-    } else {
-        if(gbc_mode) {
-            return work_ram[loc + bank_offset];
+u8 IO_Bus::read_ram(u16 offset) {
+    if(offset >= 0xC000 && offset < 0xE000) {
+        offset -= 0xC000;
+
+        if(offset < 0x1000) {
+            return work_ram[offset];
         } else {
-            return work_ram[loc];
+            if(gbc_mode) {
+                return work_ram[offset + bank_offset];
+            } else {
+                return work_ram[offset];
+            }
         }
+    }
+    else {
+        std::cerr << "ram read OOB: " << as_hex(offset) << std::endl;
     }
 }
 
-void IO_Bus::write_ram(u16 loc, u8 data) {
-    if(loc <= 0x0FFF) {
-        work_ram[loc] = data;
-    } else {
-        if(gbc_mode) {
-            work_ram[loc + bank_offset] = data;
+void IO_Bus::write_ram(u16 offset, u8 data) {
+    if(offset >= 0xC000 && offset < 0xE000) {
+        offset -= 0xC000;
+
+        if(offset < 0x1000) {
+            work_ram[offset] = data;
         } else {
-            work_ram[loc] = data;
+            if(gbc_mode) {
+                work_ram[offset + bank_offset] = data;
+            } else {
+                work_ram[offset] = data;
+            }
         }
+    }
+    else {
+        std::cerr << "ram write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
-u8 IO_Bus::read_hram(u16 loc) {
-    return high_ram[loc];
+u8 IO_Bus::read_hram(u16 offset) {
+    if(offset >= 0xFF80 && offset < 0xFFFF) {
+        offset -= 0xFF80;
+
+        return high_ram[offset];
+    }
+    else {
+        std::cerr << "hram read OOB: " << as_hex(offset) << std::endl;
+    }
 }
 
-void IO_Bus::write_hram(u16 loc, u8 data) {
-    high_ram[loc] = data;
+void IO_Bus::write_hram(u16 offset, u8 data) {
+    if(offset >= 0xFF80 && offset < 0xFFFF) {
+        offset -= 0xFF80;
+
+        high_ram[offset] = data;
+    }
+    else {
+        std::cerr << "hram write OOB: " << as_hex(offset) << std::endl;
+    }
 }
 
 /**
