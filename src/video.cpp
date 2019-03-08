@@ -203,7 +203,7 @@ bool Video_Controller::ppu_tick() {
         case BM_2:
             //std::cout << "B";
             tile_addr_base = 0x8000;
-            tile_addr = (bg_map_byte << 4) | ((y_line & 0x7) << 1);
+            tile_addr = (bg_map_byte << 4) | (((y_line+y_sc) & 0x7) << 1);
 
             if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) {
                 tile_addr_base = 0x9000;
