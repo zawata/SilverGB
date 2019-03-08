@@ -193,6 +193,7 @@ bool Video_Controller::ppu_tick() {
         switch(vram_fetch_step) {
         case BM_1:
             bg_map_byte = io->read_vram(bg_map_addr, true);
+
             if(!start_of_line) {
                 bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
             }
@@ -202,12 +203,11 @@ bool Video_Controller::ppu_tick() {
 
         case BM_2:
             //std::cout << "B";
-            tile_addr_base = 0x8000;
-            tile_addr = (bg_map_byte << 4) | (((y_line+y_sc) & 0x7) << 1);
 
-            if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) {
-                tile_addr_base = 0x9000;
-                tile_addr = (0x1000 - tile_addr);
+            if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
+                tile_addr = (bg_map_byte << 4) | (((y_line + y_sc) & 0x7) << 1);
+            } else {
+                tile_addr = (0x1000 - (bg_map_byte << 4)) | (((y_line + y_sc) & 0x7) << 1);
             }
 
             vram_fetch_step = TD_0_0;
@@ -224,7 +224,7 @@ bool Video_Controller::ppu_tick() {
             break;
 
         case TD_0_0:
-            tile_byte_1 = io->read_vram(tile_addr_base + tile_addr, true);
+            tile_byte_1 = io->read_vram(0x8000 + tile_addr, true);
             tile_addr++;
 
             vram_fetch_step = TD_0_1;
@@ -236,7 +236,7 @@ bool Video_Controller::ppu_tick() {
             break;
 
         case TD_1_0:
-            tile_byte_2 = io->read_vram(tile_addr_base + tile_addr, true);
+            tile_byte_2 = io->read_vram(0x8000 + tile_addr, true);
             tile_addr++;
 
             vram_fetch_step = TD_1_1;
@@ -263,8 +263,9 @@ bool Video_Controller::ppu_tick() {
             //TODO
 
             for(int i = 0; i < 8; i++) {
-                u8 out_color = ((tile_byte_1 >> (7 - i)) & 1) << 1;
-                out_color   |= ((tile_byte_2 >> (7 - i)) & 1);
+                u8 out_color = ((tile_byte_1 >> (7 - i)) & 1);
+                out_color   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
+
 
                 pix_fifo->enqueue(out_color);
             }
@@ -309,6 +310,11 @@ bool Video_Controller::ppu_tick() {
         }
         //clock_count checker below will reset the frame
 
+        if(line_clock_count >= 456) {
+            //TODO: supposedly the first VBLANK is shorter than the rest? refer to TCAGBD and confirm
+            new_line = true;
+        }
+
     /**
      * ERROR
      */
@@ -316,7 +322,7 @@ bool Video_Controller::ppu_tick() {
         std::cerr << "process_step error: " << process_step << std::endl;
     }
 
-    line_clock_count++; //used to find end of HBLANK
+    line_clock_count++; //used in HBLANK and VBLANK
     frame_clock_count++;
 
     if(frame_clock_count >= 70223) { //70224 clks per frame

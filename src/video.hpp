@@ -136,9 +136,8 @@ private:
     int ybase;
 
     u16
-        bg_map_addr,    // addr of the current tile in the bg  tile map;
-        wnd_map_addr,   // addr of the current tile in the wnd tile map
-        tile_addr_base; // base of the relative address
+        bg_map_addr,    // addr of the current tile in the bg  tile map
+        wnd_map_addr;   // addr of the current tile in the wnd tile map
     s16
         tile_addr;      // relative addr of the current tile data to fetch
     u8
