@@ -25,7 +25,7 @@ screen_buffer(scrn_buf) {}
 Video_Controller::~Video_Controller() {}
 
 bool Video_Controller::tick() {
-    //dma_tick(); //TODO
+    io->dma_tick();
     return ppu_tick();
 }
 

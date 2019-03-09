@@ -50,8 +50,16 @@ IO_Bus::~IO_Bus() {
     delete input;
 }
 
-u8 IO_Bus::read(u16 offset) {
-    if(offset <= 0x100) {
+u8 IO_Bus::read(u16 offset, bool bypass) {
+    if(dma_active && !bypass) {
+        if(offset >= 0xFF80 && offset < 0xFFFF) {
+            return read_hram(offset);
+        } else {
+            return 0; //TODO:
+        }
+    }
+
+    if(offset <= 0xFF) {
         if(bootrom_mode) {
             return bootrom_file->getByte(offset);
         } else {
@@ -109,6 +117,15 @@ u8 IO_Bus::read(u16 offset) {
 }
 
 void IO_Bus::write(u16 offset, u8 data) {
+    //TODO: do we need a bypass?
+    if(dma_active) {
+        if(offset >= 0xFF80 && offset < 0xFFFF) {
+            return write_hram(offset, data);
+        } else {
+            return; //TODO:
+        }
+    }
+
     if(offset <= 0x3FFF) {
     // 16KB ROM bank 00
         cart->write_rom(offset, data);
@@ -313,6 +330,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case DMA_REG:
         std::cout << "DMA" << std::endl;
         registers.DMA  = data & DMA_WRITE_MASK;
+        dma_start = true;
         break;
     case BGP_REG:
         registers.BGP  = data & BGP_WRITE_MASK;
@@ -520,6 +538,44 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
 
 void IO_Bus::request_interrupt(int i) {
     registers.IF |= i;
+}
+
+//called by Video_Controller
+void IO_Bus::dma_tick() {
+    if(dma_start) {
+        std::cout << "dma_start" << std::endl;
+        dma_start = false;
+        dma_start_active = true;
+        dma_tick_cnt = 0;
+        dma_byte_cnt = 0;
+    }
+
+    if(dma_active) {
+        //std::cout << "dma tick " << dma_tick_cnt << std::endl;
+        if(dma_tick_cnt % 4 == 0) {
+            //std::cout << "dma byte " << as_hex(dma_byte_cnt) << std::endl;
+            u16 src  = (u16)registers.DMA << 8 | dma_byte_cnt,
+                dest = 0xFE00 | dma_byte_cnt;
+            write_oam(dest, read(src, true));
+            dma_byte_cnt++;
+        }
+        dma_tick_cnt++;
+    }
+
+    if(dma_byte_cnt == 0xa0 && dma_active) {
+        std::cout << "dma_kill" << std::endl;
+        dma_active = false;
+    }
+
+    if(dma_start_active) {
+        if(dma_tick_cnt % 4 == 0) {
+            dma_tick_cnt++;
+        } else {
+            dma_tick_cnt = 0;
+            dma_start_active = false;
+            dma_active = true;
+        }
+    }
 }
 
 /**

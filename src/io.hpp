@@ -43,7 +43,7 @@ public:
     IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode);
     ~IO_Bus();
 
-    u8   read(u16 offset);
+    u8   read(u16 offset, bool bypass = false);
     void write(u16 offset, u8 data);
 
     u8   read_reg(u8 loc);
@@ -62,6 +62,14 @@ public:
     void write_hram(u16 loc, u8 data);
 
     void request_interrupt(int i);
+    void dma_tick();
+        bool
+            dma_start        = false,
+            dma_start_active = false,
+            dma_active       = false;
+        u16
+            dma_tick_cnt = 0,
+            dma_byte_cnt = 0;
 
     void      cpu_inc_DIV();
     void      cpu_inc_TIMA();
