@@ -97,13 +97,13 @@ void GB_Core::tick_instr() {
     while(!cpu->tick()) {
         vpu->tick();
     }
-    if(cpu->getRegisters().PC == breakpoint and bp_active)
+    if(cpu->getRegisters().PC == breakpoint && bp_active)
         throw breakpoint_exception();
 }
 
 void GB_Core::tick_frame() {
     do {
-        if(cpu->tick() && cpu->getRegisters().PC == breakpoint) {
+        if(cpu->tick() && cpu->getRegisters().PC == breakpoint && bp_active) {
             throw breakpoint_exception();
         }
     } while(!vpu->tick());

@@ -14,7 +14,6 @@
  * errors(making them rather easy to find)
  *
  * We can build a small shortcut handler in the same image.
-
  * At the beginning of every frame we can process the key events and build a key combination
  * then every component we want to have a shortcut just creates it's GUI Component and
  * checks its shortcut in an `if` statement.
@@ -35,18 +34,15 @@ bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
             key->state == SDL_PRESSED) { //if key was pressed
         if(     key->keysym.mod & KMOD_CTRL ||
                 key->keysym.mod & KMOD_ALT ||
-                key->keysym.mod & KMOD_SHIFT) {
+                key->keysym.mod & KMOD_SHIFT)
             this->current_shortcut = {
                 .valid     = true,
                 .ctrl_mod  = key->keysym.mod & KMOD_CTRL,
                 .alt_mod   = key->keysym.mod & KMOD_ALT,
                 .shift_mod = key->keysym.mod & KMOD_SHIFT,
-                .key       = (char)key->keysym.sym,
+                .key       = key->keysym.sym,
             };
-            return true;
-        }
     }
-    return false;
 }
 
 void GUI::clear_shortcut() {
@@ -55,76 +51,37 @@ void GUI::clear_shortcut() {
     };
 }
 
-/**
- * Creating a struct for the modifier keys allows us to use initializer lists
- * to pass in modifiers.
- *
- * so instead of doing seomthign like:
- *
- *    bool shortcut_pressed(bool ctrl_key, bool alt_key, bool shift_key, char key);
- *
- *    shortcut_pressed(true, false, true, 'c'); // CTRL+SHIFT+C
- *
- * we can do:
- *
- *    bool shortcut_pressed(mod_arg mods, char key);
- *
- *    shortcut_pressed({ CTRL, SHIFT }, 'c'); // CTRL+SHIFT+C
- *
- * Which I think looks cleaner.
- *
- * The processing for doing this is a little wierder though.
- *
- * As it is designed:
- *      3 conditions have to be created. the conditions being each of
- *      the modifier keys
- *
- *      if the current shortcut doesn't need a particular modifier, then the
- *      condition is marked as fulfilled.
- *
- *      then we "loop" through the variable sin the modifier struct
- *      and mark each condition they match as fulfilled
- *
- *      if a condition is already fulfilled and we match it,
- *      then the current shortcut wasn't using this modifier and
- *      we don't match the shortcut
- *
- *      after each field is processed, we check that all conditions are
- *      marked as fulfilled to make sure the shortcut doesn't require additional
- *      modifiers that we don't have.
- *
- *      lastly the base key is checked to see if it matches.
- *
- */
-bool GUI::shortcut_pressed(const mod_arg mods, char key) {
-    assert(mods.mod0 != 0); //all shortcuts require a modifier
+bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
+    assert(mods.size() <= 3);
+    assert(mods[0] != 0);
 
-    //check if the shortcut is valid before processing it
     if(!this->current_shortcut.valid) return false;
 
-    //setup condition flags.
-    bool mod_ctrl_handled  = !current_shortcut.ctrl_mod,
-         mod_alt_handled   = !current_shortcut.alt_mod,
-         mod_shift_handled = !current_shortcut.shift_mod;
+    bool ctrl_repeated = false,
+         alt_repeated = false,
+         shift_repeated = false;
+
+    shortcut_t current = this->current_shortcut;
 
     for(int i = 0; i < mods.size(); i++) {
         switch(mods[i]) {
         case 0:
             break;
-        case mod_key::CTRL:
-            if(mod_ctrl_handled) return false;
-            else mod_ctrl_handled = true;
+        case CTRL_MOD:
+            assert(!ctrl_repeated);
+            if(!current.ctrl_mod) return false;
+            ctrl_repeated = true;
             break;
-        case mod_key::ALT:
-            if(mod_alt_handled) return false;
-            else mod_alt_handled = true;
+        case ALT_MOD:
+            assert(!alt_repeated);
+            if(!current.alt_mod) return false;
+            alt_repeated = true;
             break;
-        case mod_key::SHIFT:
-            if(mod_shift_handled) return false;
-            else mod_shift_handled = true;
+        case SHIFT_MOD:
+            assert(!shift_repeated);
+            if(!current.shift_mod) return false;
+            shift_repeated = true;
             break;
-        default:
-            return false;
         }
     }
     return key            == current.key &&
@@ -133,20 +90,12 @@ bool GUI::shortcut_pressed(const mod_arg mods, char key) {
            shift_repeated == current.shift_mod;
 }
 
-GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io) :
+GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io, Configuration *config) :
 window(w),
 gl_context(g),
 io(io),
-core(nullptr) {
-
-    io.IniFilename = nullptr; //disable IMGUI ini file. //TODO: re-evaluate later
-
-    config = Configuration::loadConfigFile("config.cfg");
-    if(!config) {
-        std::cout << "creating new Config" << std::endl;
-        //the config doesn't exist so lets just start a new one
-        config = Configuration::newConfigFile("config.cfg");
-    }
+core(nullptr),
+config(config) {
 
     glGenTextures(1, &screen_texture);
     glBindTexture(GL_TEXTURE_2D, screen_texture);
@@ -195,7 +144,7 @@ bool GUI::preInitialize() {
     return true;
 }
 
-GUI *GUI::createGUI() {
+GUI *GUI::createGUI(Configuration *config) {
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
     SDL_Window *window = SDL_CreateWindow("SilverBoy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H + MENUBAR_HEIGHT, SDL_WINDOW_OPENGL);
@@ -210,7 +159,7 @@ GUI *GUI::createGUI() {
 
     ImGui::StyleColorsDark();
 
-    return new GUI(window, gl_context, ImGui::GetIO());
+    return new GUI(window, gl_context, ImGui::GetIO(), config);
 }
 
 void GUI::open_file(std::string file) {
@@ -219,7 +168,6 @@ void GUI::open_file(std::string file) {
     core = new GB_Core(rom_file, config);
     //core->start_thread(true);
     state_flags.game_loaded = true;
-    core->set_breakpoint(0xf1);
 }
 
 GUI::loop_return_code_t GUI::mainLoop() {
@@ -257,7 +205,7 @@ GUI::loop_return_code_t GUI::mainLoop() {
     //build the UI
     buildUI();
 
-    if(state_flags.opening_file || shortcut_pressed({ CTRL },'f')) {
+    if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
             this->open_file(file);
@@ -266,12 +214,14 @@ GUI::loop_return_code_t GUI::mainLoop() {
         state_flags.opening_file = false;
     }
 
+    if(shortcut_pressed({CTRL_MOD}, 'd')) core->getByteFromIO(00);
+
     try {
         if(shortcut_pressed({CTRL_MOD}, 't')) core->tick_instr();
         if(shortcut_pressed({CTRL_MOD, ALT_MOD}, 'f')) core->tick_frame();
         if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
             for(int i = 0; i < 0x100; i++)
-            core->tick_instr();
+                core->tick_instr();
         }
     } catch(breakpoint_exception &e) {
         SDL_ShowSimpleMessageBox(
@@ -327,9 +277,15 @@ GUI::loop_return_code_t GUI::mainLoop() {
     } else if(!state_flags.set_debug_mode && state_flags.debug_mode) {
         //unset debug mode
         SDL_SetWindowSize(this->window, GB_S_W, GB_S_H + MENUBAR_HEIGHT);
-        SDL_SetWindowResizable(this->window, SDL_FALSE);
+        //SDL_SetWindowResizable(this->window, SDL_FALSE);
         state_flags.debug_mode = false;
     }
+
+
+    /**
+     * Game Stuff
+     */
+    if(state_flags.run_game) core->tick_frame();
 
     clear_shortcut();
 
@@ -354,7 +310,7 @@ void GUI::buildUI() {
         bool cpu_register_window = false;
         bool io_register_window = false;
         bool disassemble_window = false;
-        bool VRAMview_window = false;
+        bool render_window = true;
     } window_flags;
 
     if(BeginMainMenuBar()) {
@@ -367,7 +323,7 @@ void GUI::buildUI() {
         if(state_flags.game_loaded) {
             if(BeginMenu("Emulation")) {
                 //if(MenuItem("Unpause")) core->resume_thread();
-                if(MenuItem("Pause")) state_flags.run_game = true;
+                if(MenuItem("Pause")) state_flags.run_game = false;
                 if(MenuItem("Unpause")) state_flags.run_game = true;
                 if(MenuItem("tick")) core->tick_once();
                 if(MenuItem("Next Instruction")) core->tick_instr();
@@ -378,10 +334,14 @@ void GUI::buildUI() {
 
         if(BeginMenu("Options")) {
             bool bios_loaded = config->BIOS.get_bios_loaded();
-            MenuItem("BIOS File", nullptr, &bios_loaded, false);//should never need to modify directly so we don't care about writing it back
+            bool bios_enabled = config->BIOS.get_bios_enabled();
+            MenuItem("BIOS Loaded", nullptr, &bios_loaded, false);//should never need to modify directly so we don't care about writing it back
+            MenuItem("BIOS Enabled", nullptr, &bios_enabled);
             MenuItem("Open BIOS File", NULL, &state_flags.opening_bios);
             MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
             EndMenu();
+
+            config->BIOS.set_bios_enabled(bios_enabled);
         }
 
         if(state_flags.debug_mode) {
@@ -404,12 +364,6 @@ void GUI::buildUI() {
                     if(MenuItem("Show Disassembly Window")) window_flags.disassemble_window = true;
                 }
 
-                if(window_flags.VRAMview_window) {
-                    if(MenuItem("Hide Memory View Window")) window_flags.VRAMview_window = false;
-                } else {
-                    if(MenuItem("Show Memory View Window")) window_flags.VRAMview_window = true;
-                }
-
                 EndMenu();
             }
         }
@@ -417,10 +371,9 @@ void GUI::buildUI() {
     }
 
     if(window_flags.cpu_register_window) buildCPURegisterUI();
-    if(window_flags.io_register_window) buildIORegisterUI();
-    if(window_flags.disassemble_window) buildDisassemblyUI();
-    if(window_flags.render_window) buildRenderUI();
-    if(window_flags.VRAMview_window) buildMemoryViewUI();
+    if(window_flags.io_register_window)  buildIORegisterUI();
+    if(window_flags.disassemble_window)  buildDisassemblyUI();
+    if(window_flags.render_window)       buildRenderUI();
 }
 
 void GUI::buildRenderUI() {
@@ -535,10 +488,10 @@ void GUI::buildCPURegisterUI() {
         if(TreeNode("F")) {
             reg_flags.F = true;
             Indent(5.0);
-            Text("C");
-            Text("H");
-            Text("N");
             Text("Z");
+            Text("N");
+            Text("H");
+            Text("C");
             Unindent(5.0);
             TreePop();
         } else {
@@ -601,10 +554,10 @@ void GUI::buildCPURegisterUI() {
         Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
         Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
         if(reg_flags.F) {
-            Text("%u", Bit.test(regs.AF, 3)); //C
-            Text("%u", Bit.test(regs.AF, 2)); //H
-            Text("%u", Bit.test(regs.AF, 1)); //N
-            Text("%u", Bit.test(regs.AF, 0)); //Z
+            Text("%u", Bit.test(regs.AF, 7)); //Z
+            Text("%u", Bit.test(regs.AF, 6)); //N
+            Text("%u", Bit.test(regs.AF, 5)); //H
+            Text("%u", Bit.test(regs.AF, 4)); //C
         }
     }
 
@@ -676,29 +629,29 @@ void GUI::buildIORegisterUI() {
     NextColumn();
     SetColumnWidth(-1, 50);
 
-    Text("0x%s", itoh(regs.P1, 4).c_str());
-    Text("0x%s", itoh(regs.SB, 4).c_str());
-    Text("0x%s", itoh(regs.SC, 4).c_str());
-    Text("0x%s", itoh(regs.DIV, 4).c_str());
-    Text("0x%s", itoh(regs.TIMA, 4).c_str());
-    Text("0x%s", itoh(regs.TMA, 4).c_str());
-    Text("0x%s", itoh(regs.TAC, 4).c_str());
-    Text("0x%s", itoh(regs.IF, 4).c_str());
-    Text("0x%s", itoh(regs.LCDC, 4).c_str());
-    Text("0x%s", itoh(regs.STAT, 4).c_str());
-    Text("0x%s", itoh(regs.SCY, 4).c_str());
-    Text("0x%s", itoh(regs.SCX, 4).c_str());
-    Text("0x%s", itoh(regs.LY, 4).c_str());
-    Text("0x%s", itoh(regs.LYC, 4).c_str());
-    Text("0x%s", itoh(regs.DMA, 4).c_str());
-    Text("0x%s", itoh(regs.BGP, 4).c_str());
-    Text("0x%s", itoh(regs.OBP0, 4).c_str());
-    Text("0x%s", itoh(regs.OBP1, 4).c_str());
-    Text("0x%s", itoh(regs.WY, 4).c_str());
-    Text("0x%s", itoh(regs.WX, 4).c_str());
-    Text("0x%s", itoh(regs.VBK, 4).c_str());
-    Text("0x%s", itoh(regs.SVBK, 4).c_str());
-    Text("0x%s", itoh(regs.IE, 4).c_str());
+    Text("0x%s", itoh(regs.P1, 2).c_str());
+    Text("0x%s", itoh(regs.SB, 2).c_str());
+    Text("0x%s", itoh(regs.SC, 2).c_str());
+    Text("0x%s", itoh(regs.DIV, 2).c_str());
+    Text("0x%s", itoh(regs.TIMA, 2).c_str());
+    Text("0x%s", itoh(regs.TMA, 2).c_str());
+    Text("0x%s", itoh(regs.TAC, 2).c_str());
+    Text("0x%s", itoh(regs.IF, 2).c_str());
+    Text("0x%s", itoh(regs.LCDC, 2).c_str());
+    Text("0x%s", itoh(regs.STAT, 2).c_str());
+    Text("0x%s", itoh(regs.SCY, 2).c_str());
+    Text("0x%s", itoh(regs.SCX, 2).c_str());
+    Text("0x%s", itoh(regs.LY, 2).c_str());
+    Text("0x%s", itoh(regs.LYC, 2).c_str());
+    Text("0x%s", itoh(regs.DMA, 2).c_str());
+    Text("0x%s", itoh(regs.BGP, 2).c_str());
+    Text("0x%s", itoh(regs.OBP0, 2).c_str());
+    Text("0x%s", itoh(regs.OBP1, 2).c_str());
+    Text("0x%s", itoh(regs.WY, 2).c_str());
+    Text("0x%s", itoh(regs.WX, 2).c_str());
+    Text("0x%s", itoh(regs.VBK, 2).c_str());
+    Text("0x%s", itoh(regs.SVBK, 2).c_str());
+    Text("0x%s", itoh(regs.IE, 2).c_str());
     End();
 }
 

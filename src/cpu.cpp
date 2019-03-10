@@ -39,7 +39,7 @@ io(io),
 cfg(config),
 inst_clocks(0),
 IME(true) {
-    if(cfg->BIOS.get_bios_loaded()) {
+    if(cfg->BIOS.get_bios_enabled()) {
         AF_REG = 0x0000;
         BC_REG = 0x0000;
         DE_REG = 0x0000;
@@ -47,7 +47,6 @@ IME(true) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
-        //though not currently supported, this is trivial so add it anyways
         AF_REG = 0x01b0;
         BC_REG = 0x0013;
         DE_REG = 0x00D8;

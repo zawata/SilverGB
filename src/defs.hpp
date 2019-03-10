@@ -1,6 +1,6 @@
 #pragma once
 
-#define as_hex(x) std::hex << (x) << std::dec
+#define as_hex(x) std::hex << (int)(x) << std::dec
 
 #define IMAGE_FORMAT_SIZE 3 //rgb
 

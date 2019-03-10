@@ -18,17 +18,48 @@ config(config),
 gbc_mode(gbc_mode),
 snd(new Sound_Controller()),
 input(new Input_Manager()) {
-    if(config->BIOS.get_bios_loaded()) {
-        bootrom_mode = config->BIOS.get_bios_loaded();
+    registers = { 0 };
+    if(config->BIOS.get_bios_enabled()) {
+        bootrom_mode = true;
         bootrom_file = File_Interface::openFile(config->BIOS.get_bios_filepath());
         std::cout << "Boot Rom enabled" << std::endl;
-
-        registers = { 0 };
     }
     else {
-        //TODO: cleaner exit
-        std::cerr << "BIOS Emulation not supported yet..." << std::endl;
-        exit(-1);
+        bootrom_mode = false;
+
+        //C++ doesn't support direct-initialization of structs until
+        // c++20 which im not going to target right now, so just init the annoying way
+        registers.TIMA = 0x00;
+        registers.TMA  = 0x00;
+        registers.TAC  = 0x00;
+        write(0xFF00 + NR10_REG, 0x80);
+        write(0xFF00 + NR11_REG, 0xBF);
+        write(0xFF00 + NR12_REG, 0xF3);
+        write(0xFF00 + NR14_REG, 0xBF);
+        write(0xFF00 + NR21_REG, 0x3F);
+        write(0xFF00 + NR22_REG, 0x00);
+        write(0xFF00 + NR24_REG, 0xBF);
+        write(0xFF00 + NR30_REG, 0x7F);
+        write(0xFF00 + NR31_REG, 0xFF);
+        write(0xFF00 + NR32_REG, 0x9F);
+        write(0xFF00 + NR33_REG, 0xBF);
+        write(0xFF00 + NR41_REG, 0xFF);
+        write(0xFF00 + NR42_REG, 0x00);
+        write(0xFF00 + NR43_REG, 0x00);
+        write(0xFF00 + NR44_REG, 0xBF);
+        write(0xFF00 + NR50_REG, 0x77);
+        write(0xFF00 + NR51_REG, 0xF3);
+        write(0xFF00 + NR52_REG, 0xF1);
+        registers.LCDC = 0x91;
+        registers.SCY  = 0x00;
+        registers.SCX  = 0x00;
+        registers.LYC  = 0x00;
+        registers.BGP  = 0xFC;
+        registers.OBP0 = 0xFF;
+        registers.OBP1 = 0xFF;
+        registers.WY   = 0x00;
+        registers.WX   = 0x00;
+        registers.IE   = 0x00;
     }
 
     if(gbc_mode) {

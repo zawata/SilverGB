@@ -4,3 +4,4 @@ boolean nfd_path
 group BIOS
 string bios_filepath
 boolean bios_loaded
+boolean bios_enabled

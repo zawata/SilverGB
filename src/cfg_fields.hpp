@@ -55,6 +55,17 @@ public:
             g_key_file_set_boolean(parent->cfg_file, "BIOS", "bios_loaded", data);
         }
 
+        /**
+          * bios_enabled
+          */
+        bool get_bios_enabled() {
+            return (bool)g_key_file_get_boolean(parent->cfg_file, "BIOS", "bios_enabled", nullptr);
+        }
+
+        void set_bios_enabled(bool data) {
+            g_key_file_set_boolean(parent->cfg_file, "BIOS", "bios_enabled", data);
+        }
+
     private:
         Configuration_Fields *parent;
     } BIOS = __BIOS(this);

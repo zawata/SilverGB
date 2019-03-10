@@ -20,7 +20,14 @@
 Video_Controller::Video_Controller(IO_Bus *io, Configuration *cfg, u8 *scrn_buf) :
 io(io),
 cfg(cfg),
-screen_buffer(scrn_buf) {}
+screen_buffer(scrn_buf) {
+    if(!cfg->BIOS.get_bios_enabled()) {
+        new_frame = true;
+        first_frame = true;
+
+        frame_clock_count = 0;
+    }
+}
 
 Video_Controller::~Video_Controller() {}
 
@@ -319,7 +326,7 @@ bool Video_Controller::ppu_tick() {
      * ERROR
      */
     } else {
-        std::cerr << "process_step error: " << process_step << std::endl;
+        std::cerr << "process_step error: " << (int)process_step << std::endl;
     }
 
     line_clock_count++; //used in HBLANK and VBLANK
