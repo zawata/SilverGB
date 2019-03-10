@@ -53,10 +53,16 @@ private:
     } shortcut_t;
 
     typedef enum {
-        CTRL_MOD = 1,
-        ALT_MOD,
-        SHIFT_MOD,
-    } key_mods;
+        CTRL  = 1,
+        ALT   = 2,
+        SHIFT = 3,
+    } mod_key;
+
+    typedef struct __mod_arg {
+        mod_key mod0;
+        mod_key mod1;
+        mod_key mod2;
+    } mod_arg;
 
     GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io);
 
@@ -65,10 +71,11 @@ private:
     void buildCPURegisterUI();
     void buildIORegisterUI();
     void buildDisassemblyUI();
+    void buildMemoryViewUI();
 
     bool build_shortcut(SDL_KeyboardEvent *key);
     void clear_shortcut();
-    bool shortcut_pressed(std::vector<key_mods> mods, char key);
+    bool shortcut_pressed(const mod_arg mods, char key);
 
     SDL_Window* window;
     SDL_GLContext gl_context;

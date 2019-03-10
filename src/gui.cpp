@@ -9,15 +9,15 @@
  *
  * ImGui works on a technical basis by combining gui logic and construction.
  * Any call to a GUI component will display that GUI component as well as checking
- * if it's particular logic has been met. it does this with internal static
+ * if it's particular logic has been met. It does this with internal static
  * variables to handle the rendering process and assertions to handle logical
- * errors(making them rather easy to catch)
+ * errors(making them rather easy to find)
  *
  * We can build a small shortcut handler in the same image.
 
  * At the beginning of every frame we can process the key events and build a key combination
  * then every component we want to have a shortcut just creates it's GUI Component and
- * checks it's shortcut in it't `if` statement.
+ * checks its shortcut in an `if` statement.
  * not very complex but effective.
  *
  * This does pose issues with using keyboard events and shortcuts simultaneously as we
@@ -35,15 +35,18 @@ bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
             key->state == SDL_PRESSED) { //if key was pressed
         if(     key->keysym.mod & KMOD_CTRL ||
                 key->keysym.mod & KMOD_ALT ||
-                key->keysym.mod & KMOD_SHIFT)
+                key->keysym.mod & KMOD_SHIFT) {
             this->current_shortcut = {
                 .valid     = true,
                 .ctrl_mod  = key->keysym.mod & KMOD_CTRL,
                 .alt_mod   = key->keysym.mod & KMOD_ALT,
                 .shift_mod = key->keysym.mod & KMOD_SHIFT,
-                .key       = key->keysym.sym,
+                .key       = (char)key->keysym.sym,
             };
+            return true;
+        }
     }
+    return false;
 }
 
 void GUI::clear_shortcut() {
@@ -52,37 +55,76 @@ void GUI::clear_shortcut() {
     };
 }
 
-bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
-    assert(mods.size() <= 3);
-    assert(mods[0] != 0);
+/**
+ * Creating a struct for the modifier keys allows us to use initializer lists
+ * to pass in modifiers.
+ *
+ * so instead of doing seomthign like:
+ *
+ *    bool shortcut_pressed(bool ctrl_key, bool alt_key, bool shift_key, char key);
+ *
+ *    shortcut_pressed(true, false, true, 'c'); // CTRL+SHIFT+C
+ *
+ * we can do:
+ *
+ *    bool shortcut_pressed(mod_arg mods, char key);
+ *
+ *    shortcut_pressed({ CTRL, SHIFT }, 'c'); // CTRL+SHIFT+C
+ *
+ * Which I think looks cleaner.
+ *
+ * The processing for doing this is a little wierder though.
+ *
+ * As it is designed:
+ *      3 conditions have to be created. the conditions being each of
+ *      the modifier keys
+ *
+ *      if the current shortcut doesn't need a particular modifier, then the
+ *      condition is marked as fulfilled.
+ *
+ *      then we "loop" through the variable sin the modifier struct
+ *      and mark each condition they match as fulfilled
+ *
+ *      if a condition is already fulfilled and we match it,
+ *      then the current shortcut wasn't using this modifier and
+ *      we don't match the shortcut
+ *
+ *      after each field is processed, we check that all conditions are
+ *      marked as fulfilled to make sure the shortcut doesn't require additional
+ *      modifiers that we don't have.
+ *
+ *      lastly the base key is checked to see if it matches.
+ *
+ */
+bool GUI::shortcut_pressed(const mod_arg mods, char key) {
+    assert(mods.mod0 != 0); //all shortcuts require a modifier
 
+    //check if the shortcut is valid before processing it
     if(!this->current_shortcut.valid) return false;
 
-    bool ctrl_repeated = false,
-         alt_repeated = false,
-         shift_repeated = false;
-
-    shortcut_t current = this->current_shortcut;
+    //setup condition flags.
+    bool mod_ctrl_handled  = !current_shortcut.ctrl_mod,
+         mod_alt_handled   = !current_shortcut.alt_mod,
+         mod_shift_handled = !current_shortcut.shift_mod;
 
     for(int i = 0; i < mods.size(); i++) {
         switch(mods[i]) {
         case 0:
             break;
-        case CTRL_MOD:
-            assert(!ctrl_repeated);
-            if(!current.ctrl_mod) return false;
-            ctrl_repeated = true;
+        case mod_key::CTRL:
+            if(mod_ctrl_handled) return false;
+            else mod_ctrl_handled = true;
             break;
-        case ALT_MOD:
-            assert(!alt_repeated);
-            if(!current.alt_mod) return false;
-            alt_repeated = true;
+        case mod_key::ALT:
+            if(mod_alt_handled) return false;
+            else mod_alt_handled = true;
             break;
-        case SHIFT_MOD:
-            assert(!shift_repeated);
-            if(!current.shift_mod) return false;
-            shift_repeated = true;
+        case mod_key::SHIFT:
+            if(mod_shift_handled) return false;
+            else mod_shift_handled = true;
             break;
+        default:
+            return false;
         }
     }
     return key            == current.key &&
@@ -96,6 +138,8 @@ window(w),
 gl_context(g),
 io(io),
 core(nullptr) {
+
+    io.IniFilename = nullptr; //disable IMGUI ini file. //TODO: re-evaluate later
 
     config = Configuration::loadConfigFile("config.cfg");
     if(!config) {
@@ -114,6 +158,10 @@ core(nullptr) {
 GUI::~GUI() {
     //Save Configuration
     config->saveConfigFile("config.cfg");
+
+    delete config;
+    if(rom_file) delete rom_file;
+    if(core)     delete core;
 
     //delete custom textures
     glDeleteTextures(1, &screen_texture);
@@ -209,7 +257,7 @@ GUI::loop_return_code_t GUI::mainLoop() {
     //build the UI
     buildUI();
 
-    if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
+    if(state_flags.opening_file || shortcut_pressed({ CTRL },'f')) {
         char *file = nullptr;
         if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
             this->open_file(file);
@@ -263,6 +311,9 @@ GUI::loop_return_code_t GUI::mainLoop() {
                     }
                 }
             }
+            //the bios is opened here to check and save it.
+            // the actual loading and reading is done by the core.
+            delete bios;
             free(file);
         }
         state_flags.opening_bios = false;
@@ -303,7 +354,7 @@ void GUI::buildUI() {
         bool cpu_register_window = false;
         bool io_register_window = false;
         bool disassemble_window = false;
-        bool render_window = true;
+        bool VRAMview_window = false;
     } window_flags;
 
     if(BeginMainMenuBar()) {
@@ -353,6 +404,12 @@ void GUI::buildUI() {
                     if(MenuItem("Show Disassembly Window")) window_flags.disassemble_window = true;
                 }
 
+                if(window_flags.VRAMview_window) {
+                    if(MenuItem("Hide Memory View Window")) window_flags.VRAMview_window = false;
+                } else {
+                    if(MenuItem("Show Memory View Window")) window_flags.VRAMview_window = true;
+                }
+
                 EndMenu();
             }
         }
@@ -363,6 +420,7 @@ void GUI::buildUI() {
     if(window_flags.io_register_window) buildIORegisterUI();
     if(window_flags.disassemble_window) buildDisassemblyUI();
     if(window_flags.render_window) buildRenderUI();
+    if(window_flags.VRAMview_window) buildMemoryViewUI();
 }
 
 void GUI::buildRenderUI() {
@@ -409,6 +467,37 @@ void GUI::buildRenderUI() {
         ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
     }
     End();
+
+    //auto screen sizing and placement code
+    // if(window.w > window.h) {
+    //     //more wide than tall
+    //     pixel_size = (window.h/144);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = (window.w/2) - (image.w/2);
+    //     image.y = 0;
+
+    // } else if(window.w < window.h) {
+    //     //more wide than tall
+    //     pixel_size = (window.w/160);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = 0;
+    //     image.y = (window.h/2) - (image.h/2);
+    // } else {
+    //     //perfect square
+    //     pixel_size = (window.h/144);
+
+    //     image.w = pixel_size * 160;
+    //     image.h = pixel_size * 144;
+
+    //     image.x = 0;
+    //     image.y = 0;
+    // }
 
     if(!state_flags.debug_mode) {
         PopStyleVar(4);
