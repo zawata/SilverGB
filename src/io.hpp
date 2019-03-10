@@ -71,7 +71,8 @@ public:
             dma_tick_cnt = 0,
             dma_byte_cnt = 0;
 
-    void      cpu_inc_DIV();
+    u16       cpu_inc_DIV();
+    u16       cpu_get_DIV();
     void      cpu_inc_TIMA();
     u16       cpu_get_TAC_cs();
 
@@ -138,6 +139,7 @@ private:
     bool bootrom_mode = false;
 
     u16 bank_offset;
+    u16 div_cnt;
 
     std::vector<u8> work_ram;
     std::vector<u8> high_ram;

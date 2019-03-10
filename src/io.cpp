@@ -221,7 +221,7 @@ u8  IO_Bus::read_reg(u8 loc) {
 
     //Timer Registers
     case DIV_REG:
-        return registers.DIV & DIV_READ_MASK;
+        return div_cnt >> 8;
     case TIMA_REG:
         return registers.TIMA & TIMA_READ_MASK;
     case TMA_REG:
@@ -303,7 +303,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.SC = SC_DEFAULTS | (data & SC_WRITE_MASK);
         return;
     case DIV_REG  :
-        registers.DIV = data & DIV_WRITE_MASK;
+        div_cnt = 0;
         return;
     case TIMA_REG :
         registers.TIMA = data & TIMA_WRITE_MASK;
@@ -340,7 +340,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case LCDC_REG :
         if(!Bit.test(data, 7) && !check_mode(MODE_VBLANK))
             std::cerr << "LCD Disable outside VBLANK" << std::endl;
-        registers.LCDC = data & STAT_WRITE_MASK;
+        registers.LCDC = data & LCDC_WRITE_MASK;
     case STAT_REG:
         registers.STAT = STAT_DEFAULTS | (data & STAT_WRITE_MASK);
         break;
@@ -572,7 +572,6 @@ void IO_Bus::request_interrupt(int i) {
 //called by Video_Controller
 void IO_Bus::dma_tick() {
     if(dma_start) {
-        std::cout << "dma_start" << std::endl;
         dma_start = false;
         dma_start_active = true;
         dma_tick_cnt = 0;
@@ -580,9 +579,7 @@ void IO_Bus::dma_tick() {
     }
 
     if(dma_active) {
-        //std::cout << "dma tick " << dma_tick_cnt << std::endl;
         if(dma_tick_cnt % 4 == 0) {
-            //std::cout << "dma byte " << as_hex(dma_byte_cnt) << std::endl;
             u16 src  = (u16)registers.DMA << 8 | dma_byte_cnt,
                 dest = 0xFE00 | dma_byte_cnt;
             write_oam(dest, read(src, true));
@@ -592,7 +589,6 @@ void IO_Bus::dma_tick() {
     }
 
     if(dma_byte_cnt == 0xa0 && dma_active) {
-        std::cout << "dma_kill" << std::endl;
         dma_active = false;
     }
 
@@ -611,15 +607,15 @@ void IO_Bus::dma_tick() {
  * CPU Routines
  */
 
-void IO_Bus::cpu_inc_DIV() {
 // increment DIV
-    registers.DIV++;
-}
+u16 IO_Bus::cpu_inc_DIV() { return ++div_cnt; }
+u16 IO_Bus::cpu_get_DIV() { return div_cnt; }
 
 void IO_Bus::cpu_inc_TIMA() {
 //Increment TIMA. if it overflowed, request a TIMER Interrupt and set TIMA back to TMA
-    if(!(++registers.TIMA)) {
-        registers.IF |= TIMER_INT;
+    registers.TIMA++;
+    if(registers.TIMA == 0) {
+        request_interrupt(TIMER_INT);
         registers.TIMA = registers.TMA;
     }
 }

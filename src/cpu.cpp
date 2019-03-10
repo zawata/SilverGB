@@ -69,16 +69,16 @@ CPU::registers_t CPU::getRegisters() {
     };
 }
 
-//TODO: make this execute 4 clock cycles properly timed. not one.
 //TODO: halt and stop
 bool CPU::tick() {
-    //divider functions
-    cpu_counter++;
-    if(!(cpu_counter % 16))   on_div16();
-    if(!(cpu_counter % 64))   on_div64();
-    if(!(cpu_counter % 256))  on_div256();
-    if(!(cpu_counter % 1024)) on_div1024();
-    cpu_counter %= DIV_MAX;
+    u16 old_div = io->cpu_get_DIV();
+    u16 new_div = io->cpu_inc_DIV();
+
+    u16 changed_div = (old_div ^ new_div) & ~new_div; //get bits that have fallen
+    if(changed_div & 0x8)   on_div16();
+    if(changed_div & 0x20)  on_div64();
+    if(changed_div & 0x80)  on_div256();
+    if(changed_div & 0x100) on_div1024();
 
     if(!inst_clocks) { //used to properly time the instruction execution
         //flag for if an interrupt has been thrown
@@ -151,7 +151,6 @@ void CPU::on_div64() {
 
 void CPU::on_div256() {
     if(io->cpu_get_TAC_cs() == 256) io->cpu_inc_TIMA();
-    io->cpu_inc_DIV(); //DIV register always incremented on the 256th clock pulse
 }
 
 void CPU::on_div1024() {
