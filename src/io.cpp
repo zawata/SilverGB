@@ -92,7 +92,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        return 0; //TODO: ECHO or zero?
+        return read_ram(offset - 0xE000 + 0xC000);
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
@@ -152,7 +152,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
-        std::cerr << "write to ECHO RAM?" << std::endl;
+        write_ram(offset - 0xE000 + 0xC000, data);
         return;
     }
     else if(offset <= 0xFE9F) {
@@ -180,14 +180,13 @@ void IO_Bus::write(u16 offset, u8 data) {
 u8  IO_Bus::read_reg(u8 loc) {
     switch(loc) {
     case P1_REG   :
-        //TODO: I don't think this is a good idea. should probably update on CPU clock
-        return input->read_inputs(registers.P1);
+        return P1_DEFAULTS | input->read_inputs(registers.P1);
 
     //Serial Registers
     case SB_REG   :
         return registers.SB & SB_READ_MASK;
     case SC_REG   :
-        return registers.SC & SB_READ_MASK;
+        return SC_DEFAULTS | (registers.SC & SC_READ_MASK);
 
     //Timer Registers
     case DIV_REG:
@@ -197,9 +196,9 @@ u8  IO_Bus::read_reg(u8 loc) {
     case TMA_REG:
         return registers.TMA & TMA_READ_MASK;
     case TAC_REG:
-        return registers.TAC & TAC_READ_MASK;
+        return TAC_DEFAULTS | (registers.TAC & TAC_READ_MASK);
     case IF_REG:
-        return registers.IF & IF_READ_MASK;
+        return IF_DEFAULTS | (registers.IF & IF_READ_MASK);
 
     //Sound Registers
     case NR10_REG: case NR11_REG: case NR12_REG: case NR13_REG: case NR14_REG:
@@ -257,21 +256,20 @@ u8  IO_Bus::read_reg(u8 loc) {
     case IE_REG:
         return registers.IE & IE_READ_MASK;
     default:
-        std::cerr << "REG err at " << loc << std::endl;
+        std::cerr << "REG err at " << as_hex(loc) << std::endl;
     }
 }
 
 void IO_Bus::write_reg(u8 loc, u8 data) {
-    std::cout <<  "write reg: " << as_hex(loc) << std::endl;;
     switch(loc) {
     case P1_REG   :
-        registers.P1 = data & P1_WRITE_MASK;
+        registers.P1 = P1_DEFAULTS | (data & P1_WRITE_MASK);
         return;
     case SB_REG   :
         registers.SB = data & SB_WRITE_MASK;
         return;
     case SC_REG   :
-        registers.SC = data & SC_WRITE_MASK;
+        registers.SC = SC_DEFAULTS | (data & SC_WRITE_MASK);
         return;
     case DIV_REG  :
         registers.DIV = data & DIV_WRITE_MASK;
@@ -283,10 +281,10 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.TMA = data & TMA_WRITE_MASK;
         return;
     case TAC_REG  :
-        registers.TAC = data & TAC_WRITE_MASK;
+        registers.TAC = TAC_DEFAULTS | (data & TAC_WRITE_MASK);
         return;
     case IF_REG   :
-        registers.IF = data & IF_WRITE_MASK;
+        registers.IF = IF_DEFAULTS | (data & IF_WRITE_MASK);
         return;
 
     //Sound Registers
@@ -313,7 +311,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
             std::cerr << "LCD Disable outside VBLANK" << std::endl;
         registers.LCDC = data & STAT_WRITE_MASK;
     case STAT_REG:
-        registers.STAT = data & STAT_WRITE_MASK;
+        registers.STAT = STAT_DEFAULTS | (data & STAT_WRITE_MASK);
         break;
     case SCY_REG:
         registers.SCY  = data & SCY_WRITE_MASK;
@@ -328,7 +326,6 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.LYC  = data & LYC_WRITE_MASK;
         break;
     case DMA_REG:
-        std::cout << "DMA" << std::endl;
         registers.DMA  = data & DMA_WRITE_MASK;
         dma_start = true;
         break;
@@ -380,7 +377,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         registers.IE = data & IE_WRITE_MASK;
         return;
     default:
-        std::cerr << "REG err at " << loc << std::endl;
+        std::cerr << "REG err at " << as_hex(loc) << std::endl;
         return;
     }
 }
@@ -533,9 +530,10 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
 }
 
 /**
- * Internal Routines
+ * Interface Routines
  */
 
+//Called for any interrupt
 void IO_Bus::request_interrupt(int i) {
     registers.IF |= i;
 }
@@ -614,6 +612,6 @@ IO_Bus::Interrupt IO_Bus::cpu_check_interrupts() {
 }
 
 void IO_Bus::cpu_unset_interrupt(IO_Bus::Interrupt i) {
-//turn off the specific interrupt
+    //turn off the specific interrupt
     registers.IF &= ~(i);
 }

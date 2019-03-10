@@ -16,6 +16,7 @@
 #define P1_REG           0x00
 #define P1_WRITE_MASK    0x30
 #define P1_READ_MASK     P1_WRITE_MASK
+#define P1_DEFAULTS      0xC0
 #define P1_DAT           __ARR(P1)
 
 // Serial Data
@@ -26,8 +27,9 @@
 
 //Serial Clock
 #define SC_REG           0x02
-#define SC_WRITE_MASK    0x83
+#define SC_WRITE_MASK    0x81 //TODO: CGB Clock Speed
 #define SC_READ_MASK     SC_WRITE_MASK
+#define SC_DEFAULTS      ~SC_WRITE_MASK
 #define SC_DAT           __ARR(SC)
 
 // Divider
@@ -52,12 +54,14 @@
 #define TAC_REG          0x07
 #define TAC_WRITE_MASK   0x07
 #define TAC_READ_MASK    TAC_WRITE_MASK
+#define TAC_DEFAULTS     ~TAC_WRITE_MASK
 #define TAC_DAT          __ARR(TAC)
 
 // Interrupt Flags
 #define IF_REG           0x0F
 #define IF_WRITE_MASK    0x1F
 #define IF_READ_MASK     IF_WRITE_MASK
+#define IF_DEFAULTS      ~IF_WRITE_MASK
 #define IF_DAT           __ARR(IF)
 
 // Channel 1 Sweep register
@@ -194,8 +198,9 @@
 
 // LCDC Status
 #define STAT_REG         0x41
-#define STAT_WRITE_MASK  0xF8
-#define STAT_READ_MASK   0xFF
+#define STAT_WRITE_MASK  0x78
+#define STAT_READ_MASK   0x7F
+#define STAT_DEFAULTS    ~STAT_READ_MASK
 #define STAT_DAT         __ARR(STAT)
 
 // Scroll Y
