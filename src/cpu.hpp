@@ -52,11 +52,11 @@ private:
         struct {
             union {
                 struct {
-                    u8 z   : 1; //zero_flag
-                    u8 n   : 1; //subtraction
-                    u8 h   : 1; //half_carry
-                    u8 c   : 1; //carry
                     u8 __u : 4; //unused
+                    u8 c   : 1; //carry
+                    u8 h   : 1; //half_carry
+                    u8 n   : 1; //subtraction
+                    u8 z   : 1; //zero_flag
                 } b_F;
                 u8 i_F;
             };
@@ -202,6 +202,7 @@ private:
     // Push/Pop
     //====================
     u8 pop_rr(u16 *r1);
+    u8 pop_af(u16 *r1); //special case
     u8 push_rr(u16 *r1);
 
     //====================

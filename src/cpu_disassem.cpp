@@ -36,10 +36,10 @@ std::string CPU::getOpString(u8 op) {
         case 0x08: return format("LD (\\), SP");
         case 0x09: return format("ADD HL, BC");
         case 0x0a: return format("LD A, (BC)");
-        case 0x0b: return format("DEC BC ");
+        case 0x0b: return format("DEC BC");
         case 0x0c: return format("INC C");
         case 0x0d: return format("DEC C");
-        case 0x0e: return format("DEC C");
+        case 0x0e: return format("LD C, %");
         case 0x0f: return format("RRCA");
         case 0x10: return format("STOP");
         case 0x11: return format("LD DE, \\");
@@ -217,7 +217,7 @@ std::string CPU::getOpString(u8 op) {
         case 0xbd: return format("CP L");
         case 0xbe: return format("CP (HL)");
         case 0xbf: return format("CP A");
-        case 0xc0: return format("RET NC");
+        case 0xc0: return format("RET NZ");
         case 0xc1: return format("POP BC");
         case 0xc2: return format("JP NZ \\");
         case 0xc3: return format("JP \\");
@@ -225,7 +225,7 @@ std::string CPU::getOpString(u8 op) {
         case 0xc5: return format("PUSH BC");
         case 0xc6: return format("ADD A, %");
         case 0xc7: return format("RST 00h");
-        case 0xc8: return format("CALL Z, \\");
+        case 0xc8: return format("RET Z");
         case 0xc9: return format("RET");
         case 0xca: return format("JP Z, \\");
         case 0xcb: return getCBOpString(io->read(PC));
@@ -233,14 +233,14 @@ std::string CPU::getOpString(u8 op) {
         case 0xcd: return format("CALL \\");
         case 0xce: return format("ADC A, %");
         case 0xcf: return format("RST 08h");
-        case 0xd0: return format("CALL NC, \\");
+        case 0xd0: return format("RET NC");
         case 0xd1: return format("POP DE");
         case 0xd2: return format("JP NC, \\");
         case 0xd4: return format("CALL NC \\");
         case 0xd5: return format("PUSH DE");
         case 0xd6: return format("SUB %");
         case 0xd7: return format("RST 10h");
-        case 0xd8: return format("CALL C \\");
+        case 0xd8: return format("RET C");
         case 0xd9: return format("RETI");
         case 0xda: return format("JP C \\");
         case 0xdc: return format("CALL C \\");
@@ -266,7 +266,7 @@ std::string CPU::getOpString(u8 op) {
         case 0xf7: return format("RST 30h");
         case 0xf8: return format("LD HL, SP + %");
         case 0xf9: return format("LD SP, HL");
-        case 0xfa: return format("LD A, (%)");
+        case 0xfa: return format("LD A, (\\)");
         case 0xfb: return format("EI");
         case 0xfe: return format("CP %");
         case 0xff: return format("RST 38h");

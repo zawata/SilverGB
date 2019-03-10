@@ -1,6 +1,7 @@
 #include "cpu.hpp"
+#include "defs.hpp"
 
-#define as_hex(x) std::hex << (x) << std::dec
+#include "util/bit.hpp"
 
 #define C_FLAG (this->AF.b_AF.b_F.c)
 #define H_FLAG (this->AF.b_AF.b_F.h)
@@ -159,7 +160,7 @@ void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    std::cout << "Instruction: " << getOpString(op) << std::endl;
+    std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(op) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -170,12 +171,12 @@ u8 CPU::decode(u8 op) {
         case 0x05: return dec_r(&B_REG);                 //   4  DEC B
         case 0x06: return load_r_n(&B_REG);              //   8  LD B, xx
         case 0x07: return rlca_r(&A_REG);                //   4  RLCA
-        case 0x08: return load_llnn_rr(&SP_REG);         //  ??  LD (yyxx), SP  (?)
+        case 0x08: return load_llnn_rr(&SP_REG);         //  ??  LD (yyxx), SP
         case 0x09: return add_rr_rr(&HL_REG, &BC_REG);   //   8  ADD HL, BC
         case 0x0a: return load_r_ll(&A_REG, BC_REG);     //   8  LD A, (BC)
         case 0x0b: return dec_rr(&BC_REG);               //   8  DEC BC
         case 0x0c: return inc_r(&C_REG);                 //   4  INC C
-        case 0x0d: return inc_r(&D_REG);                 //   4  DEC C
+        case 0x0d: return dec_r(&C_REG);                 //   4  DEC C
         case 0x0e: return load_r_n(&C_REG);              //   8  LD C, xx
         case 0x0f: return rrca_r(&A_REG);                //   4  RRCA
         case 0x10: return stop();                        //  ??  STOP
@@ -191,7 +192,7 @@ u8 CPU::decode(u8 op) {
         case 0x1a: return load_r_ll(&A_REG, DE_REG);     //   8  LD A,(DE)
         case 0x1b: return dec_rr(&DE_REG);               //   8  DEC DE
         case 0x1c: return inc_r(&E_REG);                 //   4  INC E
-        case 0x1d: return inc_r(&E_REG);                 //   4  DEC E
+        case 0x1d: return dec_r(&E_REG);                 //   4  DEC E
         case 0x1e: return load_r_n(&E_REG);              //   8  LD E, xx
         case 0x1f: return rra_r(&A_REG);                 //   4  RRA
         case 0x20: return jump_rel_cond_n(NZ_COND);      //  ??  JR NZ, xx
@@ -424,15 +425,13 @@ u8 CPU::decode(u8 op) {
             default:
                 return 0;
             }
-            // wat...
-            std::cerr << "CB end of case: " << data << std::endl;
         }
         break;
         case 0xcc: return call_cond_nn(Z_COND);          //  ??  CALL Z, yyxx
         case 0xcd: return call_nn();                     //  24  CALL yyxx
         case 0xce: return adc_r_n(&A_REG);               //   8  ADC A, xx
         case 0xcf: return rst_l(0x08);                   //  16  RST 08h
-        case 0xd0: return call_cond_nn(NC_COND);         //  ??  RET NC
+        case 0xd0: return ret_cond(NC_COND);             //  ??  RET NC
         case 0xd1: return pop_rr(&DE_REG);               //  12  POP DE
         case 0xd2: return jump_cond_ll(NC_COND);         //  ??  JP NC, yyxx
         case 0xd3: return invalid_op(0xd3);              //  --  ----
@@ -465,9 +464,9 @@ u8 CPU::decode(u8 op) {
         case 0xee: return xor_r_n(&A_REG);               //   8  XOR xx
         case 0xef: return rst_l(0x28);                   //  16  RST 28h
         case 0xf0: return load_r_lln(&A_REG);            //  12  LD A, ($FF00 + xx)
-        case 0xf1: return pop_rr(&AF_REG);               //  12  POP AF
+        case 0xf1: return pop_af(&AF_REG);               //  12  POP AF
         case 0xf2: return load_r_llr(&A_REG, &C_REG);    //   8  LD A, (FF00 + C)
-        case 0xf3: return di();          //   4  DI
+        case 0xf3: return di();                          //   4  DI
         case 0xf4: return invalid_op(0xf4);              //  --  ----
         case 0xf5: return push_rr(&AF_REG);              //  16  PUSH AF
         case 0xf6: return or_r_n(&A_REG);                //   8  OR xx
@@ -475,7 +474,7 @@ u8 CPU::decode(u8 op) {
         case 0xf8: return load_rr_rrn(&HL_REG, &SP_REG); //  12  LD HL, SP + xx
         case 0xf9: return load_rr_rr(&SP_REG, &HL_REG);  //   8  LD SP, HL
         case 0xfa: return load_r_llnn(&A_REG);           //  16  LD A, (yyxx)
-        case 0xfb: return ei();           //   4  EI
+        case 0xfb: return ei();                          //   4  EI
         case 0xfc: return invalid_op(0xfc);              //  --  ----
         case 0xfd: return invalid_op(0xfd);              //  --  ----
         case 0xfe: return cp_r_n(&A_REG);                //   8  CP xx
@@ -484,17 +483,24 @@ u8 CPU::decode(u8 op) {
     }
 }
 
-u8 CPU::fetch_8()   { return io->read(PC_REG++); }
-u16 CPU::fetch_16() { return (io->read(PC_REG++) | (io->read(PC_REG++) << 8)); }
+u8 CPU::fetch_8() {
+    return io->read(PC_REG++);
+}
+
+u16 CPU::fetch_16() {
+    u8 q1 = fetch_8();
+    u8 q2 = fetch_8();
+    return (u16)q2 << 8 | q1;
+}
 
 void CPU::stack_push(u16 n) {
-    io->write(SP_REG--, n >> 8);
-    io->write(SP_REG--, n & 0xFF);
+    io->write(--SP_REG, n >> 8);
+    io->write(--SP_REG, (u8)n);
 }
 
 u16  CPU::stack_pop() {
-    u8 q1 = io->read(++SP_REG);
-    u8 q2 = io->read(++SP_REG);
+    u8 q1 = io->read(SP_REG++);
+    u8 q2 = io->read(SP_REG++);
     return (u16)q2 << 8 | q1;
 }
 
@@ -622,7 +628,7 @@ u8 CPU::load_r_llnn(u8 *r1) {
 //====================
 u8 CPU::inc_r(u8 *r1) {
 //HNZ
-    Z_FLAG = !(*r1);
+    Z_FLAG = !(u8)(*r1 + 1);
     H_FLAG = check_half_carry_8(1, *r1, (u16)*r1 + 1);
     N_FLAG = 0;
 
@@ -632,8 +638,8 @@ u8 CPU::inc_r(u8 *r1) {
 
 u8 CPU::dec_r(u8 *r1) {
 //HNZ
-    Z_FLAG = !(*r1);
-    H_FLAG = !~(*r1 & 0xF);
+    Z_FLAG = !(*r1 - 1);
+    H_FLAG = check_half_carry_8(1, *r1, *r1 - 1);
     N_FLAG = 1;
 
     (*r1)--;
@@ -655,7 +661,7 @@ u8 CPU::inc_ll(u16 loc) {
     u8 r1 = io->read(loc)+1;
 
     Z_FLAG = !r1;
-    H_FLAG = check_half_carry_8(1,r1, (u16)r1+1);
+    H_FLAG = check_half_carry_8(1,r1, (u16)r1+1); //TODO: is this wrong?
     N_FLAG = 0;
 
     io->write(loc, r1);
@@ -666,8 +672,8 @@ u8 CPU::dec_ll(u16 loc) {
 //HNZ
     u8 r1 = io->read(loc)-1;
 
-    Z_FLAG = !r1;
-    H_FLAG = check_half_carry_8(r1,1,r1-1);
+    Z_FLAG = !(r1);
+    H_FLAG = check_half_carry_8(r1,1,r1-1); //TODO: is this wrong?
     N_FLAG = 0;
 
     io->write(loc, r1);
@@ -681,7 +687,7 @@ u8 CPU::add_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(*r1+r2);
+    Z_FLAG = !(u8)(*r1 + r2);
     H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
     N_FLAG = 0;
     C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
@@ -692,7 +698,7 @@ u8 CPU::add_r_n(u8 *r1) {
 
 u8 CPU::add_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(*r1+*r2);
+    Z_FLAG = !(u8)(*r1 + *r2);
     H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1 + *r2);
     N_FLAG = 0;
     C_FLAG = check_carry_8(*r1, *r2, (u16)*r1 + *r2);
@@ -704,7 +710,7 @@ u8 CPU::add_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(*r1+r2);
+    Z_FLAG = !(u8)(*r1 + r2);
     H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
     N_FLAG = 0;
     C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
@@ -1028,6 +1034,12 @@ u8 CPU::cp_r_ll(u8 *r1, u16 loc) {
 //====================
 u8 CPU::pop_rr(u16 *r1) {
     *r1 = stack_pop();
+    return 12;
+}
+
+//special case
+u8 CPU::pop_af(u16 *r1) {
+    *r1 = stack_pop() & 0xfff0;
     return 12;
 }
 
@@ -1359,12 +1371,12 @@ u8 CPU::swap_ll(u16 loc) {
 //====================
 // Test Bit
 //====================
-u8 CPU::bit_b_r(u8 bit, u8 *reg) {
+u8 CPU::bit_b_r(u8 bit, u8 *r1) {
 //HNZ
 
     H_FLAG = 1;
     N_FLAG = 0;
-    Z_FLAG = !(*reg & 1<<bit);
+    Z_FLAG = !Bit.test(*r1, bit);
 
     return 8;
 }
@@ -1375,7 +1387,7 @@ u8 CPU::bit_b_ll(u8 bit, u16 loc) {
 
     H_FLAG = 1;
     N_FLAG = 0;
-    Z_FLAG = !(r1 & 1<<bit);
+    Z_FLAG = !Bit.test(r1, bit);
 
     return 12;
 }
@@ -1384,14 +1396,14 @@ u8 CPU::bit_b_ll(u8 bit, u16 loc) {
 // Reset Bit
 //====================
 u8 CPU::res_b_r(u8 bit, u8 *reg) {
-    *reg &= ~(1<<bit);
+    Bit.reset(reg, bit);
     return 8;
 }
 
 u8 CPU::res_b_ll(u8 bit, u16 loc) {
     u8 r = io->read(loc);
 
-    r &= ~(1<<bit);
+    Bit.reset(&r, bit);
     io->write(loc, r);
 
     return 16;
@@ -1401,14 +1413,14 @@ u8 CPU::res_b_ll(u8 bit, u16 loc) {
 // Set Bit
 //====================
 u8 CPU::set_b_r(u8 bit, u8 *reg) {
-    *reg |= 1<<bit;
+    Bit.set(reg, bit);
     return 8;
 }
 
 u8 CPU::set_b_ll(u8 bit, u16 loc) {
     u8 r = io->read(loc);
 
-    r |= 1<<bit;
+    Bit.set(&r, bit);
     io->write(loc, r);
 
     return 16;
@@ -1492,25 +1504,25 @@ u8 CPU::ccf() {
 //====================
 u8 CPU::halt() {
     is_halted = true;
-    return 0;
+    return 4;
 }
 
 u8 CPU::stop() {
     is_stopped = true;
-    return 0;
+    return 4;
 }
 
 //====================
 // Enable/Disable Interrupts
 //====================
 u8 CPU::ei() {
-    IME = 1;
-    return 0; //TODO: return length of intruction
+    IME = 1; //TODO: IME gets set on next machine cycle
+    return 4;
 }
 
 u8 CPU::di() {
     IME = 0;
-    return 0; //TODO: return length of intruction
+    return 4;
 }
 
 //====================
@@ -1519,7 +1531,7 @@ u8 CPU::di() {
 u8 CPU::rst_l(u8 loc) {
     stack_push(PC);
     PC = loc;
-    return 0; //TODO: return length of intruction
+    return 16;
 }
 
 //====================
