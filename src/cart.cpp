@@ -3,6 +3,8 @@
 #include "util/util.hpp"
 #include "util/ints.hpp"
 
+#include "defs.hpp"
+
 #include "file.hpp"
 
 #include <vector>
@@ -44,13 +46,14 @@ struct ROM_Controller : public MemoryBankController {
 
     void write_rom(u16 offset, u8 data) override {
         //We don't write to the ROM in the ROM Controller
-        std::cerr << "write out of bounds" << std::endl;
+        //std::cerr << "write out of bounds" << std::endl;
     }
 
     u8 read_ram(u16 offset) override {
         if(offset >= 0xA000 && offset <= 0xBFFF) {
+            offset -= 0xA000;
             if(cart_type.RAM)
-                return ram[offset - 0xA000];
+                return ram[offset];
             else
                 return 0;
         } else {
@@ -61,8 +64,9 @@ struct ROM_Controller : public MemoryBankController {
 
     void write_ram(u16 offset, u8 data) override {
         if(offset >= 0xA000 && offset <= 0xBFFF) {
+            offset -= 0xA000;
             if(cart_type.RAM)
-                ram[offset - 0xA000] = data;
+                ram[offset] = data;
         } else {
             std::cerr << "write out of bounds" << std::endl;
         }
@@ -82,12 +86,15 @@ struct MBC1_Controller : public MemoryBankController {
     MemoryBankController(rom_file, cart_type) {
         if(cart_type.RAM)
             this->ram = ram;
+
+        bank_num = 1;
     }
 
     u8 read_rom(u16 offset) override {
         if(offset <= 0x3FFF) {
             return rom_file->getByte(offset);
         } else if(offset <= 0x7FFF) {
+            offset -= 0x4000;
             return rom_file->getByte(offset + (bank_num * ROM_BANK_SIZE));
         } else {
             std::cerr << "read out of bounds" << std::endl;
@@ -111,8 +118,8 @@ struct MBC1_Controller : public MemoryBankController {
 
     u8 read_ram(u16 offset) override {
         if(offset >= 0xA000 && offset <= 0xBFFF) {
+            offset -= 0xA000;
             if(cart_type.RAM && ram_enable) {
-                offset -= 0xA000;
                 if(mode_select) ram[offset+(bank_num * RAM_BANK_SIZE)];
                 else            ram[offset];
             }
@@ -228,6 +235,11 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
     // } else if (cart_type.MBC3) {
     //     controller = new MBC3_Controller(f, cart_type, ram);
     }
+
+    std::cout << "cart:      " << getCartTitle() << std::endl;
+    std::cout << "cart type: " << (std::string)getCartType() << std::endl;
+    std::cout << "cart rom:  " << getROMSize() << std::endl;
+    std::cout << "cart ram:  " << getRAMSize() << std::endl;
 }
 
 Cartridge::~Cartridge() = default;
