@@ -72,6 +72,22 @@ but I'm developing and testing it on Linux so that is where it's "guaranteed" to
 🚫Input  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫Input Stuff  
 
+## Features
+
+Blargg Rom Tests:
+&nbsp;&nbsp;&nbsp;&nbsp;➕️cpu_instrs
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 01-special
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 02-interrupts.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 03-op sp,hl.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 04-op r,imm.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️ 05-op rp.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️ 06-ld r,r.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 07-jr,jp,call,ret,rst.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️ 08-misc instrs.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 09-op r,r.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔️ 10-bit ops.gb
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 11-op a,(hl).gb
+
 ## Questions
 ### Who?
 Me
