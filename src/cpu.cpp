@@ -355,7 +355,7 @@ u8 CPU::decode(u8 op) {
         case 0xbf: return cp_r_r(&A_REG, &A_REG);        //   4  CP A
         case 0xc0: return ret_cond(NZ_COND);             //  ??  RET NZ
         case 0xc1: return pop_rr(&BC_REG);               //  12  POP BC
-        case 0xc2: return jump_cond_ll(NC_COND);         //  ??  JP NZ yyxx
+        case 0xc2: return jump_cond_ll(NZ_COND);         //  ??  JP NZ yyxx
         case 0xc3: return jump_nn();                     //  16  JP yyxx
         case 0xc4: return call_cond_nn(NZ_COND);         //  ??  CALL NZ yyxx
         case 0xc5: return push_rr(&BC_REG);              //  16  PUSH BC
