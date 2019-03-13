@@ -30,9 +30,13 @@
 #define PC_REG this->PC
 
 inline bool check_half_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x10; }
+inline bool check_half_carry_8(u8 x, u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x10; }
 inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
+inline bool check_carry_8(u8 x, u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x100;   }
 inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
+inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x1000; }
 inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
+inline bool check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
 CPU::CPU(IO_Bus *io, Configuration *config) :
 io(io),
@@ -751,9 +755,9 @@ u8 CPU::adc_r_n(u8 *r1) {
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
     Z_FLAG = !(u8)(*r1 + r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, r2 + old_c, (u16)*r1 + r2 + old_c);
+    H_FLAG = check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
     N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2 + old_c, (u16)*r1 + r2 + old_c);
+    C_FLAG = check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
 
     *r1 += r2 + old_c;
     return 8;
@@ -764,9 +768,9 @@ u8 CPU::adc_r_r(u8 *r1, u8 *r2) {
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
     Z_FLAG = !(u8)(*r1 + *r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, *r2 + old_c, (u16)*r1 + *r2 + old_c);
+    H_FLAG = check_half_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c);
     N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, *r2 + old_c, (u16)*r1 + *r2 + old_c);
+    C_FLAG = check_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c);
 
     *r1 += *r2 + old_c;
     return 4;
@@ -779,9 +783,9 @@ u8 CPU::adc_r_ll(u8 *r1, u16 loc) {
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
     Z_FLAG = !(u8)(*r1 + r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, r2 + old_c, (u16)*r1 + r2 + old_c);
+    H_FLAG = check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
     N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2 + old_c, (u16)*r1 + r2 + old_c);
+    C_FLAG = check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
 
     *r1 += r2 + old_c;
     return 8;
@@ -796,7 +800,7 @@ u8 CPU::sub_r_n(u8 *r1) {
 
     Z_FLAG = !(u8)(*r1 - r2);
     H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 - r2);
-    N_FLAG = 0;
+    N_FLAG = 1;
     C_FLAG = check_carry_8(*r1, r2, (u16)*r1 - r2);
 
     *r1 -= r2;
@@ -808,7 +812,7 @@ u8 CPU::sub_r(u8 *r1, u8 *r2) {
 
     Z_FLAG = !(u8)(*r1 - *r2);
     H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1 - *r2);
-    N_FLAG = 0;
+    N_FLAG = 1;
     C_FLAG = check_carry_8(*r1, *r2, (u16)*r1 - *r2);
 
     *r1 -= *r2;
@@ -821,7 +825,7 @@ u8 CPU::sub_ll(u8 *r1, u16 loc) {
 
     Z_FLAG = !(u8)(*r1 - r2);
     H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 - r2);
-    N_FLAG = 0;
+    N_FLAG = 1;
     C_FLAG = check_carry_8(*r1, r2, (u16)*r1 - r2);
 
     *r1 -= r2;
@@ -837,12 +841,14 @@ u8 CPU::sbc_r_n(u8 *r1) {
 
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(*r1 - r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, r2 - old_c, (u16)*r1 - r2 - old_c);
+    Z_FLAG = !(u8)(*r1 - r2 - old_c);
+    H_FLAG = check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
     N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2 - old_c, (u16)*r1 - r2 - old_c);
+    C_FLAG = check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
 
-    *r1 -= r2 - old_c;
+    *r1 -= r2;
+    *r1 -= old_c;
+
     return 8;
 }
 
@@ -850,12 +856,14 @@ u8 CPU::sbc_r_r(u8 *r1, u8 *r2) {
 //CHNZ
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(*r1 - *r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, *r2 - old_c, (u16)*r1 - *r2 - old_c);
+    Z_FLAG = !(u8)(*r1 - *r2 - old_c);
+    H_FLAG = check_half_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c);
     N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, *r2 - old_c, (u16)*r1 - *r2 - old_c);
+    C_FLAG = check_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c);
 
-    *r1 -= *r2 - old_c;
+    *r1 -= *r2;
+    *r1 -= old_c;
+
     return 4;
 }
 
@@ -865,12 +873,14 @@ u8 CPU::sbc_r_ll(u8 *r1, u16 loc) {
 
     u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(*r1 - r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, r2 - old_c, (u16)*r1 - r2 - old_c);
+    Z_FLAG = !(u8)(*r1 - r2 - old_c);
+    H_FLAG = check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
     N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2 - old_c, (u16)*r1 - r2 - old_c);
+    C_FLAG = check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
 
-    *r1 -= r2 - old_c;
+    *r1 -= r2;
+    *r1 -= old_c;
+
     return 8;
 }
 
