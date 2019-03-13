@@ -93,9 +93,12 @@ private:
     u16 PC;
 
     //flags
-    bool IME;
-    bool is_halted;
-    bool is_stopped;
+    bool
+        IME = 0,
+        is_halted = false,
+        halt_bug  = false,
+        is_stopped = false,
+        ei_ime_enable = false;
 
     //Execution Functions
     u8 *decode_reg(u8 reg);

@@ -69,7 +69,7 @@ CPU::registers_t CPU::getRegisters() {
     };
 }
 
-//TODO: halt and stop
+//TODO: stop
 bool CPU::tick() {
     u16 old_div = io->cpu_get_DIV();
     u16 new_div = io->cpu_inc_DIV();
@@ -81,59 +81,54 @@ bool CPU::tick() {
     if(changed_div & 0x100) on_div1024();
 
     if(!inst_clocks) { //used to properly time the instruction execution
-        //flag for if an interrupt has been thrown
+        u8 int_pc = 0, int_val = 0;
         bool int_set = false;
+        if(io->cpu_check_interrupts() & IO_Bus::Interrupt::VBLANK_INT) {
+            int_pc = VBLANK_INT_OFFSET;
+            int_val = IO_Bus::Interrupt::VBLANK_INT;
+        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::LCD_STAT_INT) {
+             int_pc = LCD_STAT_INT_OFFSET;
+            int_val = IO_Bus::Interrupt::LCD_STAT_INT;
+        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::TIMER_INT) {
+            int_pc = TIMER_INT_OFFSET;
+            int_val = IO_Bus::Interrupt::TIMER_INT;
+        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::SERIAL_INT) {
+            int_pc = SERIAL_INT_OFFSET;
+            int_val = IO_Bus::Interrupt::SERIAL_INT;
+        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::JOYPAD_INT) {
+            int_pc = JOYPAD_INT_OFFSET;
+            int_val = IO_Bus::Interrupt::JOYPAD_INT;
+        }
 
-        //ISR transfer summary:
-        // disable Interrupts
-        // push the PC
-        // set the PC to the interrupt offset
-        // unset the interrupt flag
-        if(IME) {
-            if(io->cpu_check_interrupts()) {
-                std::cout << "Interrupt: ";
-            }
+        if(int_val) {
+            if(is_halted) is_halted = false;
 
-            if(io->cpu_check_interrupts() & IO_Bus::Interrupt::VBLANK_INT) {
-                std::cout << "VBLANK" << std::endl;
-                IME=false;
-                stack_push(PC);
-                PC = VBLANK_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::VBLANK_INT);
-                int_set = true;
-            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::LCD_STAT_INT) {
-                std::cout << "STAT" << std::endl;
-                IME=false;
-                stack_push(PC);
-                PC = LCD_STAT_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
-                int_set = true;
-            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::TIMER_INT) {
-                std::cout << "TIMER" << std::endl;
-                IME=false;
-                stack_push(PC);
-                PC = TIMER_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::TIMER_INT);
-                int_set = true;
-            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::SERIAL_INT) {
-                std::cout << "SERIAL" << std::endl;
-                IME=false;
-                stack_push(PC);
-                PC = SERIAL_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::SERIAL_INT);
-                int_set = true;
-            } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::JOYPAD_INT) {
-                std::cout << "JOYPAD" << std::endl;
-                IME=false;
-                stack_push(PC);
-                PC = JOYPAD_INT_OFFSET;
-                io->cpu_unset_interrupt(IO_Bus::Interrupt::JOYPAD_INT);
+            //ISR transfer summary:
+            // disable Interrupts
+            // push the PC
+            // set the PC to the interrupt offset
+            // unset the interrupt flag
+            // set clocks for ISR transfer
+            if(IME) {
+                IME = 0;
+                stack_push(PC_REG);
+                io->cpu_unset_interrupt((IO_Bus::Interrupt)int_val);
+                PC_REG = int_pc;
+                inst_clocks = 20;
                 int_set = true;
             }
         }
-        //if an interupt was just set, set the instruction delay, then execute once it's done
-        if(!int_set) inst_clocks = decode(fetch_8());
-        else         inst_clocks = 20; //ISR transfer takes 5 machine cycles
+
+        if(!int_set && !is_halted) {
+            bool old_ei_ime_enable = ei_ime_enable;
+
+            inst_clocks = decode(fetch_8());
+
+            if(old_ei_ime_enable && ei_ime_enable) {
+                ei_ime_enable = false;
+                IME=1;
+            }
+        }
     }
     inst_clocks--;
 
@@ -177,7 +172,7 @@ u8 CPU::decode(u8 op) {
         case 0x0d: return dec_r(&C_REG);                 //   4  DEC C
         case 0x0e: return load_r_n(&C_REG);              //   8  LD C, xx
         case 0x0f: return rrca_r(&A_REG);                //   4  RRCA
-        case 0x10: return stop();                        //  ??  STOP
+        case 0x10: return stop();                        //   4  STOP
         case 0x11: return load_rr_nn(&DE_REG);           //  12  LD DE, yyxx
         case 0x12: return load_ll_r(DE_REG, &A_REG);     //   8  LD (DE), A
         case 0x13: return inc_rr(&DE_REG);               //   8  INC DE
@@ -279,7 +274,7 @@ u8 CPU::decode(u8 op) {
         case 0x73: return load_ll_r(HL_REG, &E_REG);     //   8  LD (HL), E
         case 0x74: return load_ll_r(HL_REG, &H_REG);     //   8  LD (HL), H
         case 0x75: return load_ll_r(HL_REG, &L_REG);     //   8  LD (HL), L
-        case 0x76: return halt();                        //   *  HALT
+        case 0x76: return halt();                        //   4  HALT
         case 0x77: return load_ll_r(HL_REG, &A_REG);     //   8  LD (HL), A
         case 0x78: return load_r_r(&A_REG, &B_REG);      //   4  LD A, B
         case 0x79: return load_r_r(&A_REG, &C_REG);      //   4  LD A, C
@@ -482,7 +477,12 @@ u8 CPU::decode(u8 op) {
 }
 
 u8 CPU::fetch_8() {
-    return io->read(PC_REG++);
+    if(halt_bug) {
+        halt_bug = false;
+        return io->read(PC_REG);
+    } else {
+        return io->read(PC_REG++);
+    }
 }
 
 u16 CPU::fetch_16() {
@@ -1433,9 +1433,6 @@ u8 CPU::set_b_ll(u8 bit, u16 loc) {
 u8 CPU::daa_r(u8 *r1) {
 //CHZ
 
-    //really want to know if anyone actually uses this instruction
-    std::cout << "DAA called. HFS" << std::endl;
-
     u8 h = *r1 >> 4;
     u8 l = *r1 & 0xF;
 
@@ -1504,7 +1501,11 @@ u8 CPU::ccf() {
 // Halt/Stop
 //====================
 u8 CPU::halt() {
-    is_halted = true;
+    if(!IME && io->cpu_check_interrupts())
+        halt_bug = true;
+    else
+        is_halted = true;
+
     return 4;
 }
 
@@ -1517,7 +1518,8 @@ u8 CPU::stop() {
 // Enable/Disable Interrupts
 //====================
 u8 CPU::ei() {
-    IME = 1; //TODO: IME gets set on next machine cycle
+    if(!ei_ime_enable)
+        ei_ime_enable = true;
     return 4;
 }
 
