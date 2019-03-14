@@ -46,6 +46,8 @@ private:
 
     u8 inst_clocks;
     u16 cpu_counter;
+    //globally track div values because writes to the TIMA register
+    u16 old_div = 0, new_div = 0;
 
     //registers:
     union {

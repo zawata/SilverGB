@@ -608,11 +608,13 @@ void IO_Bus::dma_tick() {
  */
 
 // increment DIV
-u16 IO_Bus::cpu_inc_DIV() { return ++div_cnt; }
+u16 IO_Bus::cpu_inc_DIV() {
+    registers.DIV = (div_cnt + 1) & 0xFF00;
+    return ++div_cnt;
+}
 u16 IO_Bus::cpu_get_DIV() { return div_cnt; }
 
 void IO_Bus::cpu_inc_TIMA() {
-//Increment TIMA. if it overflowed, request a TIMER Interrupt and set TIMA back to TMA
     registers.TIMA++;
     if(registers.TIMA == 0) {
         request_interrupt(TIMER_INT);

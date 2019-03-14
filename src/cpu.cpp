@@ -75,15 +75,6 @@ CPU::registers_t CPU::getRegisters() {
 
 //TODO: stop
 bool CPU::tick() {
-    u16 old_div = io->cpu_get_DIV();
-    u16 new_div = io->cpu_inc_DIV();
-
-    u16 changed_div = (old_div ^ new_div) & ~new_div; //get bits that have fallen
-    if(changed_div & 0x8)   on_div16();
-    if(changed_div & 0x20)  on_div64();
-    if(changed_div & 0x80)  on_div256();
-    if(changed_div & 0x100) on_div1024();
-
     if(!inst_clocks) { //used to properly time the instruction execution
         u8 int_pc = 0, int_val = 0;
         bool int_set = false;
@@ -135,6 +126,13 @@ bool CPU::tick() {
         }
     }
     inst_clocks--;
+
+    new_div = io->cpu_inc_DIV();
+    if(Bit.fallen(old_div, new_div, 3)) on_div16();
+    if(Bit.fallen(old_div, new_div, 5)) on_div64();
+    if(Bit.fallen(old_div, new_div, 7)) on_div256();
+    if(Bit.fallen(old_div, new_div, 9)) on_div1024();
+    old_div = new_div;
 
     //if inst_clocks is 0 here, then the next clock will execute an instruction
     return inst_clocks == 0;
