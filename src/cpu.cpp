@@ -1447,31 +1447,27 @@ u8 CPU::set_b_ll(u8 bit, u16 loc) {
 u8 CPU::daa_r(u8 *r1) {
 //CHZ
 
-    u8 h = *r1 >> 4;
-    u8 l = *r1 & 0xF;
+    u8 old_a = *r1;
+    u8 old_c =  C_FLAG;
 
-    //these lookup tables were derived from the Gameboy Prgrammers Manual P.122
     if(!N_FLAG) { // addition
-        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x8) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x9) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x06; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0xA,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if(!C_FLAG && bounded(h,0x9,0xF) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if(!C_FLAG && bounded(h,0xA,0xF) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x60; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x2) && !H_FLAG && bounded(l,0xA,0xF)) { *r1 += 0x66; C_FLAG = 1;
-        } else if( C_FLAG && bounded(h,0x0,0x3) &&  H_FLAG && bounded(l,0x0,0x3)) { *r1 += 0x66; C_FLAG = 1;
+        // mostly DAA from x86 but gb doesn't set H_FLAG
+        if(((*r1 & 0xF) > 9) || H_FLAG) {
+            *r1 += 6;
+            C_FLAG = 1;
+        }
+
+        if((old_a > 0x99) || old_c) {
+            *r1 += 0x60;
+            C_FLAG = 1;
         } else {
-            std::cerr << "DAA error N1: " << *r1 << std::endl;
+            C_FLAG = 0;
         }
     } else { // subtraction
-        if(       !C_FLAG && bounded(h,0x0,0x9) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0x00; C_FLAG = 0;
-        } else if(!C_FLAG && bounded(h,0x0,0x8) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0xFA; C_FLAG = 0;
-        } else if( C_FLAG && bounded(h,0x7,0xF) && !H_FLAG && bounded(l,0x0,0x9)) { *r1 += 0xA0; C_FLAG = 0;
-        } else if( C_FLAG && bounded(h,0x6,0xF) &&  H_FLAG && bounded(l,0x6,0xF)) { *r1 += 0x9A; C_FLAG = 1;
-        } else {
-            std::cerr << "DAA error N0: " << *r1 << std::endl;
-        }
+        //derived from Gameboy Programmers Manual P.122
+        if     ( C_FLAG &&  H_FLAG) *r1 += 0x9a;
+        else if( C_FLAG && !H_FLAG) *r1 += 0xa0;
+        else if(!C_FLAG &&  H_FLAG) *r1 += 0xfa;
     }
 
     H_FLAG = 0;
