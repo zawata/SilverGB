@@ -612,9 +612,11 @@ u8 CPU::load_rr_rrn(u16 *r1, u16 *r2) {
     s8 e = (s8)fetch_8(); //signed
 
     Z_FLAG = 0;
-    H_FLAG = check_half_carry_16(*r2, e, (u32)*r2 + e);
     N_FLAG = 0;
-    C_FLAG = check_carry_16(*r2, e, (u32)*r2 + e);
+
+    //stupid signed operand breaks existing carry calculations
+    H_FLAG = (*r2 & 0xF) + (e & 0xF) > 0xF;
+    C_FLAG = (*r2 & 0xFF) + (e & 0xFF) > 0xFF;
 
     *r1 = *r2 + e;
     return 12;
@@ -726,9 +728,11 @@ u8 CPU::add_rr_n(u16 *r1) {
     s8 r2 = (s8)fetch_8();
 
     Z_FLAG = 0;
-    H_FLAG = check_half_carry_16(*r1, r2, (u32)*r1 + r2);
     N_FLAG = 0;
-    C_FLAG = check_carry_16(*r1, r2, (u32)*r1 + r2);
+
+    //stupid signed operand breaks existing carry calculations
+    H_FLAG = (*r1 & 0xF) + (r2 & 0xF) > 0xF;
+    C_FLAG = (*r1 & 0xFF) + (r2 & 0xFF) > 0xFF;
 
     *r1 += r2;
 
