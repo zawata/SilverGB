@@ -21,7 +21,7 @@
 #define STAT_MODE_1_INT_BIT 4
 #define STAT_MODE_0_INT_BIT 3
 #define STAT_COIN_BIT       2
-#define STAT_MODE_FLAG      0x3
+#define STAT_MODE_FLAG      (0x3)
 
 class Video_Controller {
 public:
@@ -133,7 +133,9 @@ private:
         SP_1,   //Sprite 2
     } vram_fetch_step = (__VRAM_fetch_steps)0;
 
-    int ybase;
+    u8 old_LY  = 0;
+    bool
+        coin_bit_signal = false;
 
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map
@@ -167,6 +169,9 @@ private:
 
     u32 current_byte = 0;
 
-    //check that vblank int was requested this frame;
-    bool vblank_int_requested = false;
+    bool
+        vblank_int_requested = false,
+        old_mode2_int = false,
+        old_mode1_int = false,
+        old_mode0_int = false;
 };

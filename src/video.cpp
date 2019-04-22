@@ -56,7 +56,8 @@ bool Video_Controller::ppu_tick() {
     if(!LCD_ENABLED) {
         // std::cout << "off" << std::endl;
         //TODO: detail any further behavior?
-        //reset LY?
+        reg(LY) = 0;
+        reg(STAT) &= ~STAT_MODE_FLAG; //clear mode bits
 
         new_frame = true;
         first_frame = true;
@@ -142,15 +143,52 @@ bool Video_Controller::ppu_tick() {
     /**
      * Occurs on every clock
      */
-    reg(STAT) = (reg(STAT) & ~STAT_MODE_FLAG) | process_step; //set current mode
+    if(frame_disable && y_line == 0 && process_step == SCANLINE_OAM) {
+        //frame disable is true for the first frame after the LCD is reenabled.
+
+        /**
+         * TODO: verify
+         * Allegedly, or at least as far as BGB and gekkio's tests indicate,
+         * The first frame after the LCD is reenabled, during the OAM state
+         * the STAT mode flag is set to 0 instead of 2. It's corrected during
+         * the transition to VRAM mode.
+         **/
+        reg(STAT) &= ~STAT_MODE_FLAG;
+    } else {
+        reg(STAT) = (reg(STAT) & ~STAT_MODE_FLAG) | process_step; //set current mode
+    }
+
+    /**
+     * TODO: verify
+     * STAT Coin Bit sets instantaneously, but stat-IF isn't set until LY changes
+     */
+    if(reg(LY) == reg(LYC)) {
+        Bit.set(&reg(STAT), STAT_COIN_BIT);
+    } else {
+        Bit.reset(&reg(STAT), STAT_COIN_BIT);
+    }
+
+    bool coin_int =
+            Bit.test(reg(STAT), STAT_COIN_INT_BIT) &&
+            Bit.test(reg(STAT), STAT_COIN_BIT)     &&
+            !coin_bit_signal                       &&
+            old_LY != reg(LY);
+    old_LY  = reg(LY);
+    coin_bit_signal = Bit.test(reg(STAT), STAT_COIN_BIT);
 
     bool
-        coin_int =  (Bit.test(reg(STAT), STAT_COIN_INT_BIT) && Bit.test(reg(STAT), STAT_COIN_BIT)),
         mode2_int = (Bit.test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
         mode1_int = (Bit.test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
-        mode0_int = (Bit.test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK);
-
-    if(coin_int || mode2_int || mode1_int || mode0_int) {
+        mode0_int = (Bit.test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK),
+        throw_stat =
+            coin_int                                    ||
+            (mode2_int && (mode2_int != old_mode2_int)) ||
+            (mode1_int && (mode1_int != old_mode1_int)) ||
+            (mode0_int && (mode0_int != old_mode0_int));
+    old_mode2_int = mode2_int;
+    old_mode1_int = mode1_int;
+    old_mode0_int = mode0_int;
+    if(throw_stat) {
         io->request_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
     }
 
