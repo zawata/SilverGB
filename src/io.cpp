@@ -242,7 +242,7 @@ u8  IO_Bus::read_reg(u8 loc) {
     case LCDC_REG:
         return registers.LCDC & LCDC_READ_MASK;
     case STAT_REG:
-        return registers.STAT & STAT_READ_MASK;
+        return STAT_DEFAULTS | (registers.STAT & STAT_READ_MASK);
     case SCY_REG:
         return registers.SCY  & SCY_READ_MASK;
     case SCX_REG:
@@ -341,6 +341,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         if(!Bit.test(data, 7) && !check_mode(MODE_VBLANK))
             std::cerr << "LCD Disable outside VBLANK" << std::endl;
         registers.LCDC = data & LCDC_WRITE_MASK;
+        break;
     case STAT_REG:
         registers.STAT = STAT_DEFAULTS | (data & STAT_WRITE_MASK);
         break;
@@ -565,7 +566,7 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
  */
 
 //Called for any interrupt
-void IO_Bus::request_interrupt(int i) {
+void IO_Bus::request_interrupt(IO_Bus::Interrupt i) {
     registers.IF |= i;
 }
 

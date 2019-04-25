@@ -75,6 +75,13 @@ CPU::registers_t CPU::getRegisters() {
 
 //TODO: stop
 bool CPU::tick() {
+    new_div = io->cpu_inc_DIV();
+    if(Bit.fallen(old_div, new_div, 3)) on_div16();
+    if(Bit.fallen(old_div, new_div, 5)) on_div64();
+    if(Bit.fallen(old_div, new_div, 7)) on_div256();
+    if(Bit.fallen(old_div, new_div, 9)) on_div1024();
+    old_div = new_div;
+
     if(!inst_clocks) { //used to properly time the instruction execution
         u8 int_pc = 0, int_val = 0;
         bool int_set = false;
@@ -124,33 +131,30 @@ bool CPU::tick() {
                 IME=1;
             }
         }
+
+        // prevent inst_clocks from underflowing during HALTs.
+        // also keep CPU operating on proper M cycles.
+        if(is_halted) inst_clocks = 4;
     }
     inst_clocks--;
-
-    new_div = io->cpu_inc_DIV();
-    if(Bit.fallen(old_div, new_div, 3)) on_div16();
-    if(Bit.fallen(old_div, new_div, 5)) on_div64();
-    if(Bit.fallen(old_div, new_div, 7)) on_div256();
-    if(Bit.fallen(old_div, new_div, 9)) on_div1024();
-    old_div = new_div;
 
     //if inst_clocks is 0 here, then the next clock will execute an instruction
     return inst_clocks == 0;
 }
 
-void CPU::on_div16() {
+inline void CPU::on_div16() {
     if(io->cpu_get_TAC_cs() == 16) io->cpu_inc_TIMA();
 }
 
-void CPU::on_div64() {
+inline void CPU::on_div64() {
     if(io->cpu_get_TAC_cs() == 64) io->cpu_inc_TIMA();
 }
 
-void CPU::on_div256() {
+inline void CPU::on_div256() {
     if(io->cpu_get_TAC_cs() == 256) io->cpu_inc_TIMA();
 }
 
-void CPU::on_div1024() {
+inline void CPU::on_div1024() {
     if(io->cpu_get_TAC_cs() == 1024) io->cpu_inc_TIMA();
 }
 

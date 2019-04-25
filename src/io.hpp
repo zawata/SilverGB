@@ -61,7 +61,7 @@ public:
     u8   read_hram(u16 loc);
     void write_hram(u16 loc, u8 data);
 
-    void request_interrupt(int i);
+    void request_interrupt(Interrupt i);
     void dma_tick();
         bool
             dma_start        = false,

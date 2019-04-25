@@ -1,4 +1,5 @@
 #include <cstring>
+#include <iostream>
 
 #include "defs.hpp"
 #include "io_reg.hpp"
@@ -50,11 +51,9 @@ Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
 }
 
 bool Video_Controller::ppu_tick() {
-    // std::cout << "ppu_tick: " << frame_clock_count << ", ";
     //TODO: How many of the PPU variables can we make static?
 
     if(!LCD_ENABLED) {
-        // std::cout << "off" << std::endl;
         //TODO: detail any further behavior?
         reg(LY) = 0;
         reg(STAT) &= ~STAT_MODE_FLAG; //clear mode bits
@@ -113,11 +112,6 @@ bool Video_Controller::ppu_tick() {
         pix_fifo->clear();
 
         reg(LY) = y_line; //set LY
-        if(reg(LY) == reg(LYC)) {
-            Bit.set(&reg(STAT), STAT_COIN_BIT);
-        } else {
-            Bit.reset(&reg(STAT), STAT_COIN_BIT);
-        }
 
         if(y_line < 144) {
             x_sc = reg(SCX); //lock scx for the current line
@@ -132,6 +126,12 @@ bool Video_Controller::ppu_tick() {
                 ((BG_TILE_MAP == TILE_MAP_1) ? 0 : 0x0400) |
                 ((u16)((y_line+y_sc) & 0xf8) << 2) |
                 (x_sc >> 3);
+
+            wnd_map_addr =
+                0x9800 |
+                WINDOW_TILE_MAP << 10 |
+                ((y_line + y_sc) & 0xf8) << 2;
+
         } else if(y_line < 154) {
             process_step = VBLANK;
             //TODO: anything else?
@@ -236,6 +236,8 @@ bool Video_Controller::ppu_tick() {
          * hence every fetch step has 2 enum entries.
          */
         switch(vram_fetch_step) {
+
+        // Background map clk 1
         case BM_1:
             bg_map_byte = io->read_vram(bg_map_addr, true);
 
@@ -246,8 +248,8 @@ bool Video_Controller::ppu_tick() {
             vram_fetch_step = BM_2;
             break;
 
+        // Background map clk 2
         case BM_2:
-            //std::cout << "B";
 
             if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
                 tile_addr = (bg_map_byte << 4) | (((y_line + y_sc) & 0x7) << 1);
@@ -258,16 +260,28 @@ bool Video_Controller::ppu_tick() {
             vram_fetch_step = TD_0_0;
             break;
 
-        case WM_1: //TODO
+        // window map clk 1
+        case WM_1:
+
+            wnd_map_byte = io->read_vram(wnd_map_addr, true);
+            wnd_map_addr++;
 
             vram_fetch_step = WM_2;
             break;
 
-        case WM_2: //TODO
+        // window map clk 2
+        case WM_2:
+
+            if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
+                tile_addr = (wnd_map_byte << 4) | (((y_line + y_sc) & 0x7) << 1);
+            } else {
+                tile_addr = (0x1000 - (wnd_map_byte << 4)) | (((y_line + y_sc) & 0x7) << 1);
+            }
 
             vram_fetch_step = TD_0_0;
             break;
 
+        // tile data 1 clk 1
         case TD_0_0:
             tile_byte_1 = io->read_vram(0x8000 + tile_addr, true);
             tile_addr++;
@@ -275,11 +289,12 @@ bool Video_Controller::ppu_tick() {
             vram_fetch_step = TD_0_1;
             break;
 
+        // tile data 1 clk 2
         case TD_0_1:
-            //std::cout << "0";
             vram_fetch_step = TD_1_0;
             break;
 
+        // tile data 2 clk 1
         case TD_1_0:
             tile_byte_2 = io->read_vram(0x8000 + tile_addr, true);
             tile_addr++;
@@ -287,8 +302,8 @@ bool Video_Controller::ppu_tick() {
             vram_fetch_step = TD_1_1;
             break;
 
+        // tile data 2 clk 2
         case TD_1_1:
-            //std::cout << "1";
 
             if(start_of_line) {
                 start_of_line = false;
@@ -299,13 +314,13 @@ bool Video_Controller::ppu_tick() {
             }
             break;
 
+        // sprite data clk 1
         case SP_0:
-            //TODO
             vram_fetch_step = SP_1;
             break;
 
+        // sprite data clk 2
         case SP_1:
-            //TODO
 
             for(int i = 0; i < 8; i++) {
                 u8 out_color = ((tile_byte_1 >> (7 - i)) & 1);
@@ -314,8 +329,7 @@ bool Video_Controller::ppu_tick() {
 
                 pix_fifo->enqueue(out_color);
             }
-
-            vram_fetch_step = BM_1; //TODO: logic for which step to go back to.
+            vram_fetch_step = BM_1;
             break;
         default:
             std::cerr << "vram step error" << vram_fetch_step << std::endl;
@@ -332,7 +346,10 @@ bool Video_Controller::ppu_tick() {
             }
 
             x_line++;
-            if(x_line == 160) {
+            if(x_line == reg(WX)) {
+                vram_fetch_step = WM_1;
+                pix_fifo->clear();
+            } else if(x_line == 160) {
                 process_step = HBLANK;
             }
         }
@@ -341,7 +358,7 @@ bool Video_Controller::ppu_tick() {
      * HBLANK
      */
     } else if(process_step == HBLANK) {
-        if(line_clock_count >= 456) {
+        if(line_clock_count >= 455) {
             new_line = true;
         }
 
@@ -351,7 +368,7 @@ bool Video_Controller::ppu_tick() {
     } else if(process_step == VBLANK) {
         if(!vblank_int_requested) {
             vblank_int_requested = true;
-            io->request_interrupt(IO_Bus::VBLANK_INT);
+            io->request_interrupt(IO_Bus::Interrupt::VBLANK_INT);
         }
         //clock_count checker below will reset the frame
 
