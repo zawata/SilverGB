@@ -1,4 +1,4 @@
-#include "cpu.hpp"
+#include "gb/cpu.hpp"
 #include "defs.hpp"
 
 #include "util/bit.hpp"
@@ -159,7 +159,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(op) << std::endl;
+    std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -1523,7 +1523,8 @@ u8 CPU::halt() {
 
 u8 CPU::stop() {
     is_stopped = true;
-    return 4;
+    PC_REG--;
+    return 1;
 }
 
 //====================
@@ -1544,8 +1545,8 @@ u8 CPU::di() {
 // Reset
 //====================
 u8 CPU::rst_l(u8 loc) {
-    stack_push(PC);
-    PC = loc;
+    stack_push(PC_REG);
+    PC_REG = loc;
     return 16;
 }
 
@@ -1553,13 +1554,13 @@ u8 CPU::rst_l(u8 loc) {
 // Jump
 //====================
 u8 CPU::jump_nn() {
-    PC = fetch_16();
+    PC_REG = fetch_16();
 
     return 16;
 }
 
 u8 CPU::jump_ll(u16 loc) {
-    PC = loc;
+    PC_REG = loc;
 
     return 4;
 }
@@ -1567,7 +1568,7 @@ u8 CPU::jump_ll(u16 loc) {
 u8 CPU::jump_cond_ll(bool cond) {
     u16 t = fetch_16(); //need to fetch regardless of the condition;
     if(cond) {
-        PC = t;
+        PC_REG = t;
         return 16;
     }
     return 12;
@@ -1575,14 +1576,14 @@ u8 CPU::jump_cond_ll(bool cond) {
 
 u8 CPU::jump_rel_n() {
     s8 e = fetch_8();
-    PC += e;
+    PC_REG += e;
     return 12;
 }
 
 u8 CPU::jump_rel_cond_n(bool cond) {
     s8 e = fetch_8();
     if(cond) {
-        PC += e;
+        PC_REG += e;
         return 12;
     }
     return 8;
@@ -1594,8 +1595,8 @@ u8 CPU::jump_rel_cond_n(bool cond) {
 u8 CPU::call_nn() {
     //PC should be instruction after the call
     u16 new_pc = fetch_16();
-    stack_push(PC);
-    PC = new_pc;
+    stack_push(PC_REG);
+    PC_REG = new_pc;
     return 24;
 }
 
@@ -1603,8 +1604,8 @@ u8 CPU::call_cond_nn(bool cond) {
     //PC should be instruction after the call
     u16 new_pc = fetch_16(); //fetch icrements the PC
     if(cond) {
-        stack_push(PC);
-        PC = new_pc;
+        stack_push(PC_REG);
+        PC_REG = new_pc;
         return 24;
     } else {
         return 12;
@@ -1615,19 +1616,19 @@ u8 CPU::call_cond_nn(bool cond) {
 // Return
 //====================
 u8 CPU::ret() {
-    PC = stack_pop();
+    PC_REG = stack_pop();
     return 16;
 }
 
 u8 CPU::reti() {
-    PC = stack_pop();
+    PC_REG = stack_pop();
     IME = 1; //re-enable interrupts
     return 16;
 }
 
 u8 CPU::ret_cond(bool cond) {
     if(cond) {
-        PC = stack_pop();
+        PC_REG = stack_pop();
         return 20;
     } else {
         return 8;
@@ -1639,6 +1640,6 @@ u8 CPU::ret_cond(bool cond) {
 //====================
 u8 CPU::invalid_op(u8 op) {
     std::cerr << "Invalid OP" << std::endl;
-    PC--; //to make the game freeze
+    PC_REG--; //to make the game freeze
     return 0;
 }

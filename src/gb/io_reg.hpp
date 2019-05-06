@@ -6,10 +6,10 @@
 #define __ARR(X) { X##_REG, X##_WRITE_MASK, X##_READ_MASK }
 
 
-//Every register has defined it's:
+//Every register has defined its:
 // - Location from the IO Offset
-// - Bits it write too in the from of a mask
-// - Bits it can read from in the form of a mask
+// - Bits that can be written in the form of a mask
+// - Bits that can be read in the form of a mask
 // - The above data in the form of an initializer list.
 
 // Ports Register

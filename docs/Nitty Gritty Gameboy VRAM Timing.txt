@@ -110,14 +110,14 @@ it simply restarts the whole fetch sequence over again, no matter where
 it was!  The timing is generated like so:
 
 B01   (6 cycles) fetch background tile nametable+bitplanes
-B01_  (1 to 172 cycles) ((xscroll % 7) + xwindow + 1)
+B01s  (1 to 172 cycles) ((xscroll % 7) + xwindow + 1)
 W01   (6 cycles) fetch window tile nametable+bitplanes
-W01_  (1.5 to 166.5 cycles)  (166.5 - xwindow)
+W01s  (1.5 to 166.5 cycles)  (166.5 - xwindow)
 
 As can be seen, it's very similar to the first case.  Only now,
 the number of B12_ accesses is controlled by the xscroll value
 and the xwindow value.  As before, when the number of cycles has
-elapsed, the access pattern is just cut short, and the W12 (W = window
+elapsed, the access pattern is just cut short, and the W01 (W = window
 nametable entry) access starts.
 
 This window access pattern is identical to the background one, except
@@ -366,8 +366,8 @@ The shift register is only 159 bits- the input data is used as the 160th
 bit for latching into the LCD column drivers.
 
 * The first pixel shifted into the register appears on the first column
-* The last pixel shifted in appears on the second to last column
-* The input pixel data on the input lines appears on the first column
+* The last pixel shifted in appears on the second-to-last column
+* The input pixel data on the input lines appears on the last column
 
 Terrible ASCII:
 

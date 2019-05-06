@@ -1,6 +1,12 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+
 #include <cstdint>
+#else
+#include <stdint.h>
+#endif
 
 typedef  int8_t  s8;
 typedef  int16_t s16;
@@ -12,3 +18,7 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 
 typedef u64      size_t;
+
+#ifdef __cplusplus
+}
+#endif

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "file.hpp"
+#include "util/file.hpp"
 #include "cfg.hpp"
-#include "cpu.hpp"
-#include "io.hpp"
-#include "video.hpp"
+#include "gb/cpu.hpp"
+#include "gb/io.hpp"
+#include "gb/video.hpp"
 
 #include <thread>
 #include <atomic>
@@ -35,7 +35,10 @@ public:
     u8 getByteFromIO(u16 addr);
     u8 *getScreenBuffer();
 
-    void set_breakpoint(u16 bp);
+    void set_bp(u16 bp, bool en = false);
+    u16 get_bp();
+    void set_bp_active(bool en);
+    bool get_bp_active();
 
     //void dump_io_registers();
 

@@ -1,6 +1,6 @@
-#include "io.hpp"
+#include "gb/io.hpp"
 
-#include "io_reg.hpp"
+#include "gb/io_reg.hpp"
 
 #include "util/bit.hpp"
 

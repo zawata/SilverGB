@@ -1,6 +1,6 @@
 #pragma once
 
-#include "io.hpp"
+#include "gb/io.hpp"
 #include "util/util.hpp"
 
 #include <iostream>
@@ -25,8 +25,8 @@ public:
     bool tick();
 
     u8 decode(u8 op);
-    std::string getOpString(u8 op);
-    std::string getCBOpString(u8 op);
+    std::string getOpString(u16 PC);
+    std::string getCBOpString(u16 PC);
 
     registers_t getRegisters();
 
@@ -37,9 +37,9 @@ private:
     void on_div1024();
 
     //used for disassembly
-    std::string i8();
-    std::string i16();
-    std::string format(std::string fmt);
+    std::string i8(u16 PC);
+    std::string i16(u16 PC);
+    std::string format(std::string fmt, u16 PC);
 
     IO_Bus *io;
     Configuration *cfg;

@@ -2,10 +2,9 @@
 
 #include "util/util.hpp"
 #include "util/ints.hpp"
+#include "util/bit.hpp"
 
 #include "defs.hpp"
-
-#include "file.hpp"
 
 #include <vector>
 
@@ -46,7 +45,7 @@ struct ROM_Controller : public MemoryBankController {
 
     void write_rom(u16 offset, u8 data) override {
         //We don't write to the ROM in the ROM Controller
-        //std::cerr << "write out of bounds" << std::endl;
+        std::cerr << "write out of bounds" << std::endl;
     }
 
     u8 read_ram(u16 offset) override {
@@ -95,7 +94,11 @@ struct MBC1_Controller : public MemoryBankController {
             return rom_file->getByte(offset);
         } else if(offset <= 0x7FFF) {
             offset -= 0x4000;
-            return rom_file->getByte(offset + (bank_num * ROM_BANK_SIZE));
+
+            if(!mode_select) offset += (((bank_num << 5) | rom_bank_num) * ROM_BANK_SIZE);
+            else             offset += (                   rom_bank_num * ROM_BANK_SIZE);
+
+            return rom_file->getByte(offset);
         } else {
             std::cerr << "read out of bounds" << std::endl;
         }
@@ -169,30 +172,65 @@ private:
 struct MBC2_Controller : public MemoryBankController {
     MBC2_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
+        std::cerr << "MBC2 no yet implemented. Will probably crash now" << std::endl;
         if(cart_type.RAM)
             this->ram = ram;
     }
 
-    u8 read_rom(u16 offset) override {}
+    u8 read_rom(u16 offset) override {
+        if(offset <= 0x3FFF) {
+            return rom_file->getByte(offset);
+        } else if(offset <= 0x7FFF) {
+            offset -= 0x4000;
+            return rom_file->getByte(offset + (rom_bank_num * ROM_BANK_SIZE));
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+        }
+    }
 
-    void write_rom(u16 offset, u8 data) override {}
+    void write_rom(u16 offset, u8 data) override {
+        if(offset <= 0x1FFF) {
+            if(Bit.test(offset, 8)) return;
 
-    u8 read_ram(u16 offset) override {}
+            ram_enable = (data & 0xF) == 0xA;
+        } else if(offset <= 0x7FFF) {
+            if(Bit.test(offset, 8)) return;
 
-    void write_ram(u16 offset, u8 data) override {}
+            rom_bank_num = data & 0xF;
+        } else {
+            std::cerr << "read out of bounds" << std::endl;
+        }
+    }
+
+    u8 read_ram(u16 offset) override {
+
+    }
+
+    void write_ram(u16 offset, u8 data) override {
+
+    }
 
 private:
     std::vector<u8> ram;
+
+    bool ram_enable;
+    u8 rom_bank_num = 0;
+    //true = ram_banking, false = rom_banking
+    bool mode_select = false;
+
+    static const u16 ROM_BANK_SIZE = 0x4000;
+    static const u16 RAM_BANK_SIZE = 0x2000;
 };
 
 /**
- * MBC2
+ * MBC3
  *
  * TODO: this
  */
 struct MBC3_Controller : public MemoryBankController {
     MBC3_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
+        std::cerr << "MBC3 not yet implemented. Will probably crash now" << std::endl;
         if(cart_type.RAM)
             this->ram = ram;
     }
@@ -230,10 +268,10 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
         controller = new ROM_Controller(f, cart_type, ram);
     } else if (cart_type.MBC1) {
         controller = new MBC1_Controller(f, cart_type, ram);
-    // } else if (cart_type.MBC2) {
-    //     controller = new MBC2_Controller(f, cart_type, ram);
-    // } else if (cart_type.MBC3) {
-    //     controller = new MBC3_Controller(f, cart_type, ram);
+    } else if (cart_type.MBC2) {
+        controller = new MBC2_Controller(f, cart_type, ram);
+    } else if (cart_type.MBC3) {
+        controller = new MBC3_Controller(f, cart_type, ram);
     }
 
     std::cout << "cart:      " << getCartTitle() << std::endl;
@@ -280,23 +318,23 @@ u32 Cartridge::getROMSize() {
     u8 rom_size_byte = rom_file->getByte(Cartridge_Constants::ROM_SIZE_OFFSET);
     switch(rom_size_byte) {
     case 0x00:
-        return 32768;
+        return 32768; // 2^15
     case 0x01:
-        return 65536;
+        return 65536; // 2^16
     case 0x02:
-        return 131072;
+        return 131072; // 2^17
     case 0x03:
-        return 262144;
+        return 262144; // 2^18
     case 0x04:
-        return 524288;
+        return 524288; //2^19
     case 0x05:
-        return 1048576;
+        return 1048576; //2^20
     case 0x06:
-        return 2097152;
+        return 2097152; //2^21
     case 0x07:
-        return 4194304;
+        return 4194304; //2^22
     case 0x08:
-        return 8388608;
+        return 8388608; //2^23
 
     //until I can figure out what these calculate too return not supported
     case 0x52:

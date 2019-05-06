@@ -9,7 +9,7 @@
 #include "GL/gl3w.h"
 #include "nfd.h"
 
-#include "core.hpp"
+#include "gb/core.hpp"
 #include "cfg.hpp"
 
 #define DMG_BIOS_CRC 0x59c8598e
@@ -65,6 +65,7 @@ private:
     void buildCPURegisterUI();
     void buildIORegisterUI();
     void buildDisassemblyUI();
+    void buildBreakpointUI();
     void buildMemoryViewUI();
 
     bool build_shortcut(SDL_KeyboardEvent *key);

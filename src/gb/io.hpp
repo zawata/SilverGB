@@ -2,10 +2,10 @@
 
 #include <vector>
 
-#include "audio.hpp"
-#include "cart.hpp"
+#include "gb/audio.hpp"
+#include "gb/cart.hpp"
 #include "cfg.hpp"
-#include "input.hpp"
+#include "gb/input.hpp"
 
 #include "util/ints.hpp"
 

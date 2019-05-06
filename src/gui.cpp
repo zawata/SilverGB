@@ -54,7 +54,6 @@ void GUI::clear_shortcut() {
 bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
     assert(mods.size() <= 3);
     assert(mods[0] != 0);
-
     if(!this->current_shortcut.valid) return false;
 
     bool ctrl_repeated = false,
@@ -147,7 +146,7 @@ bool GUI::preInitialize() {
 GUI *GUI::createGUI(Configuration *config) {
     SDL_DisplayMode current;
     SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window *window = SDL_CreateWindow("SilverBoy", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H + MENUBAR_HEIGHT, SDL_WINDOW_OPENGL);
+    SDL_Window *window = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H + MENUBAR_HEIGHT, SDL_WINDOW_OPENGL);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
     gl3wInit();
@@ -168,14 +167,10 @@ void GUI::open_file(std::string file) {
     core = new GB_Core(rom_file, config);
     //core->start_thread(true);
     state_flags.game_loaded = true;
+    core->set_bp(0x02a5, true);
 }
 
 GUI::loop_return_code_t GUI::mainLoop() {
-    // Poll and handle events (inputs, window resize, etc.)
-    // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
-    // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
-    // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
-    // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -183,10 +178,12 @@ GUI::loop_return_code_t GUI::mainLoop() {
         switch(event.type) {
         case SDL_QUIT:
             state_flags.done = true;
+            break;
         case SDL_WINDOWEVENT:
             if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
                 state_flags.done = true;
             }
+            break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
             if(!io.WantCaptureKeyboard) {
@@ -194,6 +191,7 @@ GUI::loop_return_code_t GUI::mainLoop() {
                     //do other stuff with the key event
                 }
             }
+            break;
         }
     }
 
@@ -285,7 +283,12 @@ GUI::loop_return_code_t GUI::mainLoop() {
     /**
      * Game Stuff
      */
-    if(state_flags.run_game) core->tick_frame();
+    try {
+        if(state_flags.run_game) core->tick_frame();
+    }
+    catch(breakpoint_exception &e) {
+        state_flags.run_game = false;
+    }
 
     clear_shortcut();
 
@@ -310,6 +313,7 @@ void GUI::buildUI() {
         bool cpu_register_window = false;
         bool io_register_window = false;
         bool disassemble_window = false;
+        bool breakpoint_window = false;
         bool render_window = true;
     } window_flags;
 
@@ -346,23 +350,10 @@ void GUI::buildUI() {
 
         if(state_flags.debug_mode) {
             if(BeginMenu("Debug")) {
-                if(window_flags.cpu_register_window) {
-                    if(MenuItem("Hide CPU Register Window")) window_flags.cpu_register_window = false;
-                } else {
-                    if(MenuItem("Show CPU Register Window")) window_flags.cpu_register_window = true;
-                }
-
-                if(window_flags.io_register_window) {
-                    if(MenuItem("Hide IO Register Window")) window_flags.io_register_window = false;
-                } else {
-                    if(MenuItem("Show IO Register Window")) window_flags.io_register_window = true;
-                }
-
-                if(window_flags.disassemble_window) {
-                    if(MenuItem("Hide Disassembly Window")) window_flags.disassemble_window = false;
-                } else {
-                    if(MenuItem("Show Disassembly Window")) window_flags.disassemble_window = true;
-                }
+                MenuItem("CPU Register Window", nullptr, &window_flags.cpu_register_window);
+                MenuItem("IO Register Window", nullptr, &window_flags.io_register_window);
+                MenuItem("Hide Disassembly Window", nullptr, &window_flags.disassemble_window);
+                MenuItem("Breakpoint Window",nullptr, &window_flags.breakpoint_window);
 
                 EndMenu();
             }
@@ -373,6 +364,7 @@ void GUI::buildUI() {
     if(window_flags.cpu_register_window) buildCPURegisterUI();
     if(window_flags.io_register_window)  buildIORegisterUI();
     if(window_flags.disassemble_window)  buildDisassemblyUI();
+    if(window_flags.breakpoint_window)   buildBreakpointUI();
     if(window_flags.render_window)       buildRenderUI();
 }
 
@@ -804,3 +796,46 @@ void GUI::buildDisassemblyUI() {
 //     End();
 //     PopStyleColor(3);
 // }
+
+void GUI::buildBreakpointUI() {
+    using namespace ImGui;
+
+    ImGuiInputTextCallback text_func =
+        [](ImGuiInputTextCallbackData *data) -> int {
+            switch(data->EventChar) {
+            case '0' ... '9':
+                break;
+            case 'a' ... 'f':
+                data->EventChar -= ('a' - 'A');
+                break;
+            case 'A' ... 'F':
+                break;
+            default:
+                return 1;
+                break;
+            }
+            return 0;
+        };
+
+    static char buf[5] = "";
+
+    if(Begin("Breakpoint", nullptr, ImGuiWindowFlags_NoResize)) {
+        Columns(2, nullptr, true);
+            SetColumnWidth(-1, 90);
+            Dummy({0,0.25});
+            Text("Breakpoint:");
+            Dummy({0,0.25});
+            Text("Enabled:");
+        NextColumn();
+            PushItemWidth(50);
+            InputText("##", buf, 5, ImGuiInputTextFlags_CallbackCharFilter, text_func);
+            //SetItemDefaultFocus();
+            PopItemWidth();
+
+            bool breakpoint_enabled = core->get_bp_active();
+            if(Checkbox("##", &breakpoint_enabled)) {
+                core->set_bp_active(breakpoint_enabled);
+            }
+    }
+    End();
+}

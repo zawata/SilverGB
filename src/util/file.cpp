@@ -3,8 +3,6 @@
 #include "util/crc.hpp"
 #include "util/util.hpp"
 
-#include "defs.hpp"
-
 File_Interface::File_Interface() {}
 
 File_Interface::~File_Interface() {}
@@ -69,7 +67,7 @@ void File_Interface::setByte(u32 offset, u8 data) {
 }
 
 void File_Interface::setBuffer(u32 offset, u8 *buf, size_t len) {
-    seekFile_g(offset);
+    seekFile_p(offset);
     file.write((char *)buf, len);
     file.flush();
 }
