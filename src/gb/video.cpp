@@ -129,7 +129,7 @@ bool Video_Controller::ppu_tick() {
 
             wnd_map_addr =
                 0x9800 |
-                WINDOW_TILE_MAP << 10 |
+                ((WINDOW_TILE_MAP == TILE_MAP_1) ? 0 : 0x0400) |
                 ((y_line + y_sc) & 0xf8) << 2;
 
         } else if(y_line < 154) {
@@ -241,6 +241,8 @@ bool Video_Controller::ppu_tick() {
         case BM_1:
             bg_map_byte = io->read_vram(bg_map_addr, true);
 
+            //increment bg_map_addr, but only the bottom 5 bits.
+            // this will wrap around the edge of the tile map
             if(!start_of_line) {
                 bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
             }
@@ -250,12 +252,13 @@ bool Video_Controller::ppu_tick() {
 
         // Background map clk 2
         case BM_2:
+            tile_addr = 0;
+            if(Bit.test(bg_map_byte, 7)) tile_addr = 0x800;
+            else if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) tile_addr = 0x1000;
 
-            if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
-                tile_addr = (bg_map_byte << 4) | (((y_line + y_sc) & 0x7) << 1);
-            } else {
-                tile_addr = (0x1000 - (bg_map_byte << 4)) | (((y_line + y_sc) & 0x7) << 1);
-            }
+            tile_addr +=
+                    ((bg_map_byte & 0x7F) << 4) |
+                    (((y_line + y_sc) & 0x7) << 1);
 
             vram_fetch_step = TD_0_0;
             break;
@@ -271,12 +274,13 @@ bool Video_Controller::ppu_tick() {
 
         // window map clk 2
         case WM_2:
+            tile_addr = 0;
+            if(Bit.test(wnd_map_byte, 7)) tile_addr = 0x800;
+            else if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) tile_addr = 0x1000;
 
-            if(BG_WND_TILE_DATA == Video_Controller::MODE_0_1) {
-                tile_addr = (wnd_map_byte << 4) | (((y_line + y_sc) & 0x7) << 1);
-            } else {
-                tile_addr = (0x1000 - (wnd_map_byte << 4)) | (((y_line + y_sc) & 0x7) << 1);
-            }
+            tile_addr +=
+                    ((wnd_map_byte & 0x7F) << 4) |
+                    (((y_line + y_sc) & 0x7) << 1);
 
             vram_fetch_step = TD_0_0;
             break;
