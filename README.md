@@ -2,12 +2,28 @@
 Because it's not quite gold!
 
 ## Summary
-SilverGB is gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year
-class regarding CPU execution pipelines, and my general knowledge of embedded development.
+SilverGB is gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year class regarding CPU execution pipelines, and my general knowledge of embedded development.  
 
-I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me about 6 years ago when I first tried to start this project(as a sophmore in highschool ha!): minor knowledge of programming but major interest in doing something cool.
+I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me about 6 years ago when I first tried to start this project(as a sophmore in highschool ha!): minor knowledge of programming but major interest in doing something cool.  
 
-The emulator features a GUI created with "Dear ImGui" which is an absolutely fantastic GUI Library. It utilizes SDL for media interfaces(Input, Audio, Window Managment) and OpenGL for graphics. It attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing) but I'm developing and testing it on Linux so that is where it's "guaranteed" to work.(note the quotes...)
+The emulator features a GUI created with "Dear ImGui" which is an absolutely fantastic GUI Library. It utilizes SDL for media interfaces(Input, Audio, Window Management) and OpenGL for graphics. It attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing) but I'm developing and testing it on Linux so that is where it's "guaranteed" to work.(note the quotes...)  
+
+## Major TODOs
+
+Slight TODOs are littered throughout the code, the bigger ones are placed here:  
+ - Replace the growing build system with something more scalable/easier, either CMake or Meson+Ninja
+ - Modfiy UI to utilize libui for App menus and ImGUI for graphics.
+   - libui may need to calm down a little first. also the build system needs to change
+   - additionally imgui should be changed to be 'source-included' and moved to a submodule to make updates easier/not my problem
+ - Audio Processing Unit(See the `sound_impl` branch, which is massively out of date now)
+ - M-Cycle accurate CPU rewrite(see `src/gb/new_cpu.c`)
+   - Basic structure is done and designed, just need to actually implement all 499 instructions
+ - Accurate VPU timing
+   - Most of this isn't centrally documented but spread across 3-4 documents and dozens of test-roms. So yay.
+ - core-clocking rewrite
+   - I'm gonna need to do some research on this one...the current implementation is fucked and I'm not experienced enough in this area to know how to fix it.
+   - As the project currently doesn't play games this isn't a concern but eventually yes. 
+
 
 ## Progress:  
 ✔️ = Done  
