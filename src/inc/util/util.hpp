@@ -10,7 +10,8 @@ static inline bool bounded(u8 x, u8 y, u8 z)                    { return (x >= y
 
 //TODO: this has become unruly and terrible. do it again
 static inline std::string itoh(u64 i, u8 zp = 0, bool caps = false) {
-    char buf[17];
+    char buf[17] = { 0 };
+
     if(!caps) {
         switch(zp) {
         case 0:
