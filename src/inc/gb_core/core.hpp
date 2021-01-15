@@ -1,10 +1,9 @@
 #pragma once
 
 #include "util/file.hpp"
-#include "cfg.hpp"
-#include "gb/cpu.hpp"
-#include "gb/io.hpp"
-#include "gb/video.hpp"
+#include "gb_core/cpu.hpp"
+#include "gb_core/io.hpp"
+#include "gb_core/video.hpp"
 
 #include <thread>
 #include <atomic>
@@ -15,7 +14,7 @@ struct breakpoint_exception {
 
 class GB_Core {
 public:
-    GB_Core(File_Interface *rom, Configuration *cfg);
+    GB_Core(Silver::File *rom, Silver::File *bootrom);
     ~GB_Core();
 
 
@@ -33,7 +32,7 @@ public:
     CPU::registers_t getRegistersFromCPU();
     IO_Bus::io_registers_t getregistersfromIO();
     u8 getByteFromIO(u16 addr);
-    u8 *getScreenBuffer();
+    u8 const* getScreenBuffer();
 
     void set_bp(u16 bp, bool en = false);
     u16 get_bp();

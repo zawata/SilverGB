@@ -1,10 +1,11 @@
-#include "cart.hpp"
+#include "gb_core/cart.hpp"
 
+#include "util/file.hpp"
 #include "util/util.hpp"
 #include "util/ints.hpp"
 #include "util/bit.hpp"
 
-#include "defs.hpp"
+#include "gb_core/defs.hpp"
 
 #include <vector>
 
@@ -17,11 +18,11 @@ struct MemoryBankController {
     virtual u8 read_ram(u16 offset) = 0;
     virtual void write_ram(u16 offset, u8 data) = 0;
 protected:
-    MemoryBankController(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type) :
+    MemoryBankController(Silver::File *rom_file, Cartridge_Constants::cart_type_t cart_type) :
     rom_file(rom_file),
     cart_type(cart_type) {}
 
-    File_Interface *rom_file;
+    Silver::File *rom_file;
     Cartridge_Constants::cart_type_t cart_type;
 };
 
@@ -29,7 +30,7 @@ protected:
  * ROM with optional RAM
  */
 struct ROM_Controller : public MemoryBankController {
-    ROM_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    ROM_Controller(Silver::File *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
         if(cart_type.RAM)
             this->ram = ram;
@@ -40,6 +41,7 @@ struct ROM_Controller : public MemoryBankController {
             return rom_file->getByte(offset);
         } else {
             std::cerr << "read out of bounds" << std::endl;
+            return 0;
         }
     }
 
@@ -81,11 +83,12 @@ private:
  * TODO: do MBC's always have ram?
  */
 struct MBC1_Controller : public MemoryBankController {
-    MBC1_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MBC1_Controller(Silver::File *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
         if(cart_type.RAM)
             this->ram = ram;
 
+        ram_enable = false; //TODO?
         bank_num = 1;
     }
 
@@ -101,12 +104,13 @@ struct MBC1_Controller : public MemoryBankController {
             return rom_file->getByte(offset);
         } else {
             std::cerr << "read out of bounds" << std::endl;
+            return 0;
         }
     }
 
     void write_rom(u16 offset, u8 data) override {
         if(offset <= 0x1FFF) {
-            ram_enable = data & 0xf == 0xA;
+            ram_enable = (data & 0xf) == 0xA;
         } else if(offset <= 0x3FFF) {
             rom_bank_num = data & 0x1F;
             if(!rom_bank_num) rom_bank_num++; //correct rom bank from 0
@@ -123,8 +127,8 @@ struct MBC1_Controller : public MemoryBankController {
         if(offset >= 0xA000 && offset <= 0xBFFF) {
             offset -= 0xA000;
             if(cart_type.RAM && ram_enable) {
-                if(mode_select) ram[offset+(bank_num * RAM_BANK_SIZE)];
-                else            ram[offset];
+                if(mode_select) return ram[offset+(bank_num * RAM_BANK_SIZE)];
+                else            return ram[offset];
             }
             else {
                 return 0;
@@ -170,11 +174,13 @@ private:
  * TODO: this
  */
 struct MBC2_Controller : public MemoryBankController {
-    MBC2_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MBC2_Controller(Silver::File *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
-        std::cerr << "MBC2 no yet implemented. Will probably crash now" << std::endl;
+        std::cerr << "MBC2 not yet implemented. Will probably crash now" << std::endl;
         if(cart_type.RAM)
             this->ram = ram;
+
+        ram_enable = false;
     }
 
     u8 read_rom(u16 offset) override {
@@ -185,6 +191,7 @@ struct MBC2_Controller : public MemoryBankController {
             return rom_file->getByte(offset + (rom_bank_num * ROM_BANK_SIZE));
         } else {
             std::cerr << "read out of bounds" << std::endl;
+            return 0;
         }
     }
 
@@ -203,7 +210,7 @@ struct MBC2_Controller : public MemoryBankController {
     }
 
     u8 read_ram(u16 offset) override {
-
+        return 0;
     }
 
     void write_ram(u16 offset, u8 data) override {
@@ -228,24 +235,41 @@ private:
  * TODO: this
  */
 struct MBC3_Controller : public MemoryBankController {
-    MBC3_Controller(File_Interface *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
+    MBC3_Controller(Silver::File *rom_file, Cartridge_Constants::cart_type_t cart_type, std::vector<u8> ram) :
     MemoryBankController(rom_file, cart_type) {
         std::cerr << "MBC3 not yet implemented. Will probably crash now" << std::endl;
         if(cart_type.RAM)
             this->ram = ram;
     }
 
-    u8 read_rom(u16 offset) override {}
+    u8 read_rom(u16 offset) override {
+        return 0;
+    }
 
     void write_rom(u16 offset, u8 data) override {}
 
-    u8 read_ram(u16 offset) override {}
+    u8 read_ram(u16 offset) override {
+        return 0;
+    }
 
     void write_ram(u16 offset, u8 data) override {}
 
 private:
     std::vector<u8> ram;
 };
+
+/**
+ * Cartridge Data
+ */
+std::string get_ram_file_name(std::string rom_file_name) {
+    std::string ram_file_name = rom_file_name;
+    auto ext = rom_file_name.find_last_of('.') + 1;
+
+    ram_file_name.erase(ext, std::string::npos);
+    ram_file_name.append("sav");
+
+    return ram_file_name;
+}
 
 const u8 Cartridge_Constants::MAGIC_NUM[Cartridge_Constants::MAGIC_NUM_LENGTH] = {
         0xCE,0xED,0x66,0x66,0xCC,0x0D,0x00,0x0B,
@@ -255,15 +279,47 @@ const u8 Cartridge_Constants::MAGIC_NUM[Cartridge_Constants::MAGIC_NUM_LENGTH] =
         0xBB,0xBB,0x67,0x63,0x6E,0x0E,0xEC,0xCC,
         0xDD,0xDC,0x99,0x9F,0xBB,0xB9,0x33,0x3E };
 
-Cartridge::Cartridge(File_Interface *f) :
+Cartridge::Cartridge(Silver::File *f) :
 rom_file(f),
 cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
     std::vector<u8> ram;
 
-    if(cart_type.RAM) {
+    //open ram info
+    if(cart_type.RAM && getRAMSize() > 0) {
         ram.reserve(getRAMSize());
+
+        if(cart_type.BATTERY) {
+            //get ram file name
+            std::string ram_file_name = get_ram_file_name(rom_file->getFilename());
+
+            //open ram file
+            Silver::File *ram_file;
+            if((ram_file = Silver::File::createFile(ram_file_name)) == nullptr) {
+                ram_file = Silver::File::openFile(ram_file_name);
+            }
+
+            //check that fiel could be opened
+            if(!ram_file) {
+                std::cerr << "Error Opening " << ram_file_name << std::endl;
+                std::cerr << "Ram Data will not be saved." << std::endl;
+                goto ContinueLoad; //TODO: no
+            }
+
+            //check that file size matches cart ram size
+            auto ram_size = ram_file->getSize();
+            if(ram_size != getRAMSize()) {
+                std::cerr << "Ram File " << ram_file_name << "does not match cart type" << std::endl
+                          << "Data will not be loaded" << std::endl;
+                goto ContinueLoad; //TODO: no
+            }
+
+            //load ram data from file
+            ram_file->getBuffer(0, ram.data(), getRAMSize());
+        }
     }
 
+//TODO: I haaaaate gotos. clean this up when i care more
+ContinueLoad:
     if(cart_type.ROM) {
         controller = new ROM_Controller(f, cart_type, ram);
     } else if (cart_type.MBC1) {
@@ -274,10 +330,19 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
         controller = new MBC3_Controller(f, cart_type, ram);
     }
 
+    //debug info
     std::cout << "cart:      " << getCartTitle() << std::endl;
     std::cout << "cart type: " << (std::string)getCartType() << std::endl;
     std::cout << "cart rom:  " << getROMSize() << std::endl;
-    std::cout << "cart ram:  " << getRAMSize() << std::endl;
+    if(cart_type.RAM) {
+        std::cout << "cart ram:  " << getRAMSize();
+        if(cart_type.BATTERY) {
+            std::cout << ", Battery-Backed" << std::endl;
+        }
+        else {
+            std::cout << std::endl;
+        }
+    }
 }
 
 Cartridge::~Cartridge() = default;
@@ -291,7 +356,7 @@ u16 Cartridge::getCodeOffset() {
 bool Cartridge::checkMagicNumber() {
     u8 buf[Cartridge_Constants::MAGIC_NUM_LENGTH];
     rom_file->getBuffer(Cartridge_Constants::MAGIC_NUM_OFFSET, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
-    return byteCompare(Cartridge_Constants::MAGIC_NUM, buf, 48);
+    return byteCompare(Cartridge_Constants::MAGIC_NUM, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
 }
 
 std::string Cartridge::getCartTitle() {
@@ -336,7 +401,7 @@ u32 Cartridge::getROMSize() {
     case 0x08:
         return 8388608; //2^23
 
-    //until I can figure out what these calculate too return not supported
+    //until I can figure out what these calculate to, return not supported
     case 0x52:
     case 0x53:
     case 0x54:

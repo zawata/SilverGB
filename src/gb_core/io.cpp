@@ -1,10 +1,9 @@
-#include "gb/io.hpp"
-
-#include "gb/io_reg.hpp"
+#include "gb_core/defs.hpp"
+#include "gb_core/io.hpp"
+#include "gb_core/io_reg.hpp"
 
 #include "util/bit.hpp"
-
-#include "defs.hpp"
+#include <stdexcept>
 
 #define MODE_HBLANK 0
 #define MODE_VBLANK 1
@@ -12,68 +11,62 @@
 #define MODE_VRAM   3
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
-IO_Bus::IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode) :
-cart(cart),
-config(config),
-gbc_mode(gbc_mode),
+IO_Bus::IO_Bus(Cartridge *cart, bool gbc_mode, Silver::File *bios_file = nullptr) :
 snd(new Sound_Controller()),
-input(new Input_Manager()) {
+input(new Input_Manager()),
+cart(cart),
+gbc_mode(gbc_mode),
+bootrom_file(bios_file),
+bootrom_mode(bios_file != nullptr) {
     registers = { 0 };
-    if(config->BIOS.get_bios_enabled()) {
-        bootrom_mode = true;
-        bootrom_file = File_Interface::openFile(config->BIOS.get_bios_filepath());
-        std::cout << "Boot Rom enabled" << std::endl;
-    }
-    else {
-        bootrom_mode = false;
-
-        //C++ doesn't support direct-initialization of structs until
-        // c++20 which im not going to target right now, so just init the annoying way
-        registers.TIMA = 0x00;
-        registers.TMA  = 0x00;
-        registers.TAC  = 0x00;
-        write(0xFF00 + NR10_REG, 0x80);
-        write(0xFF00 + NR11_REG, 0xBF);
-        write(0xFF00 + NR12_REG, 0xF3);
-        write(0xFF00 + NR14_REG, 0xBF);
-        write(0xFF00 + NR21_REG, 0x3F);
-        write(0xFF00 + NR22_REG, 0x00);
-        write(0xFF00 + NR24_REG, 0xBF);
-        write(0xFF00 + NR30_REG, 0x7F);
-        write(0xFF00 + NR31_REG, 0xFF);
-        write(0xFF00 + NR32_REG, 0x9F);
-        write(0xFF00 + NR33_REG, 0xBF);
-        write(0xFF00 + NR41_REG, 0xFF);
-        write(0xFF00 + NR42_REG, 0x00);
-        write(0xFF00 + NR43_REG, 0x00);
-        write(0xFF00 + NR44_REG, 0xBF);
-        write(0xFF00 + NR50_REG, 0x77);
-        write(0xFF00 + NR51_REG, 0xF3);
-        write(0xFF00 + NR52_REG, 0xF1);
-        registers.LCDC = 0x91;
-        registers.SCY  = 0x00;
-        registers.SCX  = 0x00;
-        registers.LYC  = 0x00;
-        registers.BGP  = 0xFC;
-        registers.OBP0 = 0xFF;
-        registers.OBP1 = 0xFF;
-        registers.WY   = 0x00;
-        registers.WX   = 0x00;
-        registers.IE   = 0x00;
+    if(bios_file == nullptr) {
+       //C++ doesn't support direct-initialization of structs until
+       // c++20 which im not going to target right now, so just init the annoying way
+       registers.TIMA = 0x00;
+       registers.TMA  = 0x00;
+       registers.TAC  = 0x00;
+       write(0xFF00 + NR10_REG, 0x80);
+       write(0xFF00 + NR11_REG, 0xBF);
+       write(0xFF00 + NR12_REG, 0xF3);
+       write(0xFF00 + NR14_REG, 0xBF);
+       write(0xFF00 + NR21_REG, 0x3F);
+       write(0xFF00 + NR22_REG, 0x00);
+       write(0xFF00 + NR24_REG, 0xBF);
+       write(0xFF00 + NR30_REG, 0x7F);
+       write(0xFF00 + NR31_REG, 0xFF);
+       write(0xFF00 + NR32_REG, 0x9F);
+       write(0xFF00 + NR33_REG, 0xBF);
+       write(0xFF00 + NR41_REG, 0xFF);
+       write(0xFF00 + NR42_REG, 0x00);
+       write(0xFF00 + NR43_REG, 0x00);
+       write(0xFF00 + NR44_REG, 0xBF);
+       write(0xFF00 + NR50_REG, 0x77);
+       write(0xFF00 + NR51_REG, 0xF3);
+       write(0xFF00 + NR52_REG, 0xF1);
+       registers.LCDC = 0x91;
+       registers.SCY  = 0x00;
+       registers.SCX  = 0x00;
+       registers.LYC  = 0x00;
+       registers.BGP  = 0xFC;
+       registers.OBP0 = 0xFF;
+       registers.OBP1 = 0xFF;
+       registers.WY   = 0x00;
+       registers.WX   = 0x00;
+       registers.IE   = 0x00;
     }
 
     if(gbc_mode) {
-        work_ram.reserve(GBC_WORK_RAM_SIZE);
-        video_ram_char.reserve(GBC_VRAM_CHAR_SIZE);
+        work_ram.resize(GBC_WORK_RAM_SIZE);
+        video_ram_char.resize(GBC_VRAM_CHAR_SIZE);
     }
     else {
-        work_ram.reserve(DMG_WORK_RAM_SIZE);
-        video_ram_char.reserve(DMG_VRAM_CHAR_SIZE);
+        work_ram.resize(DMG_WORK_RAM_SIZE);
+        video_ram_char.resize(DMG_VRAM_CHAR_SIZE);
     }
 
-    high_ram.reserve(HIGH_RAM_SIZE);
-    video_ram_back.reserve(VRAM_BACK_SIZE);
-    oam_ram.reserve(OAM_RAM_SIZE);
+    high_ram.resize(HIGH_RAM_SIZE);
+    video_ram_back.resize(VRAM_BACK_SIZE);
+    oam_ram.resize(OAM_RAM_SIZE);
 }
 
 IO_Bus::~IO_Bus() {
@@ -145,6 +138,9 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
     // Interrupts Enable Register (IE)
         return read_reg(offset-0xFF00);
     }
+
+    std::cerr << "IO Overread" << std::endl;
+    return 0;
 }
 
 void IO_Bus::write(u16 offset, u8 data) {
@@ -160,26 +156,32 @@ void IO_Bus::write(u16 offset, u8 data) {
     if(offset <= 0x3FFF) {
     // 16KB ROM bank 00
         cart->write_rom(offset, data);
+        return;
     }
     else if(offset <= 0x7FFF) {
     // 16KB ROM Bank 01~NN
         cart->write_rom(offset, data);
+        return;
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
         write_vram(offset, data);
+        return;
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
         cart->write_ram(offset, data);
+        return;
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
         write_ram(offset, data);
+        return;
     }
     else if(offset <= 0xDFFF) {
     // 4KB Work RAM (WRAM) bank 1~N
         write_ram(offset, data);
+        return;
     }
     else if(offset <= 0xFDFF) {
     // Mirror of C000~DDFF (ECHO RAM)
@@ -189,6 +191,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
         write_oam(offset, offset);
+        return;
     }
     else if(offset <= 0xFEFF) {
     // Not Usable
@@ -197,15 +200,20 @@ void IO_Bus::write(u16 offset, u8 data) {
     else if(offset <= 0xFF7F) {
     // I/O Registers
         write_reg(offset - 0xFF00, data);
+        return;
     }
     else if(offset <= 0xFFFE) {
     // High RAM (HRAM)
         write_hram(offset, data);
+        return;
     }
     else if(offset <= 0xFFFF) {
     // Interrupts Enable Register (IE)
         write_reg(offset - 0xFF00, data);
+        return;
     }
+
+    std::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
 }
 
 u8  IO_Bus::read_reg(u8 loc) {
@@ -288,6 +296,7 @@ u8  IO_Bus::read_reg(u8 loc) {
         return registers.IE & IE_READ_MASK;
     default:
         std::cerr << "REG err at " << as_hex(loc) << std::endl;
+        return 0;
     }
 }
 
@@ -453,6 +462,7 @@ u8 IO_Bus::read_vram(u16 offset, bool bypass) {
     }
     else {
         std::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
+        return 0;
     }
 }
 
@@ -487,6 +497,7 @@ u8 IO_Bus::read_oam(u16 offset, bool bypass) {
     }
     else {
         std::cerr << "oam read OOB: " << as_hex(offset) << std::endl;
+        return 0;
     }
 }
 
@@ -517,6 +528,7 @@ u8 IO_Bus::read_ram(u16 offset) {
     }
     else {
         std::cerr << "ram read OOB: " << as_hex(offset) << std::endl;
+        return 0;
     }
 }
 
@@ -547,6 +559,7 @@ u8 IO_Bus::read_hram(u16 offset) {
     }
     else {
         std::cerr << "hram read OOB: " << as_hex(offset) << std::endl;
+        return 0;
     }
 }
 
@@ -632,7 +645,9 @@ u16 IO_Bus::cpu_get_TAC_cs() {
         case 2: return 64;
         case 3: return 256;
         }
-    } else return 0; // the TIMA register won't be incremented
+    }
+
+    return 0; // the TIMA register won't be incremented
 }
 
 IO_Bus::Interrupt IO_Bus::cpu_check_interrupts() {

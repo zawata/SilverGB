@@ -1,12 +1,10 @@
 #pragma once
 
-#include "cfg.hpp"
 #include "io.hpp"
 
 #include "defs.hpp"
 
 #include "util/ints.hpp"
-
 #include "util/CircularQueue.hpp"
 
 #define OBG_ATTR_BG_PRIORITY   7
@@ -57,7 +55,7 @@ public:
         {0x00, 0x00, 0x00}  // black
     };
 
-    Video_Controller(IO_Bus *io, Configuration *cfg, u8 *screen_buffer);
+    Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
     ~Video_Controller();
 
     bool tick();
@@ -67,7 +65,6 @@ public:
 
 private:
     IO_Bus *io;
-    Configuration *cfg;
 
     bool gbc_mode;
     u8 *screen_buffer = NULL; //buffer for the screen, passed from core
@@ -148,10 +145,9 @@ private:
         tile_byte_1,    // 1st byte from the current tile fetched
         tile_byte_2;    // 1st byte from the current tile fetched
 
-    u16
+    u8
         y_line, // y counter for current_pixel
-        x_line; // x counter for current pixel
-    u16
+        x_line, // x counter for current pixel
         x_sc,   // x_scroll locked at beginning of line
         y_sc;   // y_scroll locked as beginning of line
     bool

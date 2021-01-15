@@ -1,9 +1,9 @@
 #include <cstring>
 #include <iostream>
 
-#include "defs.hpp"
-#include "io_reg.hpp"
-#include "video.hpp"
+#include "gb_core/defs.hpp"
+#include "gb_core/io_reg.hpp"
+#include "gb_core/video.hpp"
 
 #include "util/bit.hpp"
 
@@ -18,15 +18,15 @@
 #define OBJ_ENABLED      (Bit.test(reg(LCDC), 1))
 #define BG_WND_BLANK     (Bit.test(reg(LCDC), 0)) //TODO: DMG only
 
-Video_Controller::Video_Controller(IO_Bus *io, Configuration *cfg, u8 *scrn_buf) :
+Video_Controller::Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
-cfg(cfg),
 screen_buffer(scrn_buf) {
-    if(!cfg->BIOS.get_bios_enabled()) {
-        new_frame = true;
-        first_frame = true;
+    if(!bootrom_enabled) {
+        std::cout << "Starting PPU without bootrom not supported!" << std::endl;
+       new_frame = true;
+       first_frame = true;
 
-        frame_clock_count = 0;
+       frame_clock_count = 0;
     }
 }
 
@@ -43,11 +43,13 @@ bool Video_Controller::tick() {
 
 Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
     int loc = 0xFE00 + (index * 4);
-    return (Video_Controller::obj_sprite_t){
-        io->read_oam(loc + 0, true),
-        io->read_oam(loc + 1, true),
-        io->read_oam(loc + 2, true),
-        io->read_oam(loc + 3, true)};
+
+    Video_Controller::obj_sprite_t o;
+    return o = {
+            io->read_oam(loc + 0, true),
+            io->read_oam(loc + 1, true),
+            io->read_oam(loc + 2, true),
+            io->read_oam(loc + 3, true)};
 }
 
 bool Video_Controller::ppu_tick() {
@@ -76,7 +78,7 @@ bool Video_Controller::ppu_tick() {
             first_frame = false;
             frame_disable = true;
 
-            memset(screen_buffer, 0xFF, GB_S_P_SZ);
+            // memset(screen_buffer, 0xFF, GB_S_P_SZ);
         } else {
             frame_disable = false;
         }
@@ -385,7 +387,7 @@ bool Video_Controller::ppu_tick() {
      * ERROR
      */
     } else {
-        std::cerr << "process_step error: " << (int)process_step << std::endl;
+        std::cerr << "process_step error: " << as_hex((int)process_step) << std::endl;
     }
 
     line_clock_count++; //used in HBLANK and VBLANK

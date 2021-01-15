@@ -5,13 +5,17 @@
 
 #include "util/ints.hpp"
 
-class File_Interface {
+namespace Silver {
+
+class File {
 public:
 
-    ~File_Interface();
+    ~File();
 
-    static File_Interface *openFile(std::string filename, bool write=false);
-    static File_Interface *createFile(std::string filename);
+    static File *openFile(std::string filename, bool write=false);
+    static File *createFile(std::string filename);
+
+    static bool fileExists(std::string);
 
     u32 getCRC();
     u32 getSize();
@@ -22,11 +26,16 @@ public:
     void setByte(u32 offset, u8 data);
     void setBuffer(u32 offset, u8 *buf, size_t len);
 
+    std::string getFilename();
+
 private:
     std::fstream file;
+    std::string filename;
 
-    File_Interface();
+    File(std::string filename);
 
     void seekFile_g(u32 offset);
     void seekFile_p(u32 offset);
 };
+
+} // namespace Silver

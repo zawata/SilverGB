@@ -1,7 +1,10 @@
 # ide files
 .vscode/
 
-# output of the makefile
+#specifically visual studio
+.vs/
+.cache/
+
 out/
 
 # my test files

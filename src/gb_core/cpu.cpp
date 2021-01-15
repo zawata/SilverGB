@@ -1,5 +1,5 @@
-#include "gb/cpu.hpp"
-#include "defs.hpp"
+#include "gb_core/cpu.hpp"
+#include "gb_core/defs.hpp"
 
 #include "util/bit.hpp"
 
@@ -38,12 +38,12 @@ inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) &
 inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
 inline bool check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
-CPU::CPU(IO_Bus *io, Configuration *config) :
+CPU::CPU(IO_Bus *io, bool bootrom_enabled = false) :
 io(io),
-cfg(config),
 inst_clocks(0),
+cpu_counter(0),
 IME(true) {
-    if(cfg->BIOS.get_bios_enabled()) {
+    if(bootrom_enabled) {
         AF_REG = 0x0000;
         BC_REG = 0x0000;
         DE_REG = 0x0000;
@@ -51,6 +51,7 @@ IME(true) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
+        std::cout << "Starting CPU without bootrom not supported!" << std::endl;
         AF_REG = 0x01b0;
         BC_REG = 0x0013;
         DE_REG = 0x00D8;
@@ -63,7 +64,9 @@ IME(true) {
 CPU::~CPU() {}
 
 CPU::registers_t CPU::getRegisters() {
-    return (CPU::registers_t){
+    //Thanks microsoft...
+#if defined(_MSC_VER)
+    CPU::registers_t r = {
         AF_REG,
         BC_REG,
         DE_REG,
@@ -71,6 +74,18 @@ CPU::registers_t CPU::getRegisters() {
         SP_REG,
         PC_REG
     };
+
+    return r;
+#else
+    return (CPU::registers_t) {
+        AF_REG,
+        BC_REG,
+        DE_REG,
+        HL_REG,
+        SP_REG,
+        PC_REG
+    };
+#endif
 }
 
 //TODO: stop
@@ -159,7 +174,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG) << std::endl;
+    // std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -478,8 +493,9 @@ u8 CPU::decode(u8 op) {
         case 0xfd: return invalid_op(0xfd);              //  --  ----
         case 0xfe: return cp_r_n(&A_REG);                //   8  CP xx
         case 0xff: return rst_l(0x38);                   //  16  RST 38h
-        default: return 0; //to silence the warnings
     }
+
+    return 0; //to silence the warnings
 }
 
 u8 CPU::fetch_8() {

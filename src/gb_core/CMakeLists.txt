@@ -1,0 +1,9 @@
+add_library(gb_core
+		"audio.cpp"
+		"cart.cpp"
+		"core.cpp"
+		"cpu.cpp"
+		"cpu_disassem.cpp"
+		"input.cpp"
+		"io.cpp"
+		"video.cpp")

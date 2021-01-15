@@ -2,10 +2,9 @@
 
 #include <vector>
 
-#include "gb/audio.hpp"
-#include "gb/cart.hpp"
-#include "cfg.hpp"
-#include "gb/input.hpp"
+#include "gb_core/audio.hpp"
+#include "gb_core/cart.hpp"
+#include "gb_core/input.hpp"
 
 #include "util/ints.hpp"
 
@@ -40,7 +39,7 @@ public:
         JOYPAD_INT   = 1<<4,
     };
 
-    IO_Bus(Cartridge *cart, Configuration *config, bool gbc_mode);
+    IO_Bus(Cartridge *cart, bool gbc_mode, Silver::File *bios_file);
     ~IO_Bus();
 
     u8   read(u16 offset, bool bypass = false);
@@ -63,13 +62,13 @@ public:
 
     void request_interrupt(Interrupt i);
     void dma_tick();
-        bool
-            dma_start        = false,
-            dma_start_active = false,
-            dma_active       = false;
-        u16
-            dma_tick_cnt = 0,
-            dma_byte_cnt = 0;
+    bool
+        dma_start        = false,
+        dma_start_active = false,
+        dma_active       = false;
+    u16
+        dma_tick_cnt = 0,
+        dma_byte_cnt = 0;
 
     u16       cpu_inc_DIV();
     u16       cpu_get_DIV();
@@ -132,8 +131,7 @@ public:
 
 private:
     Cartridge *cart;
-    File_Interface *bootrom_file;
-    Configuration *config;
+    Silver::File *bootrom_file;
 
     bool gbc_mode;
     bool bootrom_mode = false;

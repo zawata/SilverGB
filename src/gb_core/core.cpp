@@ -1,12 +1,36 @@
-#include "core.hpp"
+#include "gb_core/core.hpp"
+
+#include <chrono>
+
+#include "gb_core/defs.hpp"
+
+#include "gb_core/video.hpp"
+
+GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
+    screen_buffer = (u8 *)malloc(GB_S_P_SZ);
+
+    cart = new Cartridge(rom);
+    io = new IO_Bus(cart, false, bootrom);
+    cpu = new CPU(io, bootrom != nullptr);
+    vpu = new Video_Controller(io, screen_buffer, bootrom != nullptr);
+}
+
+GB_Core::~GB_Core() {
+    delete vpu;
+    delete cpu;
+    delete io;
+    delete cart;
+
+    free(screen_buffer);
+}
+
+/**
+ * Thread Functions
+ */
+#if defined(ENABLE_THREADING)
 
 #include <thread>
 #include <condition_variable>
-#include <chrono>
-
-#include "defs.hpp"
-
-#include "video.hpp"
 
 static std::atomic<bool> pause_loop = ATOMIC_VAR_INIT(true);
 static std::atomic<bool> loop_paused = ATOMIC_VAR_INIT(true);
@@ -14,25 +38,6 @@ static std::atomic<bool> kill_thread = ATOMIC_VAR_INIT(true);
 static std::condition_variable cond;
 static std::mutex m_lock;
 
-GB_Core::GB_Core(File_Interface *rom, Configuration *cfg):
-cart(new Cartridge(rom)),
-io(new IO_Bus(cart, cfg, false)),
-cpu(new CPU(io, cfg)) {
-    screen_buffer = (u8 *)malloc(GB_S_P_SZ);
-
-    vpu = new Video_Controller(io, cfg, screen_buffer);
-}
-
-GB_Core::~GB_Core() {
-    //we didn't create vpu so we don't need to delete it.
-    delete cpu;
-    delete io;
-    delete cart;
-}
-
-/**
- * Thread Functions
- */
 void GB_Core::init_thread(bool paused) {
     kill_thread = false;
     pause_loop = paused;
@@ -70,7 +75,7 @@ void GB_Core::run_thread() {
             loop_paused = false;
         }
 
-        int v_step;
+        // int v_step;
 
         auto start = std::chrono::high_resolution_clock::now();
         do {
@@ -84,6 +89,8 @@ void GB_Core::run_thread() {
     }
 }
 
+#endif
+
 /**
  * Tick Functions
  */
@@ -94,7 +101,6 @@ void GB_Core::tick_once() {
 }
 
 void GB_Core::tick_instr() {
-    #pragma unroll
     for(int i = 0; i < 4; i++) {
         cpu->tick();
         vpu->tick();
@@ -151,8 +157,16 @@ u8 GB_Core::getByteFromIO(u16 addr) {
         output_file << (int)screen_buffer[i] << " ";
     }
     output_file.close();
+    return 0;
 }
 
+u8 const* GB_Core::getScreenBuffer() {
+    return screen_buffer;
+}
+
+/**
+ * Breakpoint Functions
+ */
 void GB_Core::set_bp(u16 bp, bool en) {
     breakpoint = bp;
     set_bp_active(en);
@@ -163,9 +177,7 @@ u16 GB_Core::get_bp() { return breakpoint; }
 void GB_Core::set_bp_active(bool en) { bp_active = en; }
 bool GB_Core::get_bp_active()        { return bp_active; }
 
-u8 *GB_Core::getScreenBuffer() {
-    return screen_buffer;
-}
+
 
 // u8 *GB_Core::getVRAMBuffer() {
 //     u8 *map = (u8 *)malloc(64*128);

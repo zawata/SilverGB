@@ -1,0 +1,169 @@
+﻿{
+  "configurations": [
+    {
+      "name": "x64-MSVC-Debug",
+      "configurationType": "Debug",
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "-DCMAKE_BUILD_TYPE=Debug",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "variables": [
+        {
+          "name": "wxWidgets_LIB_DIR",
+          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
+          "type": "PATH"
+        },
+        {
+          "name": "wxWidgets_ROOT_DIR",
+          "value": "C:/libs/wxWidgets",
+          "type": "PATH"
+        }
+      ],
+      "cmakeToolchain": "",
+      "generator": "Visual Studio 16 2019 Win64"
+    },
+    {
+      "name": "x64-Clang-Ninja-Debug",
+      "generator": "Ninja",
+      "configurationType": "Debug",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "clang_cl_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_C_COMPILER",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_C_COMPILER_AR",
+          "value": "C:/Program Files/LLVM/bin/llvm-ar.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_C_COMPILER_RANLIB",
+          "value": "C:/Program Files/LLVM/bin/llvm-ranlib.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER_AR",
+          "value": "C:/Program Files/LLVM/bin/llvm-ar.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER_RANLIB",
+          "value": "C:/Program Files/LLVM/bin/llvm-ranlib.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "x64-windows",
+          "type": "STRING"
+        },
+        {
+          "name": "wxWidgets_LIB_DIR",
+          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
+          "type": "PATH"
+        },
+        {
+          "name": "wxWidgets_ROOT_DIR",
+          "value": "C:/libs/wxWidgets",
+          "type": "PATH"
+        }
+      ]
+    },
+    {
+      "name": "x64-Clang-Ninja-Release",
+      "generator": "Ninja",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "addressSanitizerEnabled": true,
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "clang_cl_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_C_COMPILER",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_C_COMPILER_AR",
+          "value": "C:/Program Files/LLVM/bin/llvm-ar.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_C_COMPILER_RANLIB",
+          "value": "C:/Program Files/LLVM/bin/llvm-ranlib.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER",
+          "value": "C:/Program Files/LLVM/bin/clang-cl.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER_AR",
+          "value": "C:/Program Files/LLVM/bin/llvm-ar.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "CMAKE_CXX_COMPILER_RANLIB",
+          "value": "C:/Program Files/LLVM/bin/llvm-ranlib.exe",
+          "type": "FILEPATH"
+        },
+        {
+          "name": "VCPKG_TARGET_TRIPLET",
+          "value": "x64-windows",
+          "type": "STRING"
+        },
+        {
+          "name": "wxWidgets_LIB_DIR",
+          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
+          "type": "PATH"
+        },
+        {
+          "name": "wxWidgets_ROOT_DIR",
+          "value": "C:/libs/wxWidgets",
+          "type": "PATH"
+        }
+      ]
+    },
+    {
+      "name": "x64-MSVC-Release",
+      "generator": "Visual Studio 16 2019 Win64",
+      "configurationType": "RelWithDebInfo",
+      "buildRoot": "${projectDir}\\out\\build\\${name}",
+      "installRoot": "${projectDir}\\out\\install\\${name}",
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "",
+      "ctestCommandArgs": "",
+      "addressSanitizerEnabled": true,
+      "inheritEnvironments": [ "msvc_x64_x64" ],
+      "variables": [
+        {
+          "name": "wxWidgets_LIB_DIR",
+          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
+          "type": "PATH"
+        },
+        {
+          "name": "wxWidgets_ROOT_DIR",
+          "value": "C:/libs/wxWidgets",
+          "type": "PATH"
+        }
+      ]
+    }
+  ]
+}

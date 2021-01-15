@@ -1,4 +1,4 @@
-#include "gb/input.hpp"
+#include "gb_core/input.hpp"
 
 #include "util/bit.hpp"
 

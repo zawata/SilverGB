@@ -1,8 +1,6 @@
 #if 0
 #include "util/ints.hpp"
 
-#include "stdbool.h"
-
 #define C_FLAG (Bit.test(AF.b_AF.i_F, 3))
 #define H_FLAG (Bit.test(AF.b_AF.i_F, 2))
 #define N_FLAG (Bit.test(AF.b_AF.i_F, 1))
@@ -367,7 +365,7 @@ decoded_op_t decode[0xF][0xF] = {
     },{
         { jump_rel_cond_n ,{ cond(NZ)                                    }},    //   ?? JR NZ, xx
         { load_rr_nn      ,{          .r16_1 = &HL_REG                   }},    //   12 LD HL, yyxx
-        { loadi_rr_r      ,{          .r16_1 = &HL_REG, .r8_2 = &A_REG  }},    //    8 LDI (HL), A
+        { loadi_rr_r      ,{          .r16_1 = &HL_REG, .r8_2 = &A_REG   }},    //    8 LDI (HL), A
         { inc_rr          ,{          .r16_1 = &HL_REG                   }},    //    8 INC HL
         { inc_r           ,{          .r8_1  = &H_REG                    }},    //    4 INC H
         { dec_r           ,{          .r8_1  = &H_REG                    }},    //    4 DEC H
@@ -375,7 +373,7 @@ decoded_op_t decode[0xF][0xF] = {
         { daa_r           ,{          .r8_1  = &A_REG                    }},    //    4 DAA
         { jump_rel_cond_n ,{ cond(Z)                                     }},    //   ?? JR Z, xx
         { add_rr_rr       ,{          .r16_1 = &HL_REG, .r16_2 = &HL_REG }},    //    8 ADD HL, HL
-        { loadi_r_rr      ,{          .r8_1  = &A_REG,  .r16_2 = &HL_REG  }},    //    8 LDI A,  (HL)
+        { loadi_r_rr      ,{          .r8_1  = &A_REG,  .r16_2 = &HL_REG }},    //    8 LDI A,  (HL)
         { dec_rr          ,{          .r16_1 = &HL_REG                   }},    //    8 DEC HL
         { inc_r           ,{          .r8_1  = &L_REG                    }},    //    4 INC L
         { dec_r           ,{          .r8_1  = &L_REG                    }},    //    4 DEC L

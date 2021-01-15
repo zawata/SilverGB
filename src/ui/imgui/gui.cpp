@@ -1,118 +1,81 @@
-//#include <assert.h>
-
 #include "gui.hpp"
+
+#include "GL/gl3w.h"
+#include "SDL_video.h"
+#include "imgui/imgui_impl_sdl.h"
+#include "imgui/imgui_impl_opengl3.h"
+#include "imgui/ImGuiFileBrowser.h"
+
+#include "imgui_shortcut_handler.hpp"
 
 #include "util/bit.hpp"
 
-/**
- *  A small shortcut handler built in the image of ImGui.
- *
- * ImGui works on a technical basis by combining gui logic and construction.
- * Any call to a GUI component will display that GUI component as well as checking
- * if it's particular logic has been met. It does this with internal static
- * variables to handle the rendering process and assertions to handle logical
- * errors(making them rather easy to find)
- *
- * We can build a small shortcut handler in the same image.
- * At the beginning of every frame we can process the key events and build a key combination
- * then every component we want to have a shortcut just creates it's GUI Component and
- * checks its shortcut in an `if` statement.
- * not very complex but effective.
- *
- * This does pose issues with using keyboard events and shortcuts simultaneously as we
- * might accidentally attempt to use keyboard events as shortcuts unintentionally.
- *
- * We can overcome this by checking if a keyevent has a modifier on it and denying all
- * shortcut requests without a modifier key.
- *
- **/
-
-bool GUI::build_shortcut(SDL_KeyboardEvent *key) {
-    if(     key->keysym.sym >= 32 &&  //if ascii
-            key->keysym.sym <= 122 &&
-            key->keysym.mod &&        //if it has a modifier
-            key->state == SDL_PRESSED) { //if key was pressed
-        if(     key->keysym.mod & KMOD_CTRL ||
-                key->keysym.mod & KMOD_ALT ||
-                key->keysym.mod & KMOD_SHIFT)
-            this->current_shortcut = {
-                .valid     = true,
-                .ctrl_mod  = key->keysym.mod & KMOD_CTRL,
-                .alt_mod   = key->keysym.mod & KMOD_ALT,
-                .shift_mod = key->keysym.mod & KMOD_SHIFT,
-                .key       = key->keysym.sym,
-            };
+namespace ImGui {
+    IMGUI_API void SetNextWindowRelativePos(const ImGuiViewport *viewport, const ImVec2& pos, ImGuiCond cond = 0, const ImVec2& pivot = ImVec2(0, 0)) {
+        SetNextWindowPos({viewport->Pos.x + pos.x,viewport->Pos.y + pos.y});
     }
 }
 
-void GUI::clear_shortcut() {
-    this->current_shortcut = {
-        .valid = false,
-    };
+std::pair<ImVec2, ImVec2> get_screen_area(ImVec2 &win_bounds) {
+    //auto screen sizing and placement code
+    ImVec2 img_bottom_left;
+    ImVec2 img_top_right;
+
+    float scaling_factor = min(win_bounds.x/GB_S_W, win_bounds.y/GB_S_H);
+
+    //calculate img size
+    img_top_right.x = scaling_factor * GB_S_W;
+    img_top_right.y = scaling_factor * GB_S_H;
+
+    img_bottom_left.x = (win_bounds.x - img_top_right.x) / 2;
+    img_bottom_left.y = (win_bounds.y - img_top_right.y) / 2;
+
+    img_top_right.x += img_bottom_left.x;
+    img_top_right.y += img_bottom_left.y;
+
+    return std::make_pair(img_bottom_left, img_top_right);
 }
 
-bool GUI::shortcut_pressed(std::vector<key_mods> mods, char key) {
-    assert(mods.size() <= 3);
-    assert(mods[0] != 0);
-    if(!this->current_shortcut.valid) return false;
-
-    bool ctrl_repeated = false,
-         alt_repeated = false,
-         shift_repeated = false;
-
-    shortcut_t current = this->current_shortcut;
-
-    for(int i = 0; i < mods.size(); i++) {
-        switch(mods[i]) {
-        case 0:
-            break;
-        case CTRL_MOD:
-            assert(!ctrl_repeated);
-            if(!current.ctrl_mod) return false;
-            ctrl_repeated = true;
-            break;
-        case ALT_MOD:
-            assert(!alt_repeated);
-            if(!current.alt_mod) return false;
-            alt_repeated = true;
-            break;
-        case SHIFT_MOD:
-            assert(!shift_repeated);
-            if(!current.shift_mod) return false;
-            shift_repeated = true;
-            break;
-        }
-    }
-    return key            == current.key &&
-           ctrl_repeated  == current.ctrl_mod &&
-           alt_repeated   == current.alt_mod &&
-           shift_repeated == current.shift_mod;
-}
-
-GUI::GUI(SDL_Window *w, SDL_GLContext g, ImGuiIO &io, Configuration *config) :
+GUI::GUI(SDL_Window *w, SDL_GLContext g, Configuration *config) :
 window(w),
 gl_context(g),
-io(io),
+rom_file(nullptr),
+bios_file(nullptr),
 core(nullptr),
 config(config) {
+    //Build Screen Texture, leave unpopulated right now  so we can do partial updates later
+    glGenTextures(1, &screen_texture);                                check_gl_error();
+    glBindTexture(GL_TEXTURE_2D, screen_texture);                     check_gl_error();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); check_gl_error();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); check_gl_error();
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, GB_S_W, GB_S_H);        check_gl_error();
+    glBindTexture(GL_TEXTURE_2D, 0);                                  check_gl_error();
 
-    glGenTextures(1, &screen_texture);
-    glBindTexture(GL_TEXTURE_2D, screen_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glGenFramebuffers(1, &screen_texture_fbo);                        check_gl_error();
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_texture_fbo);       check_gl_error();
+    glFramebufferTexture2D(
+            GL_READ_FRAMEBUFFER,
+            GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_2D,
+            screen_texture,
+            0);                                                       check_gl_error();
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 }
 
 GUI::~GUI() {
     //Save Configuration
-    config->saveConfigFile("config.cfg");
+    config->saveConfigFile("config.cfg"); //TODO: demagic
 
     delete config;
     if(rom_file) delete rom_file;
     if(core)     delete core;
 
-    //delete custom textures
+    //delete custom GL constructs
     glDeleteTextures(1, &screen_texture);
+    glDeleteFramebuffers(1, &screen_texture_fbo);
 
     //shutdown ImGUI
     ImGui_ImplOpenGL3_Shutdown();
@@ -144,52 +107,59 @@ bool GUI::preInitialize() {
 }
 
 GUI *GUI::createGUI(Configuration *config) {
-    SDL_DisplayMode current;
-    SDL_GetCurrentDisplayMode(0, &current);
-    SDL_Window *window = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H + MENUBAR_HEIGHT, SDL_WINDOW_OPENGL);
+    SDL_Window *window = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H, SDL_WINDOW_OPENGL);
+    SDL_SetWindowResizable(window, SDL_TRUE);
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
 
     gl3wInit();
 
     ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
     ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
     ImGui_ImplOpenGL3_Init();
 
-    ImGui::StyleColorsDark();
-
-    return new GUI(window, gl_context, ImGui::GetIO(), config);
+    return new GUI(window, gl_context, config);
 }
 
 void GUI::open_file(std::string file) {
     std::cout << "Starting Core" <<std::endl;
-    rom_file = File_Interface::openFile(file);
-    core = new GB_Core(rom_file, config);
+
+    if (config->BIOS.get_bios_loaded()) {
+        bios_file = File::openFile(config->BIOS.get_bios_filepath());
+        config->BIOS.set_bios_loaded(bios_file != nullptr);
+    }
+
+    rom_file = File::openFile(file);
+    core = new GB_Core(rom_file, bios_file);
     //core->start_thread(true);
-    state_flags.game_loaded = true;
-    core->set_bp(0x02a5, true);
+    // state_flags.game_loaded = true;
+    //core->set_bp(0x02a5, true);
 }
 
 GUI::loop_return_code_t GUI::mainLoop() {
+    namespace im = ImGui;
+
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL2_ProcessEvent(&event);
         switch(event.type) {
         case SDL_QUIT:
-            state_flags.done = true;
+            state_flags.loop_finish = true;
             break;
         case SDL_WINDOWEVENT:
             if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
-                state_flags.done = true;
+                state_flags.loop_finish = true;
             }
             break;
         case SDL_KEYDOWN:
         case SDL_KEYUP:
-            if(!io.WantCaptureKeyboard) {
-                if(!build_shortcut(&event.key)) {
-                    //do other stuff with the key event
-                }
+            if(!im::GetIO().WantCaptureKeyboard
+            && !im::BuildShortcut(&event.key)) {
+                //do other stuff with the key event
             }
             break;
         }
@@ -198,116 +168,161 @@ GUI::loop_return_code_t GUI::mainLoop() {
     // Start the ImGui frame
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL2_NewFrame(window);
-    ImGui::NewFrame();
+    im::NewFrame();
 
-    //build the UI
-    buildUI();
+    //Build out the window
+    // im::SetNextWindowViewport(im::GetMainViewport()->ID);
+    // im::SetNextWindowRelativePos(im::GetMainViewport(), {0.0f, 0.0f});
+    // im::SetNextWindowSize(im::GetIO().DisplaySize);
+    // im::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    // im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    // im::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
+    // im::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+    // im::Begin("##Game", nullptr,
+    //         ImGuiWindowFlags_NoDecoration      |
+    //         ImGuiWindowFlags_NoMove            |
+    //         ImGuiWindowFlags_NoScrollWithMouse );
 
-    if(state_flags.opening_file || shortcut_pressed({ CTRL_MOD },'f')) {
-        char *file = nullptr;
-        if(NFD_OpenDialog("gb,bin", nullptr, &file) == NFD_OKAY) {
-            this->open_file(file);
-            free(file);
-        }
-        state_flags.opening_file = false;
+    // im::ShowDemoWindow();
+
+    MainOptionsWindow();
+
+    if(state_flags.open_rom) {
+        im::OpenPopup("Open ROM File");
+        state_flags.open_rom = false;
     }
 
-    if(shortcut_pressed({CTRL_MOD}, 'd')) core->getByteFromIO(00);
-
-    try {
-        if(shortcut_pressed({CTRL_MOD}, 't')) core->tick_instr();
-        if(shortcut_pressed({CTRL_MOD, ALT_MOD}, 'f')) core->tick_frame();
-        if(shortcut_pressed({CTRL_MOD, SHIFT_MOD}, 't')) {
-            for(int i = 0; i < 0x100; i++)
-                core->tick_instr();
-        }
-    } catch(breakpoint_exception &e) {
-        SDL_ShowSimpleMessageBox(
-            SDL_MESSAGEBOX_ERROR ,
-            "Breakpoint",
-            "You've Hit a breakpoint!",
-            nullptr);
+    if(state_flags.open_ctxt_menu) {
+        state_flags.open_ctxt_menu = false;
     }
 
-    if(state_flags.opening_bios) {
-        char *file = nullptr;
-        if(NFD_OpenDialog("bin", nullptr, &file) == NFD_OKAY) {
-            File_Interface *bios = File_Interface::openFile(file);
+    // im::End();
+    // im::PopStyleVar(4);
 
-            if(!bios)
-                std::cerr << "bios file could not be opened" << std::endl;
-            else {
-                if(bios->getCRC() != DMG_BIOS_CRC) {
-                    std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
-                    SDL_ShowSimpleMessageBox(
-                            SDL_MESSAGEBOX_ERROR ,
-                            "CRC Mismatch",
-                            "CRC does not match known DMG CRC. File will not be loaded.",
-                            nullptr);
+    if(rom_dialog.showFileDialog("Open ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".gb,.bin")) {
+        this->open_file(rom_dialog.selected_path);
+    }
+    if(bios_dialog.showFileDialog("Open BIOS ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".*,.bin")) {
+        std::string file = bios_dialog.selected_path;
+        File *bios = File::openFile(file);
+
+        if(!bios)
+            std::cerr << "bios file could not be opened" << std::endl;
+        else {
+            if(bios->getCRC() != DMG_BIOS_CRC) {
+                std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
+                SDL_ShowSimpleMessageBox(
+                        SDL_MESSAGEBOX_ERROR ,
+                        "CRC Mismatch",
+                        "CRC does not match known DMG CRC. File will not be loaded.",
+                        nullptr);
+            } else {
+                if(file.size() <= 255) {
+                    std::cout << "File loaded" << std::endl;
+                    config->BIOS.set_bios_loaded(true);
+                    config->BIOS.set_bios_filepath(file.c_str());
                 } else {
-                    int file_len = std::string(file).size();
-                    if(file_len <= 255) {
-                        std::cout << "File loaded" << std::endl;
-                        config->BIOS.set_bios_loaded(true);
-                        config->BIOS.set_bios_filepath(file);
-                    } else {
-                        SDL_ShowSimpleMessageBox(
-                            SDL_MESSAGEBOX_ERROR,
-                            "File path is too long",
-                            "File path is too long...Maybe the developer should bump up the limit?",
-                            nullptr);
-                    }
+                    SDL_ShowSimpleMessageBox(
+                        SDL_MESSAGEBOX_ERROR,
+                        "File path is too long",
+                        "File path is too long...Maybe the developer should bump up the limit?",
+                        nullptr);
                 }
             }
-            //the bios is opened here to check and save it.
-            // the actual loading and reading is done by the core.
-            delete bios;
-            free(file);
         }
-        state_flags.opening_bios = false;
+        //the bios is opened here to check and save it.
+        // the actual loading and reading is done by the core.
+        delete bios;
     }
-
-    if(state_flags.set_debug_mode && !state_flags.debug_mode) {
-        //set debug mode
-        SDL_SetWindowSize(this->window, 640,480);
-        SDL_SetWindowResizable(this->window, SDL_TRUE);
-        state_flags.debug_mode = true;
-    } else if(!state_flags.set_debug_mode && state_flags.debug_mode) {
-        //unset debug mode
-        SDL_SetWindowSize(this->window, GB_S_W, GB_S_H + MENUBAR_HEIGHT);
-        //SDL_SetWindowResizable(this->window, SDL_FALSE);
-        state_flags.debug_mode = false;
-    }
-
 
     /**
      * Game Stuff
      */
-    try {
-        if(state_flags.run_game) core->tick_frame();
+    if(core) {
+        // try {
+        //     if(state_flags.run_game) core->tick_frame();
+        // }
+        // catch(breakpoint_exception &e) {
+        //     state_flags.run_game = false;
+        // }
+
+        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+        glTexSubImage2D(
+                GL_TEXTURE_2D,            // target
+                0,                        // level
+                0,                        // xoffset
+                0,                        // yoffset
+                GB_S_W,                   // width
+                GB_S_H,                   // height
+                GL_RGB,                   // format
+                GL_UNSIGNED_BYTE,         // type
+                core->getScreenBuffer());                             check_gl_error();
+        glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
     }
-    catch(breakpoint_exception &e) {
-        state_flags.run_game = false;
+    else {
+        u8 tsc[160 * 144] = {0};
+        u8 *ptr = tsc;
+        int x = 0, y = 0, p = 0;
+        for(int i = 0; i < (160 * 144); i++) {
+            switch(i % 3) {
+            case 0:
+                *ptr++ = 0xE0;
+                break;
+            case 1:
+                *ptr++ = 0x1C;
+                break;
+            case 2:
+                *ptr++ = 0x02;
+                break;
+            }
+        }
+        ptr = tsc;
+        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+        glTexSubImage2D(
+                GL_TEXTURE_2D,            // target
+                0,                        // level
+                0,                        // xoffset
+                0,                        // yoffset
+                GB_S_W,                   // width
+                GB_S_H,                   // height
+                GL_RGB,                   // format
+                GL_UNSIGNED_BYTE_3_3_2,   // type
+                ptr);                                                 check_gl_error();
+        glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
     }
 
-    clear_shortcut();
+    im::ClearShortcut();
+
+    SDL_GL_MakeCurrent(window, gl_context);
+    glViewport(0, 0, (int)im::GetIO().DisplaySize.x, (int)im::GetIO().DisplaySize.y);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    auto area = get_screen_area(im::GetIO().DisplaySize);
+    std::cout << area.first.x << " " << area.first.y << " " << area.second.x << " " << area.second.y << std::endl;
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_texture_fbo);       check_gl_error();
+    glBlitFramebuffer(
+            0, 0, GB_S_W, GB_S_H,
+            area.first.x, area.first.y, area.second.x, area.second.y,
+            GL_COLOR_BUFFER_BIT, GL_LINEAR);                          check_gl_error();
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);                        check_gl_error();
 
     // Rendering
-    ImGui::Render();
-    SDL_GL_MakeCurrent(window, gl_context);
-    glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
-    glClear(GL_COLOR_BUFFER_BIT);
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    im::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(im::GetDrawData());
+
     SDL_GL_SwapWindow(window);
 
-    if(state_flags.done) return loop_return_code_t::LOOP_FINISH;
-    else                 return loop_return_code_t::LOOP_CONTINUE;
+    if (im::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        im::UpdatePlatformWindows();
+        im::RenderPlatformWindowsDefault();
+    }
+
+    if(state_flags.loop_finish) return loop_return_code_t::LOOP_FINISH;
+    else                        return loop_return_code_t::LOOP_CONTINUE;
 }
 
-void GUI::buildUI() {
-    using namespace ImGui;
+void GUI::MainOptionsWindow() {
+    namespace im = ImGui;
 
     static struct {
         bool cpu_register_window = false;
@@ -317,345 +332,296 @@ void GUI::buildUI() {
         bool render_window = true;
     } window_flags;
 
-    if(BeginMainMenuBar()) {
-        if(BeginMenu("File")) {
-            MenuItem("Open File", NULL, &state_flags.opening_file);
-            MenuItem("Exit", NULL, &state_flags.done);
-            EndMenu();
+    // im::SetNextWindowViewport(im::GetMainViewport()->ID);
+    // im::SetNextWindowRelativePos(im::GetMainViewport(), {0.0f, 0.0f});
+    // im::SetNextWindowSize(im::GetIO().DisplaySize);
+    // im::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    // im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    // im::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
+    // im::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+    if(im::Begin("Main Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+
+        if(im::Button("Open ROM")) {
+            state_flags.open_rom = true;
         }
 
-        if(state_flags.game_loaded) {
-            if(BeginMenu("Emulation")) {
-                //if(MenuItem("Unpause")) core->resume_thread();
-                if(MenuItem("Pause")) state_flags.run_game = false;
-                if(MenuItem("Unpause")) state_flags.run_game = true;
-                if(MenuItem("tick")) core->tick_once();
-                if(MenuItem("Next Instruction")) core->tick_instr();
-                if(MenuItem("Next Frame")) core->tick_frame();
-                EndMenu();
+        if(im::CollapsingHeader("Emulation Settings")) {
+            if(state_flags.game_running) {
+                if(im::Button("Pause"))
+                    state_flags.game_running = false;
             }
+            else {
+                if(im::Button("Unpause"))
+                    state_flags.game_running = true;
+            }
+            if(im::Button("tick"))
+                core->tick_once();
+            if(im::Button("Next Instruction"))
+                core->tick_instr();
+            if(im::Button("Next Frame"))
+                core->tick_frame();
         }
 
-        if(BeginMenu("Options")) {
+        if(im::CollapsingHeader("Options")) {
             bool bios_loaded = config->BIOS.get_bios_loaded();
             bool bios_enabled = config->BIOS.get_bios_enabled();
-            MenuItem("BIOS Loaded", nullptr, &bios_loaded, false);//should never need to modify directly so we don't care about writing it back
-            MenuItem("BIOS Enabled", nullptr, &bios_enabled);
-            MenuItem("Open BIOS File", NULL, &state_flags.opening_bios);
-            MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
-            EndMenu();
+            im::MenuItem("BIOS Loaded", nullptr, &bios_loaded, false); // should never need to modify directly so we don't care about writing it back
+            im::MenuItem("BIOS Enabled", nullptr, &bios_enabled);
+            im::MenuItem("Open BIOS File", NULL, &state_flags.open_bios);
+            // im::MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
+            im::EndMenu();
 
             config->BIOS.set_bios_enabled(bios_enabled);
         }
 
         if(state_flags.debug_mode) {
-            if(BeginMenu("Debug")) {
-                MenuItem("CPU Register Window", nullptr, &window_flags.cpu_register_window);
-                MenuItem("IO Register Window", nullptr, &window_flags.io_register_window);
-                MenuItem("Hide Disassembly Window", nullptr, &window_flags.disassemble_window);
-                MenuItem("Breakpoint Window",nullptr, &window_flags.breakpoint_window);
+            if(im::BeginMenu("Debug")) {
+                im::MenuItem("CPU Register Window", nullptr, &window_flags.cpu_register_window);
+                im::MenuItem("IO Register Window", nullptr, &window_flags.io_register_window);
+                im::MenuItem("Hide Disassembly Window", nullptr, &window_flags.disassemble_window);
+                im::MenuItem("Breakpoint Window",nullptr, &window_flags.breakpoint_window);
 
-                EndMenu();
+                im::EndMenu();
             }
         }
-        EndMainMenuBar();
+        ImGui::End();
     }
+    // im::PopStyleVar(2);
 
-    if(window_flags.cpu_register_window) buildCPURegisterUI();
-    if(window_flags.io_register_window)  buildIORegisterUI();
-    if(window_flags.disassemble_window)  buildDisassemblyUI();
-    if(window_flags.breakpoint_window)   buildBreakpointUI();
-    if(window_flags.render_window)       buildRenderUI();
-}
+    // process shortcuts
+    state_flags.open_rom = state_flags.open_rom || im::ShortcutPressed({ im::CTRL_MOD },'f');
 
-void GUI::buildRenderUI() {
-    using namespace ImGui;
+    //TODO: better check for game running
+    // if(core) {
+    //     if(im::ShortcutPressed({im::CTRL_MOD}, 'd')) core->getByteFromIO(0);
 
-    if(!state_flags.debug_mode) {
-        SetNextWindowSize({GB_S_W, GB_S_H});
-        SetNextWindowPos({0, MENUBAR_HEIGHT});
-
-        PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-        PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-        PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-        Begin("Game", nullptr,
-                ImGuiWindowFlags_NoTitleBar        |
-                ImGuiWindowFlags_NoResize          |
-                ImGuiWindowFlags_NoMove            |
-                ImGuiWindowFlags_NoScrollbar       |
-                ImGuiWindowFlags_NoScrollWithMouse |
-                ImGuiWindowFlags_NoCollapse);
-    } else {
-        SetNextWindowSize({0,0});
-        PushStyleVar(ImGuiStyleVar_WindowPadding, {8,0});
-        Begin("Game", nullptr,
-                ImGuiWindowFlags_NoCollapse  |
-                ImGuiWindowFlags_NoScrollbar |
-                ImGuiWindowFlags_NoScrollWithMouse);
-    }
-
-    if(core) {
-        u8 *screen_buffer = core->getScreenBuffer();
-        glBindTexture(GL_TEXTURE_2D, screen_texture);
-        glTexImage2D(
-                GL_TEXTURE_2D,          //target
-                0,                      //level
-                GL_RGB8,                //base_format
-                GB_S_W,                 //width
-                GB_S_H,                 //height
-                0,                      //border
-                GL_RGB,                 //color_format
-                GL_UNSIGNED_BYTE,       //data_format
-                (void *)screen_buffer); //pixel_buffer
-        glBindTexture(GL_TEXTURE_2D, 0);
-        ImGui::Image((void *)(intptr_t)screen_texture, {GB_S_W, GB_S_H});
-    }
-    End();
-
-    //auto screen sizing and placement code
-    // if(window.w > window.h) {
-    //     //more wide than tall
-    //     pixel_size = (window.h/144);
-
-    //     image.w = pixel_size * 160;
-    //     image.h = pixel_size * 144;
-
-    //     image.x = (window.w/2) - (image.w/2);
-    //     image.y = 0;
-
-    // } else if(window.w < window.h) {
-    //     //more wide than tall
-    //     pixel_size = (window.w/160);
-
-    //     image.w = pixel_size * 160;
-    //     image.h = pixel_size * 144;
-
-    //     image.x = 0;
-    //     image.y = (window.h/2) - (image.h/2);
-    // } else {
-    //     //perfect square
-    //     pixel_size = (window.h/144);
-
-    //     image.w = pixel_size * 160;
-    //     image.h = pixel_size * 144;
-
-    //     image.x = 0;
-    //     image.y = 0;
+    //     try {
+    //         if(im::ShortcutPressed({im::CTRL_MOD}, 't')) core->tick_instr();
+    //         if(im::ShortcutPressed({im::CTRL_MOD, im::ALT_MOD}, 'f')) core->tick_frame();
+    //         if(im::ShortcutPressed({im::CTRL_MOD, im::SHIFT_MOD}, 't')) {
+    //             for(int i = 0; i < 0x100; i++)
+    //                 core->tick_instr();
+    //         }
+    //     } catch(breakpoint_exception &e) {
+    //         SDL_ShowSimpleMessageBox(
+    //             SDL_MESSAGEBOX_ERROR ,
+    //             "Breakpoint",
+    //             "You've Hit a breakpoint!",
+    //             nullptr);
+    //     }
     // }
 
-    if(!state_flags.debug_mode) {
-        PopStyleVar(4);
-    } else {
-        PopStyleVar(1);
-    }
+    if(window_flags.cpu_register_window) buildCPURegisterWindow();
+    if(window_flags.io_register_window)  buildIORegisterWindow();
+    if(window_flags.disassemble_window)  buildDisassemblyWindow();
+    if(window_flags.breakpoint_window)   buildBreakpointWindow();
 }
 
-void GUI::buildCPURegisterUI() {
-    using namespace ImGui;
+void GUI::buildCPURegisterWindow() {
+    // using namespace ImGui;
 
-    static struct {
-        bool AF;
-        bool F;
-        bool BC;
-        bool DE;
-        bool HL;
-    } reg_flags;
+    // static struct {
+    //     bool AF;
+    //     bool F;
+    //     bool BC;
+    //     bool DE;
+    //     bool HL;
+    // } reg_flags;
 
-    CPU::registers_t regs = { 0 };
-    if(core) regs = core->getRegistersFromCPU();
-    else     regs = { 0 };
+    // CPU::registers_t regs = { 0 };
+    // if(core) regs = core->getRegistersFromCPU();
+    // else     regs = { 0 };
 
-    //The Indentation on this window is very sensitive...
-    SetNextWindowSize({120,0});
-    Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
-    Unindent(10.0);
-    Columns(2, nullptr, true);
-    SetColumnWidth(-1, 60);
-    if(TreeNode("AF")) {
-        reg_flags.AF = true;
-        Indent(5.0);
-        Text("A");
-        Unindent(20.0);
-        if(TreeNode("F")) {
-            reg_flags.F = true;
-            Indent(5.0);
-            Text("Z");
-            Text("N");
-            Text("H");
-            Text("C");
-            Unindent(5.0);
-            TreePop();
-        } else {
-            reg_flags.F = false;
-        }
-        Indent(15.0);
-        TreePop();
-    } else {
-        reg_flags.F = false;
-        reg_flags.AF = false;
-    }
+    // //The Indentation on this window is very sensitive...
+    // SetNextWindowSize({120,0});
+    // Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
+    // Unindent(10.0);
+    // Columns(2, nullptr, true);
+    // SetColumnWidth(-1, 60);
+    // if(TreeNode("AF")) {
+    //     reg_flags.AF = true;
+    //     Indent(5.0);
+    //     Text("A");
+    //     Unindent(20.0);
+    //     if(TreeNode("F")) {
+    //         reg_flags.F = true;
+    //         Indent(5.0);
+    //         Text("Z");
+    //         Text("N");
+    //         Text("H");
+    //         Text("C");
+    //         Unindent(5.0);
+    //         TreePop();
+    //     } else {
+    //         reg_flags.F = false;
+    //     }
+    //     Indent(15.0);
+    //     TreePop();
+    // } else {
+    //     reg_flags.F = false;
+    //     reg_flags.AF = false;
+    // }
 
-    if(TreeNode("BC")) {
-        reg_flags.BC = true;
-        Indent(5.0);
-        Text("B");
-        Text("C");
-        Unindent(5.0);
-        TreePop();
-    } else {
-        reg_flags.BC = false;
-    }
+    // if(TreeNode("BC")) {
+    //     reg_flags.BC = true;
+    //     Indent(5.0);
+    //     Text("B");
+    //     Text("C");
+    //     Unindent(5.0);
+    //     TreePop();
+    // } else {
+    //     reg_flags.BC = false;
+    // }
 
-    if(TreeNode("DE")) {
-        reg_flags.DE = true;
-        Indent(5.0);
-        Text("D");
-        Text("E");
-        Unindent(5.0);
-        TreePop();
-    } else {
-        reg_flags.DE = false;
-    }
+    // if(TreeNode("DE")) {
+    //     reg_flags.DE = true;
+    //     Indent(5.0);
+    //     Text("D");
+    //     Text("E");
+    //     Unindent(5.0);
+    //     TreePop();
+    // } else {
+    //     reg_flags.DE = false;
+    // }
 
-    if(TreeNode("HL")) {
-        reg_flags.HL = true;
-        Indent(5.0);
-        Text("H");
-        Text("L");
-        Unindent(5.0);
-        TreePop();
-    } else {
-        reg_flags.HL = false;
-    }
-    Indent(20.0);
-    Text("PC");
-    Text("SP");
-    Unindent(20.0);
-    if(reg_flags.F) {
-        SetColumnWidth(-1, 60);
-    } else {
-        SetColumnWidth(-1, 50);
-    }
-    NextColumn();
-    SetColumnWidth(-1, 50);
+    // if(TreeNode("HL")) {
+    //     reg_flags.HL = true;
+    //     Indent(5.0);
+    //     Text("H");
+    //     Text("L");
+    //     Unindent(5.0);
+    //     TreePop();
+    // } else {
+    //     reg_flags.HL = false;
+    // }
+    // Indent(20.0);
+    // Text("PC");
+    // Text("SP");
+    // Unindent(20.0);
+    // if(reg_flags.F) {
+    //     SetColumnWidth(-1, 60);
+    // } else {
+    //     SetColumnWidth(-1, 50);
+    // }
+    // NextColumn();
+    // SetColumnWidth(-1, 50);
 
-    //AF
-    Text("0x%s", itoh(regs.AF, 4).c_str());
-    if(reg_flags.AF) {
-        Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
-        Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
-        if(reg_flags.F) {
-            Text("%u", Bit.test(regs.AF, 7)); //Z
-            Text("%u", Bit.test(regs.AF, 6)); //N
-            Text("%u", Bit.test(regs.AF, 5)); //H
-            Text("%u", Bit.test(regs.AF, 4)); //C
-        }
-    }
+    // //AF
+    // Text("0x%s", itoh(regs.AF, 4).c_str());
+    // if(reg_flags.AF) {
+    //     Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
+    //     Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
+    //     if(reg_flags.F) {
+    //         Text("%u", Bit.test(regs.AF, 7)); //Z
+    //         Text("%u", Bit.test(regs.AF, 6)); //N
+    //         Text("%u", Bit.test(regs.AF, 5)); //H
+    //         Text("%u", Bit.test(regs.AF, 4)); //C
+    //     }
+    // }
 
-    //BC
-    Text("0x%s", itoh(regs.BC, 4).c_str());
-    if(reg_flags.BC) {
-        Text("0x%s", itoh(regs.BC >> 8, 2).c_str());  //B
-        Text("0x%s", itoh(regs.BC & 0xFF, 2).c_str()); //C
-    }
+    // //BC
+    // Text("0x%s", itoh(regs.BC, 4).c_str());
+    // if(reg_flags.BC) {
+    //     Text("0x%s", itoh(regs.BC >> 8, 2).c_str());  //B
+    //     Text("0x%s", itoh(regs.BC & 0xFF, 2).c_str()); //C
+    // }
 
-    //DE
-    Text("0x%s", itoh(regs.DE, 4).c_str());
-    if(reg_flags.DE) {
-        Text("0x%s", itoh(regs.DE >> 8, 2).c_str());  //D
-        Text("0x%s", itoh(regs.DE & 0xFF, 2).c_str()); //E
-    }
+    // //DE
+    // Text("0x%s", itoh(regs.DE, 4).c_str());
+    // if(reg_flags.DE) {
+    //     Text("0x%s", itoh(regs.DE >> 8, 2).c_str());  //D
+    //     Text("0x%s", itoh(regs.DE & 0xFF, 2).c_str()); //E
+    // }
 
-    //HL
-    Text("0x%s", itoh(regs.HL, 4).c_str());
-    if(reg_flags.HL) {
-        Text("0x%s", itoh(regs.HL >> 8, 2).c_str());  //H
-        Text("0x%s", itoh(regs.HL & 0xFF, 2).c_str()); //L
-    }
+    // //HL
+    // Text("0x%s", itoh(regs.HL, 4).c_str());
+    // if(reg_flags.HL) {
+    //     Text("0x%s", itoh(regs.HL >> 8, 2).c_str());  //H
+    //     Text("0x%s", itoh(regs.HL & 0xFF, 2).c_str()); //L
+    // }
 
-    //PC
-    Text("0x%s", itoh(regs.PC, 4).c_str());
+    // //PC
+    // Text("0x%s", itoh(regs.PC, 4).c_str());
 
-    //SP
-    Text("0x%s", itoh(regs.SP, 4).c_str());
-    End();
+    // //SP
+    // Text("0x%s", itoh(regs.SP, 4).c_str());
+    // End();
 }
 
-void GUI::buildIORegisterUI() {
-    using namespace ImGui;
+void GUI::buildIORegisterWindow() {
+    // using namespace ImGui;
 
-    IO_Bus::io_registers_t regs = { 0 };
-    if(core) regs = core->getregistersfromIO();
-    else     regs = { 0 };
+    // IO_Bus::io_registers_t regs = { 0 };
+    // if(core) regs = core->getregistersfromIO();
+    // else     regs = { 0 };
 
-    //The Indentation on this window is very sensitive...
-    SetNextWindowSize({120,0});
-    Begin("IO Registers", nullptr, ImGuiWindowFlags_NoResize);
-    Columns(2, nullptr, true);
-    SetColumnWidth(-1, 60);
+    // //The Indentation on this window is very sensitive...
+    // SetNextWindowSize({120,0});
+    // Begin("IO Registers", nullptr, ImGuiWindowFlags_NoResize);
+    // Columns(2, nullptr, true);
+    // SetColumnWidth(-1, 60);
 
-    Text("P1");
-    Text("SB");
-    Text("SC");
-    Text("DIV");
-    Text("TIMA");
-    Text("TMA");
-    Text("TAC");
-    Text("IF");
-    Text("LCDC");
-    Text("STAT");
-    Text("SCY");
-    Text("SCX");
-    Text("LY");
-    Text("LYC");
-    Text("DMA");
-    Text("BGP");
-    Text("OBP0");
-    Text("OBP1");
-    Text("WY");
-    Text("WX");
-    Text("VBK");
-    Text("SVBK");
-    Text("IE");
-    NextColumn();
-    SetColumnWidth(-1, 50);
+    // Text("P1");
+    // Text("SB");
+    // Text("SC");
+    // Text("DIV");
+    // Text("TIMA");
+    // Text("TMA");
+    // Text("TAC");
+    // Text("IF");
+    // Text("LCDC");
+    // Text("STAT");
+    // Text("SCY");
+    // Text("SCX");
+    // Text("LY");
+    // Text("LYC");
+    // Text("DMA");
+    // Text("BGP");
+    // Text("OBP0");
+    // Text("OBP1");
+    // Text("WY");
+    // Text("WX");
+    // Text("VBK");
+    // Text("SVBK");
+    // Text("IE");
+    // NextColumn();
+    // SetColumnWidth(-1, 50);
 
-    Text("0x%s", itoh(regs.P1, 2).c_str());
-    Text("0x%s", itoh(regs.SB, 2).c_str());
-    Text("0x%s", itoh(regs.SC, 2).c_str());
-    Text("0x%s", itoh(regs.DIV, 2).c_str());
-    Text("0x%s", itoh(regs.TIMA, 2).c_str());
-    Text("0x%s", itoh(regs.TMA, 2).c_str());
-    Text("0x%s", itoh(regs.TAC, 2).c_str());
-    Text("0x%s", itoh(regs.IF, 2).c_str());
-    Text("0x%s", itoh(regs.LCDC, 2).c_str());
-    Text("0x%s", itoh(regs.STAT, 2).c_str());
-    Text("0x%s", itoh(regs.SCY, 2).c_str());
-    Text("0x%s", itoh(regs.SCX, 2).c_str());
-    Text("0x%s", itoh(regs.LY, 2).c_str());
-    Text("0x%s", itoh(regs.LYC, 2).c_str());
-    Text("0x%s", itoh(regs.DMA, 2).c_str());
-    Text("0x%s", itoh(regs.BGP, 2).c_str());
-    Text("0x%s", itoh(regs.OBP0, 2).c_str());
-    Text("0x%s", itoh(regs.OBP1, 2).c_str());
-    Text("0x%s", itoh(regs.WY, 2).c_str());
-    Text("0x%s", itoh(regs.WX, 2).c_str());
-    Text("0x%s", itoh(regs.VBK, 2).c_str());
-    Text("0x%s", itoh(regs.SVBK, 2).c_str());
-    Text("0x%s", itoh(regs.IE, 2).c_str());
-    End();
+    // Text("0x%s", itoh(regs.P1, 2).c_str());
+    // Text("0x%s", itoh(regs.SB, 2).c_str());
+    // Text("0x%s", itoh(regs.SC, 2).c_str());
+    // Text("0x%s", itoh(regs.DIV, 2).c_str());
+    // Text("0x%s", itoh(regs.TIMA, 2).c_str());
+    // Text("0x%s", itoh(regs.TMA, 2).c_str());
+    // Text("0x%s", itoh(regs.TAC, 2).c_str());
+    // Text("0x%s", itoh(regs.IF, 2).c_str());
+    // Text("0x%s", itoh(regs.LCDC, 2).c_str());
+    // Text("0x%s", itoh(regs.STAT, 2).c_str());
+    // Text("0x%s", itoh(regs.SCY, 2).c_str());
+    // Text("0x%s", itoh(regs.SCX, 2).c_str());
+    // Text("0x%s", itoh(regs.LY, 2).c_str());
+    // Text("0x%s", itoh(regs.LYC, 2).c_str());
+    // Text("0x%s", itoh(regs.DMA, 2).c_str());
+    // Text("0x%s", itoh(regs.BGP, 2).c_str());
+    // Text("0x%s", itoh(regs.OBP0, 2).c_str());
+    // Text("0x%s", itoh(regs.OBP1, 2).c_str());
+    // Text("0x%s", itoh(regs.WY, 2).c_str());
+    // Text("0x%s", itoh(regs.WX, 2).c_str());
+    // Text("0x%s", itoh(regs.VBK, 2).c_str());
+    // Text("0x%s", itoh(regs.SVBK, 2).c_str());
+    // Text("0x%s", itoh(regs.IE, 2).c_str());
+    // End();
 }
 
-void GUI::buildDisassemblyUI() {
-    using namespace ImGui;
+void GUI::buildDisassemblyWindow() {
+    // using namespace ImGui;
 
-    SetNextWindowSize({120,0});
-    Begin("Disassembly", nullptr, ImGuiWindowFlags_NoResize);
-    End();
+    // SetNextWindowSize({120,0});
+    // Begin("Disassembly", nullptr, ImGuiWindowFlags_NoResize);
+    // End();
 }
 
-// void GUI::buildMemoryViewUI() {
+// void GUI::buildMemoryViewWindow() {
 //     //NOTE: broken. I'm just tired of looking at it ATM.
 //     using namespace ImGui;
 
@@ -797,45 +763,50 @@ void GUI::buildDisassemblyUI() {
 //     PopStyleColor(3);
 // }
 
-void GUI::buildBreakpointUI() {
-    using namespace ImGui;
+    //TODO: fix
+void GUI::buildBreakpointWindow() {
+    // using namespace ImGui;
 
-    ImGuiInputTextCallback text_func =
-        [](ImGuiInputTextCallbackData *data) -> int {
-            switch(data->EventChar) {
-            case '0' ... '9':
-                break;
-            case 'a' ... 'f':
-                data->EventChar -= ('a' - 'A');
-                break;
-            case 'A' ... 'F':
-                break;
-            default:
-                return 1;
-                break;
-            }
-            return 0;
-        };
+    // ImGuiInputTextCallback text_func =
+    //     [](ImGuiInputTextCallbackData *data) -> int {
+    //         switch(data->EventChar) {
+    //         case '0' ... '9':
+    //             break;
+    //         case 'a' ... 'f':
+    //             data->EventChar -= ('a' - 'A');
+    //             break;
+    //         case 'A' ... 'F':
+    //             break;
+    //         default:
+    //             return 1;
+    //             break;
+    //         }
+    //         return 0;
+    //     };
 
-    static char buf[5] = "";
+    // static char buf[5] = "";
 
-    if(Begin("Breakpoint", nullptr, ImGuiWindowFlags_NoResize)) {
-        Columns(2, nullptr, true);
-            SetColumnWidth(-1, 90);
-            Dummy({0,0.25});
-            Text("Breakpoint:");
-            Dummy({0,0.25});
-            Text("Enabled:");
-        NextColumn();
-            PushItemWidth(50);
-            InputText("##", buf, 5, ImGuiInputTextFlags_CallbackCharFilter, text_func);
-            //SetItemDefaultFocus();
-            PopItemWidth();
+    // if(Begin("Breakpoint", nullptr, ImGuiWindowFlags_NoResize)) {
+    //     Columns(2, nullptr, true);
+    //         SetColumnWidth(-1, 90);
+    //         Dummy({0,0.25});
+    //         Text("Breakpoint:");
+    //         Dummy({0,0.25});
+    //         Text("Enabled:");
+    //     NextColumn();
+    //         PushItemWidth(50);
+    //         InputText("##", buf, 5, ImGuiInputTextFlags_CallbackCharFilter, text_func);
+    //         //SetItemDefaultFocus();
+    //         PopItemWidth();
 
-            bool breakpoint_enabled = core->get_bp_active();
-            if(Checkbox("##", &breakpoint_enabled)) {
-                core->set_bp_active(breakpoint_enabled);
-            }
-    }
-    End();
+    //         bool breakpoint_enabled = false;
+    //         if(core) {
+    //             breakpoint_enabled = core->get_bp_active();
+    //         }
+
+    //         if(Checkbox("##", &breakpoint_enabled)) {
+    //             core->set_bp_active(breakpoint_enabled);
+    //         }
+    // }
+    // End();
 }

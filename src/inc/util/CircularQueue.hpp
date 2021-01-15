@@ -16,7 +16,7 @@ public:
     size_t size(void);
     void clear(void);
 
-private:
+protected:
     T *start, *head, *tail, *end;
 };
 

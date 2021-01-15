@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gb/io.hpp"
+#include "gb_core/io.hpp"
 #include "util/util.hpp"
 
 #include <iostream>
@@ -19,7 +19,7 @@ public:
         u16 PC;
     };
 
-    CPU(IO_Bus *m, Configuration *config);
+    CPU(IO_Bus *io, bool bootrom_enabled);
     ~CPU();
 
     bool tick();
@@ -42,7 +42,6 @@ private:
     std::string format(std::string fmt, u16 PC);
 
     IO_Bus *io;
-    Configuration *cfg;
 
     u8 inst_clocks;
     u16 cpu_counter;
