@@ -22,7 +22,7 @@
 #define OBJ_PRIORITY(obj)   (Bit.test((obj).attrs, 7))
 #define OBJ_Y_FLIP(obj)     (Bit.test((obj).attrs, 6))
 #define OBJ_X_FLIP(obj)     (Bit.test((obj).attrs, 5))
-#define OBJ_PALLETTE_0(obj) (Bit.test((obj).attrs, 4)) //false if obj pallette 1
+#define OBJ_PALLETTE_1(obj) (Bit.test((obj).attrs, 4)) //false if obj pallette 0
 
 Video_Controller::Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
@@ -128,6 +128,8 @@ bool Video_Controller::ppu_tick() {
         active_sprites.clear();
         displayed_sprites.clear();
 
+        in_window = false;
+
         reg(LY) = y_line; //set LY
 
         if(y_line < 144) {
@@ -229,7 +231,6 @@ bool Video_Controller::ppu_tick() {
             current_sprite.pos_x > 0 &&
             y_line + 16 >= current_sprite.pos_y &&
             y_line + 16 < current_sprite.pos_y + ((BIG_SPRITES) ? 16 : 8)) {
-                std::cout << "sprite " << sprite_counter << ": " << (int)current_sprite.pos_x << " " << (int)current_sprite.pos_y << std::endl;
                 active_sprites.push_back(current_sprite);
             }
 
@@ -344,28 +345,12 @@ bool Video_Controller::ppu_tick() {
 
                 vram_fetch_step = BM_0;
             } else {
-                vram_fetch_step = IDLE;
-            }
-            break;
-
-        //idle clock 1
-        case IDLE:
-            if(bg_fifo->size() == 0) {
-                for(int i = 0; i < 8; i++) {
-                    u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
-                    tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
-                    tile_idx *= 2;
-
-                    u8 color = (reg(BGP) >> tile_idx) & 0x3;
-
-                    bg_fifo->enqueue(color);
-                }
-
-                vram_fetch_step = BM_0;
+                vram_fetch_step = SP_0;
             }
             break;
 
         // sprite data clk 1
+        // Doubles as IDLE
         case SP_0:
             //Do nothing for the sake of simplicity
             vram_fetch_step = SP_1;
@@ -373,25 +358,24 @@ bool Video_Controller::ppu_tick() {
 
         // sprite data clk 2
         case SP_1:
-            for(int sprite_idx = displayed_sprites.size() - 1; sprite_idx >= 0; sprite_idx--) {
-                std::cout << "processing sprite " << sprite_idx << std::endl;
-                u16 addr = 0x8000 + displayed_sprites[sprite_idx].tile_num;
+            if(displayed_sprites.size() > 0) {
+                obj_sprite_t curr_sprite = *(displayed_sprites.end() - 1);
+                displayed_sprites.erase(displayed_sprites.end() - 1);
+
+                u8 pixel_line = y_line - (curr_sprite.pos_y - 16);
+                u16 addr = 0x8000 |
+                            (curr_sprite.tile_num << 4) |
+                            (pixel_line << 1);
+
                 u8 sprite_tile_1 = io->read_vram(addr, true),
                    sprite_tile_2 = io->read_vram(addr + 1, true);
-                   displayed_sprites.erase(displayed_sprites.end() - 1);
+
+                u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
                 for(int i = 0; i < 8; i++) {
                     u8 tile_idx = ((sprite_tile_1 >> (7 - i)) & 1);
                     tile_idx   |= ((sprite_tile_2 >> (7 - i)) & 1) << 1;
                     tile_idx *= 2;
-
-                    u8 pallette = 0;
-                    if(OBJ_PALLETTE_0(displayed_sprites[sprite_idx])) {
-                        pallette = reg(OBP0);
-                    }
-                    else {
-                        pallette = reg(OBP1);
-                    }
 
                     u8 color = TRANSPARENT;
                     if(tile_idx != 0) {
@@ -412,8 +396,29 @@ bool Video_Controller::ppu_tick() {
             }
 
             if(displayed_sprites.empty()) {
-                vram_fetch_step = BM_0;
                 pause_bg_fifo = false;
+
+                // on the 8th clk of a BO1S cycle, shift in bg pixels,
+                // this will no occur on subsequent sprite reads as the bg_fifo
+                // should be disabled until the sprite fetches are done
+                if(bg_fifo->size() == 0) {
+                    for(int i = 0; i < 8; i++) {
+                        u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
+                        tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1; 
+                        tile_idx *= 2;
+
+                        u8 color = (reg(BGP) >> tile_idx) & 0x3;
+
+                        bg_fifo->enqueue(color);
+                    }
+
+                    if(in_window) {
+                        vram_fetch_step = WM_0;
+                    }
+                    else {
+                        vram_fetch_step = BM_0;
+                    }
+                }
             } else {
                 vram_fetch_step = SP_0;
             }
@@ -426,17 +431,16 @@ bool Video_Controller::ppu_tick() {
         /**
          * Actual PPU logic
          */
+        // std::cout << "fifo " << bg_fifo->size() << " " << vram_fetch_step << std::endl;
         if(bg_fifo->size() > 0 && !pause_bg_fifo) {
             u8 color_idx = bg_fifo->dequeue();
 
             if(sp_fifo->size() > 0) {
-                std::cout << "sprite pixel on line " << (int)x_line << std::endl;
                 u8 s_color_idx = sp_fifo->dequeue();
 
                 if(s_color_idx != TRANSPARENT) {
-                    color_idx = RED;
+                    color_idx = s_color_idx;
                 }
-                color_idx = RED;
             }
 
             if(!frame_disable) {
@@ -449,20 +453,17 @@ bool Video_Controller::ppu_tick() {
             if(OBJ_ENABLED ) {
                 for(auto sprite : active_sprites) {
                     if(x_line == sprite.pos_x - 8) {
-                        std::cout << "sprite displayed: " << (int)x_line << std::endl;
                         displayed_sprites.push_back(sprite);
                     }
                 }
 
                 if(!displayed_sprites.empty()) {
                     pause_bg_fifo = true;
-                    vram_fetch_step = SP_0;
                 }
             }
 
-            //FIXME: enabling the window and a sprite at the
-            // same time will cause the window not to be enabled
-            if(x_line == reg(WX)) {
+            if(x_line == reg(WX) && WINDOW_ENABLED) {
+                in_window = true;
                 vram_fetch_step = WM_1;
                 bg_fifo->clear();
             } else if(x_line == 160) {

@@ -298,7 +298,7 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
                 ram_file = Silver::File::openFile(ram_file_name);
             }
 
-            //check that fiel could be opened
+            //check that file could be opened
             if(!ram_file) {
                 std::cerr << "Error Opening " << ram_file_name << std::endl;
                 std::cerr << "Ram Data will not be saved." << std::endl;
@@ -308,7 +308,7 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
             //check that file size matches cart ram size
             auto ram_size = ram_file->getSize();
             if(ram_size != getRAMSize()) {
-                std::cerr << "Ram File " << ram_file_name << "does not match cart type" << std::endl
+                std::cerr << "Ram File " << ram_file_name << " does not match cart type" << std::endl
                           << "Data will not be loaded" << std::endl;
                 goto ContinueLoad; //TODO: no
             }

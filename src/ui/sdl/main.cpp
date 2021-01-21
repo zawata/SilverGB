@@ -232,7 +232,7 @@ int main(int argc, char *argv[])
     //load GBCore
     Silver::File *rom_file = nullptr;
     #ifdef __linux__ 
-        rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/tetris.gb");
+        rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
     #elif _WIN32
         rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\tetris.gb");
     #else
@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
         }
 
         core->tick_frame();
-        core->getByteFromIO(0);
+        // core->getByteFromIO(0);
 
         glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
         glTexSubImage2D(

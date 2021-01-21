@@ -125,17 +125,17 @@ private:
         WM_0, //Window Map clk 1
         WM_1, //Window Map clk 2;
 
-        IDLE, // Idle clocking
-
         TD_0_0, //Tile Data byte 1 clk 1
         TD_0_1, //Tile Data byte 1 clk 2
 
         TD_1_0, //Tile Data byte 2 clk 1
         TD_1_1, //Tile Data byte 2 clk 2
 
-        SP_0,   //Sprite 1
-        SP_1,   //Sprite 2
-    } vram_fetch_step = (__VRAM_fetch_steps)0;
+        SP_0,   //Sprite Data clk 1
+        SP_1,   //Sprite Data clk 2
+    };
+    __VRAM_fetch_steps vram_fetch_step = (__VRAM_fetch_steps)0,
+                       future_step     = (__VRAM_fetch_steps)0;
 
     u8 old_LY  = 0;
     bool
@@ -164,7 +164,8 @@ private:
         new_frame = false,     // the first clock tick of a new frame
         first_line = false,    // the first clock tick of the first line
         new_line = false,      // the first clock tick of a new line
-        start_of_line = false;  // the first VRAM access of a new line
+        start_of_line = false, // the first VRAM access of a new line
+        in_window = false;     // are we in window mode
 
 
     int sprite_counter = 0;
