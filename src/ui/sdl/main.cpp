@@ -30,52 +30,34 @@ void gl_init_textures() {
 }
 
 void gl_init_shaders() {
-    std::string vert_shader_source =
-            "#version 330\n"
-            "in vec2 pos_in;"
-            "in vec2 tex_in;"
-            "out vec2 tex_out;"
-            "void main() {"
-                "tex_out = tex_in;"
-                "gl_Position = vec4(pos_in.xy, 0.0, 1.0);"
-            "}";
+    std::string vert_shader_source = "                      \
+#version 150 core                                           \n\
+out vec2 v_tex;                                             \n\
+                                                            \n\
+const vec2 v_pos[4]=vec2[4](vec2(-1.0, 1.0),                \n\
+                            vec2(-1.0,-1.0),                \n\
+                            vec2( 1.0, 1.0),                \n\
+                            vec2( 1.0,-1.0));               \n\
+const vec2 t_pos[4]=vec2[4](vec2(0.0,0.0),                  \n\
+                            vec2(0.0,1.0),                  \n\
+                            vec2(1.0,0.0),                  \n\
+                            vec2(1.0,1.0));                 \n\
+                                                            \n\
+void main()                                                 \n\
+{                                                           \n\
+    v_tex=t_pos[gl_VertexID];                               \n\
+    gl_Position=vec4(v_pos[gl_VertexID], 0.0, 1.0);         \n\
+}";
 
-//     std::string vert_shader_source = "                      \
-// #version 150 core                                           \n\
-// out vec2 v_tex;                                             \n\
-//                                                             \n\
-// const vec2 pos[4]=vec2[4](vec2(-1.0, 1.0),                  \n\
-//                           vec2(-1.0,-1.0),                  \n\
-//                           vec2( 1.0, 1.0),                  \n\
-//                           vec2( 1.0,-1.0));                 \n\
-//                                                             \n\
-// void main()                                                 \n\
-// {                                                           \n\
-//     v_tex=0.5*pos[gl_VertexID] + vec2(0.5);                 \n\
-//     gl_Position=vec4(pos[gl_VertexID], 0.0, 1.0);           \n\
-// }";
-
-    std::string frag_shader_source =
-            "#version 330\n"
-            "uniform sampler2D tex_data;"
-            "in vec2 tex_in;"
-            "out vec4 frag_color;"
-            "void main() {"
-                "if (tex_in.x > 0.5) {"
-                    "frag_color = vec4(1.0, 0.0, 0.0, 1.0);"
-                "} else {"
-                    "frag_color = vec4(texture(tex_data, tex_in).rgb, 1.0);"
-                "}"
-            "}";
-//     std::string frag_shader_source = "                      \
-// #version 150 core                                           \n\
-// in vec2 v_tex;                                              \n\
-// uniform sampler2D texSampler;                               \n\
-// out vec4 color;                                             \n\
-// void main()                                                 \n\
-// {                                                           \n\
-//     color=texture(texSampler, v_tex);                       \n\
-// }";
+    std::string frag_shader_source = "                      \
+#version 150 core                                           \n\
+in vec2 v_tex;                                              \n\
+uniform sampler2D texSampler;                               \n\
+out vec4 color;                                             \n\
+void main()                                                 \n\
+{                                                           \n\
+    color=texture(texSampler, v_tex);                       \n\
+}";
 
     GLuint vert_shader, frag_shader;
     const char *c_str;
@@ -114,7 +96,7 @@ void gl_init_shaders() {
     if(!success) {
         char infoLog[512];
         glGetProgramInfoLog(shader_program, 512, NULL, infoLog);      check_gl_error();
-        std::cout << "shader program\n" << infoLog << std::endl;
+        std::cout << "shader program failed\n" << infoLog << std::endl;
     }
 
     glUseProgram(0);                                                  check_gl_error();
@@ -128,7 +110,7 @@ int main(int argc, char *argv[])
     SDL_GLContext context;
 
     // Initialize SDL
-    if (SDL_Init(SDL_INIT_EVERYTHING) != NULL) {
+    if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
         std::cout << SDL_GetError() << std::endl;
         return -1;
     }
@@ -247,8 +229,15 @@ int main(int argc, char *argv[])
             ptr);                                                 check_gl_error();
     glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
 
-    //load GBCore;
-    Silver::File *rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\tetris.gb");
+    //load GBCore
+    Silver::File *rom_file = nullptr;
+    #ifdef __linux__ 
+        rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/tetris.gb");
+    #elif _WIN32
+        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\tetris.gb");
+    #else
+
+    #endif
 
     GB_Core *core = new GB_Core(rom_file, nullptr);
 
@@ -263,6 +252,7 @@ int main(int argc, char *argv[])
         }
 
         core->tick_frame();
+        core->getByteFromIO(0);
 
         glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
         glTexSubImage2D(

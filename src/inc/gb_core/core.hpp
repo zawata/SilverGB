@@ -34,6 +34,8 @@ public:
     u8 getByteFromIO(u16 addr);
     u8 const* getScreenBuffer();
 
+    std::vector<u8> getOAMEntry(int index);
+
     void set_bp(u16 bp, bool en = false);
     u16 get_bp();
     void set_bp_active(bool en);

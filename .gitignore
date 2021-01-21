@@ -5,7 +5,12 @@
 .vs/
 .cache/
 
+#common cmake build folders
 out/
+build/
+
+#Clang Command Database
+compile_commands.json
 
 # my test files
 test_files/

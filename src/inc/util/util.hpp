@@ -2,11 +2,20 @@
 
 #include "ints.hpp"
 
+#include <cstring>
 #include <iostream>
 #include <string>
 
-static inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { while(l--) if(*a++ != *b++) break; return l == 0; }
-static inline bool bounded(u8 x, u8 y, u8 z)                    { return (x >= y) && (x <= z); }
+static inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { return ::memcmp(a, b, l) == 0; }
+
+/**
+ * a <= value <= b
+ **/
+template<typename T>
+static inline bool bounded(T value, T a, T b) {
+    static_assert(std::is_arithmetic<T>::value);
+    return (value >= a) && (value <= b);
+}
 
 //TODO: this has become unruly and terrible. do it again
 static inline std::string itoh(u64 i, u8 zp = 0, bool caps = false) {

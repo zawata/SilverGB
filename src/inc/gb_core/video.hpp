@@ -45,14 +45,28 @@ public:
         u8 pos_x;
         u8 tile_num;
         u8 attrs;
+        // u8 obj_idx;
     } obj_sprite_t;
 
+    enum {
+        WHITE = 0,
+        LIGHTGREY,
+        DARKGREY,
+        BLACK,
+        TRANSPARENT,
+        RED
+    } color_id_t;
 
-    const u8 pixel_colors[4][3] = { //using html codes for now
+
+    //using html codes for now
+    // TODO: make this user-configurable
+    static constexpr u8 pixel_colors[6][3] = {
         {0xFF, 0xFF, 0xFF}, // white
         {0xD3, 0xD3, 0xD3}, // lightgrey
         {0x69, 0x69, 0x69}, // dimgrey
-        {0x00, 0x00, 0x00}  // black
+        {0x00, 0x00, 0x00}, // black
+        {0x00, 0x00, 0xFF}, // transparent, (Blue)
+        {0xFF, 0x00, 0x00}  // red, for debugging
     };
 
     Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
@@ -71,14 +85,6 @@ private:
 
     int curr_mode;
 
-    // bool lcd_enabled;
-    // int  window_tile_map;
-    // bool window_enabled;
-    // bool bg_wnd_tile_data;
-    // int  bg_tile_map;
-    // bool big_sprites;
-    // bool obj_enabled;
-    // bool bg_wnd_blank;
     struct __registers {
         u8 LCDC;
         u8 STAT;
@@ -100,25 +106,26 @@ private:
     /**
      * PPU Variables
      */
-    CircularQueue<u8> *pix_fifo = new CircularQueue<u8>(160);
+    CircularQueue<u8> *bg_fifo  = new CircularQueue<u8>(160);
+    CircularQueue<u8> *sp_fifo = new CircularQueue<u8>(160);
     u8 process_step;
 
     int frame_clock_count = 0; // count of clocks in a frame
     int line_clock_count = 0;  // count of clocks in a line
 
     enum __OAM_fetch_steps {
-        OAM_1,
-        OAM_2
+        OAM_0,
+        OAM_1
     } oam_fetch_step;
 
     enum __VRAM_fetch_steps {
-        BM_1, //Background Map clk 1
-        BM_2, //Background Map clk 2
+        BM_0, //Background Map clk 1
+        BM_1, //Background Map clk 2
 
-        WM_1, //Window Map clk 1
-        WM_2, //Window Map clk 2;
+        WM_0, //Window Map clk 1
+        WM_1, //Window Map clk 2;
 
-        //TODO: Sprite fetch
+        IDLE, // Idle clocking
 
         TD_0_0, //Tile Data byte 1 clk 1
         TD_0_1, //Tile Data byte 1 clk 2
@@ -132,7 +139,8 @@ private:
 
     u8 old_LY  = 0;
     bool
-        coin_bit_signal = false;
+        coin_bit_signal = false,
+        pause_bg_fifo = true;
 
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map
@@ -140,7 +148,7 @@ private:
     s16
         tile_addr;      // relative addr of the current tile data to fetch
     u8
-        bg_map_byte,    // byte from the current tile in the bg  tile map
+        bg_map_byte,    // byte from the current tile in the bg tile map
         wnd_map_byte,   // byte from the current tile in the wnd tile map
         tile_byte_1,    // 1st byte from the current tile fetched
         tile_byte_2;    // 1st byte from the current tile fetched
@@ -161,6 +169,7 @@ private:
 
     int sprite_counter = 0;
     obj_sprite_t current_sprite;
+    std::vector<obj_sprite_t> active_sprites;
     std::vector<obj_sprite_t> displayed_sprites;
 
     u32 current_byte = 0;

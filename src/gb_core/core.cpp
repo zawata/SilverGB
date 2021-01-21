@@ -1,10 +1,9 @@
-#include "gb_core/core.hpp"
-
 #include <chrono>
 
+#include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
-
 #include "gb_core/video.hpp"
+#include "util/bit.hpp"
 
 GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
     screen_buffer = (u8 *)malloc(GB_S_P_SZ);
@@ -162,6 +161,33 @@ u8 GB_Core::getByteFromIO(u16 addr) {
 
 u8 const* GB_Core::getScreenBuffer() {
     return screen_buffer;
+}
+
+std::vector<u8> GB_Core::getOAMEntry(int index) {
+    if(index >= 40 ) { return {}; }
+
+    Video_Controller::obj_sprite_t sprite = vpu->oam_fetch_sprite(index);
+
+    u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
+
+    std::vector<u8> ret_vec;
+    u8 pallette = io->read_reg( Bit.test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
+    for( int i = 0; i < 16; i += 2 ) {
+        u8 b1 = io->read_oam(base_addr | i),
+           b2 = io->read_oam(base_addr | i + 1);
+
+        for(int i = 0; i < 8; i++) {
+            u8 out_color = ((b1 >> (7 - i)) & 1);
+            out_color   |= ((b2 >> (7 - i)) & 1) << 1;
+
+            const u8 *pixel_colors = Video_Controller::pixel_colors[(pallette >> (out_color * 2)) & 0x3];
+            ret_vec.push_back(pixel_colors[0]);
+            ret_vec.push_back(pixel_colors[1]);
+            ret_vec.push_back(pixel_colors[2]);
+        }
+    }
+
+    return ret_vec;
 }
 
 /**
