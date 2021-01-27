@@ -79,11 +79,13 @@ ContinueLoad:
     } else if (cart_type.MBC1) {
         controller = new MBC1_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC2) {
+        std::cerr << "MBC2 not supported, emulator will now segfault" << std::endl;
         //controller = new MBC2_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC3) {
         controller = new MBC3_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC5) {
         //controller = new MBC5_Controller(cart_type, rom, ram);
+        std::cerr << "MBC5 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.MBC6) {
         std::cerr << "MBC6 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.MBC7) {

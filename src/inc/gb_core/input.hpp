@@ -30,7 +30,9 @@ public:
     void set_input_state(button_states_t state);
     Input_Manager::button_states_t get_input_state();
 
-    u8 read_inputs(u8 reg);
+    u8 read();
+    void write(u8 data);
 private:
+    bool read_dir_keys, read_button_keys;
     button_states_t current_state;
 };

@@ -29,6 +29,8 @@ public:
     void tick_instr();
     void tick_frame();
 
+    void set_input_state(Input_Manager::button_states_t const& state);
+
     CPU::registers_t getRegistersFromCPU();
     IO_Bus::io_registers_t getregistersfromIO();
     u8 getByteFromIO(u16 addr);

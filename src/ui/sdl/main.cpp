@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "SDL_events.h"
+#include "SDL_keycode.h"
 #include "gb_core/core.hpp"
 
 #include <GL/gl3w.h>
@@ -102,6 +104,35 @@ void main()                                                 \n\
     glUseProgram(0);                                                  check_gl_error();
     // glDeleteShader(vert_shader);                                      check_gl_error();
     // glDeleteShader(vert_shader);                                      check_gl_error();
+}
+
+void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
+    switch(event->keysym.sym) {
+    case SDLK_UP:        // DPAD up
+        buttons->up     = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_DOWN:      // DPAD down
+        buttons->down   = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_LEFT:      // DPAD left
+        buttons->left   = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_RIGHT:     // DPAD right
+        buttons->right  = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_a:         // A button
+        buttons->a      = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_b:         // B button
+        buttons->b      = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_RETURN:    // Start button
+        buttons->start  = event->type == SDL_KEYDOWN;
+        break;
+    case SDLK_BACKSPACE: // Select Button
+        buttons->select = event->type == SDL_KEYDOWN;
+        break;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -234,23 +265,30 @@ int main(int argc, char *argv[])
     #ifdef __linux__ 
         rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
     #elif _WIN32
-        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\tetris.gb");
+        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
     #else
 
     #endif
 
     GB_Core *core = new GB_Core(rom_file, nullptr);
+    Input_Manager::button_states_t button_state;
 
     SDL_Event event;
     while (isRunning) {
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
+            case SDL_KEYDOWN:
+            case SDL_KEYUP:
+                set_inputs(&button_state, &event.key);
+                break;
             case SDL_QUIT:
                 isRunning = false;
                 break;
             }
         }
 
+
+        core->set_input_state(button_state);
         core->tick_frame();
         // core->getByteFromIO(0);
 

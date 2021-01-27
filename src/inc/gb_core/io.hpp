@@ -83,7 +83,7 @@ public:
 
     struct io_registers_t {
         //Input
-        u8 P1;
+        // u8 P1; //implemented in Input_Manager
 
         //Serial
         u8 SB; //Serial not supported

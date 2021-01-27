@@ -219,7 +219,7 @@ void IO_Bus::write(u16 offset, u8 data) {
 u8  IO_Bus::read_reg(u8 loc) {
     switch(loc) {
     case P1_REG   :
-        return P1_DEFAULTS | input->read_inputs(registers.P1);
+        return P1_DEFAULTS | input->read();
 
     //Serial Registers
     case SB_REG   :
@@ -302,7 +302,7 @@ u8  IO_Bus::read_reg(u8 loc) {
 void IO_Bus::write_reg(u8 loc, u8 data) {
     switch(loc) {
     case P1_REG   :
-        registers.P1 = P1_DEFAULTS | (data & P1_WRITE_MASK);
+        input->write(data & P1_WRITE_MASK);
         return;
     case SB_REG   :
         registers.SB = data & SB_WRITE_MASK;

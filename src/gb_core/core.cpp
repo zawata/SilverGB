@@ -2,6 +2,7 @@
 
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
+#include "gb_core/input.hpp"
 #include "gb_core/video.hpp"
 #include "util/bit.hpp"
 
@@ -22,73 +23,6 @@ GB_Core::~GB_Core() {
 
     free(screen_buffer);
 }
-
-/**
- * Thread Functions
- */
-#if defined(ENABLE_THREADING)
-
-#include <thread>
-#include <condition_variable>
-
-static std::atomic<bool> pause_loop = ATOMIC_VAR_INIT(true);
-static std::atomic<bool> loop_paused = ATOMIC_VAR_INIT(true);
-static std::atomic<bool> kill_thread = ATOMIC_VAR_INIT(true);
-static std::condition_variable cond;
-static std::mutex m_lock;
-
-void GB_Core::init_thread(bool paused) {
-    kill_thread = false;
-    pause_loop = paused;
-    core_thread = std::thread(&GB_Core::run_thread, this);
-}
-
-void GB_Core::pause_thread() {
-    pause_loop = true;
-    while(!loop_paused);
-}
-
-bool GB_Core::thread_paused() {
-    return loop_paused;
-}
-
-void GB_Core::resume_thread() {
-    pause_loop = false;
-
-    std::lock_guard<std::mutex> guard(m_lock);
-    cond.notify_one();
-}
-
-void GB_Core::stop_thread() {
-    kill_thread = true;
-    if(thread_paused()) resume_thread();
-    core_thread.join();
-}
-
-void GB_Core::run_thread() {
-    while(!kill_thread) {
-        if(pause_loop) {
-            loop_paused = true;
-            std::unique_lock<std::mutex> l(m_lock);
-            cond.wait(l);
-            loop_paused = false;
-        }
-
-        // int v_step;
-
-        auto start = std::chrono::high_resolution_clock::now();
-        do {
-            cpu->tick();
-        } while(!vpu->tick());
-        auto stop = std::chrono::high_resolution_clock::now();
-
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start);
-        std::cout << duration.count() << std::endl;
-        std::this_thread::sleep_for(std::chrono::microseconds(16666)-duration);
-    }
-}
-
-#endif
 
 /**
  * Tick Functions
@@ -118,6 +52,13 @@ void GB_Core::tick_frame() {
             throw breakpoint_exception();
         }
     } while(!vpu->tick());
+}
+
+/**
+ * Interface Functions
+ */
+void GB_Core::set_input_state(Input_Manager::button_states_t const& state) {
+    io->input->set_input_state(state);
 }
 
 /**

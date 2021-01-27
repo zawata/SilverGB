@@ -4,7 +4,10 @@
 
 #include <iostream>
 
-Input_Manager::Input_Manager() {}
+Input_Manager::Input_Manager() {
+    read_dir_keys = false;
+    read_button_keys = false;
+}
 Input_Manager::~Input_Manager() {}
 
 void Input_Manager::set_input_state(button_states_t state) {
@@ -15,11 +18,13 @@ Input_Manager::button_states_t Input_Manager::get_input_state() {
     return current_state;
 }
 
-u8 Input_Manager::read_inputs(u8 reg) {
-    reg &= 0x30;
-
+u8 Input_Manager::read() {
     u8 bits = 0;
-    if(Bit.test(reg, 4)) {
+
+    if(read_dir_keys)    Bit.set(&bits, 4);
+    if(read_button_keys) Bit.set(&bits, 5);
+
+    if(read_dir_keys) {
         bits |=
             current_state.down  << 3 |
             current_state.up    << 2 |
@@ -27,7 +32,7 @@ u8 Input_Manager::read_inputs(u8 reg) {
             current_state.right << 0;
     }
 
-    if(Bit.test(reg,5 )) {
+    if(read_button_keys) {
         bits |=
             current_state.start  << 3 |
             current_state.select << 2 |
@@ -35,5 +40,10 @@ u8 Input_Manager::read_inputs(u8 reg) {
             current_state.a      << 0;
     }
 
-    return reg | (~bits & 0xF);
+    return ~bits & 0xF;
+}
+
+void Input_Manager::write(u8 data) {
+    read_dir_keys = Bit.test(data, 5);
+    read_button_keys = Bit.test(data, 4);
 }
