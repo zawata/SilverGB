@@ -103,7 +103,7 @@ void CircularQueue<T>::clear(void) {
 template<typename T>
 T const& CircularQueue<T>::at(size_t idx) {
     if(size() <= idx) {
-        std::__throw_invalid_argument("idx must be less than size");
+        throw std::invalid_argument("idx must be less than size");
     }
     return *_get_pos(idx);
 }
@@ -111,7 +111,7 @@ T const& CircularQueue<T>::at(size_t idx) {
 template<typename T>
 void CircularQueue<T>::replace(size_t idx, T const& elem) {
     if(size() <= idx) {
-        std::__throw_invalid_argument("idx must be less than size");
+        throw std::invalid_argument("idx must be less than size");
     }
     T* pos = _get_pos(idx);
 

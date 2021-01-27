@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <vector>
 
 #include "util/ints.hpp"
 
@@ -16,6 +17,9 @@ public:
     static File *createFile(std::string filename);
 
     static bool fileExists(std::string);
+
+    void toVector(std::vector<u8> &vec);
+    void fromVector(std::vector<u8> const& vec);
 
     u32 getCRC();
     u32 getSize();

@@ -87,16 +87,16 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         if(bootrom_mode) {
             return bootrom_file->getByte(offset);
         } else {
-            return cart->read_rom(offset);
+            return cart->read(offset);
         }
     }
     else if(offset <= 0x3FFF) {
     // 16KB ROM bank 00
-        return cart->read_rom(offset);
+        return cart->read(offset);
     }
     else if(offset <= 0x7FFF) {
     // 16KB ROM Bank 01~NN
-        return cart->read_rom(offset); //cart will handle banking
+        return cart->read(offset); //cart will handle banking
     }
     else if(offset <= 0x9FFF) {
     // 8KB Video RAM (VRAM)
@@ -104,7 +104,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
-        return cart->read_ram(offset);
+        return cart->read(offset);
     }
     else if(offset <= 0xCFFF) {
     // 4KB Work RAM (WRAM) bank 0
@@ -155,12 +155,12 @@ void IO_Bus::write(u16 offset, u8 data) {
 
     if(offset <= 0x3FFF) {
     // 16KB ROM bank 00
-        cart->write_rom(offset, data);
+        cart->write(offset, data);
         return;
     }
     else if(offset <= 0x7FFF) {
     // 16KB ROM Bank 01~NN
-        cart->write_rom(offset, data);
+        cart->write(offset, data);
         return;
     }
     else if(offset <= 0x9FFF) {
@@ -170,7 +170,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xBFFF) {
     // 8KB External RAM
-        cart->write_ram(offset, data);
+        cart->write(offset, data);
         return;
     }
     else if(offset <= 0xCFFF) {
@@ -190,7 +190,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     }
     else if(offset <= 0xFE9F) {
     // Sprite attribute table (OAM)
-        write_oam(offset, offset);
+        write_oam(offset, data);
         return;
     }
     else if(offset <= 0xFEFF) {
@@ -294,10 +294,9 @@ u8  IO_Bus::read_reg(u8 loc) {
         return registers.SVBK & SVBK_READ_MASK;
     case IE_REG:
         return registers.IE & IE_READ_MASK;
-    default:
-        std::cerr << "REG err at " << as_hex(loc) << std::endl;
-        return 0;
     }
+
+    return 0;
 }
 
 void IO_Bus::write_reg(u8 loc, u8 data) {
@@ -414,11 +413,9 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
             bank_offset = registers.SVBK * WORK_RAM_BANK_SIZE;
         else
             bank_offset = WORK_RAM_BANK_SIZE;
+        break;
     case IE_REG   :
         registers.IE = data & IE_WRITE_MASK;
-        return;
-    default:
-        std::cerr << "REG err at " << as_hex(loc) << std::endl;
         return;
     }
 }

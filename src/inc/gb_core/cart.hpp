@@ -6,8 +6,6 @@
 
 #include <string>
 
-struct MemoryBankController;
-
 #if !defined(_MSC_VER)
 #define return_cart_type(...) { \
     return (__cart_type_t){__VA_ARGS__}; \
@@ -19,8 +17,7 @@ struct MemoryBankController;
 }
 #endif
 
-class Cartridge_Constants {
-public:
+namespace Cartridge_Constants {
     typedef struct __cart_type_t {
         static struct __cart_type_t getCartType(u8 cart_type) {
             switch(cart_type) {
@@ -117,6 +114,32 @@ public:
         int code;
     } cart_type_t;
 
+    enum rom_size_t {
+        ROM_SZ_INVALID = -1,
+        ROM_SZ_32K     = 32768,
+        ROM_SZ_64K     = 65536,
+        ROM_SZ_128K    = 131072,
+        ROM_SZ_256K    = 262144,
+        ROM_SZ_512K    = 524288,
+        ROM_SZ_1M      = 1048576,
+        ROM_SZ_1_1M    = 1179648,
+        ROM_SZ_1_2M    = 1310720,
+        ROM_SZ_1_5M    = 1572864,
+        ROM_SZ_2M      = 2097152,
+        ROM_SZ_4M      = 4194304,
+        ROM_SZ_8M      = 8388608
+    };
+
+    enum ram_size_t {
+        RAM_SZ_INVALID = -1,
+        RAM_SZ_0K      = 0,
+        RAM_SZ_2K      = 2048,
+        RAM_SZ_8K      = 8192,
+        RAM_SZ_32K     = 32768,
+        RAM_SZ_64K     = 65535,
+        RAM_SZ_128K    = 131072,
+    };
+
     static const u16 START_CODE_HI_OFFSET           = 0x0103;
     static const u16 START_CODE_LO_OFFSET           = 0x0102;
 
@@ -130,8 +153,8 @@ public:
 
     static const u16 CGB_FLAG                       = 0x0143;
 
-    static const u16 SGB_LICENSEE_CODE_BYTE1_OFFSET = 0x014B;
-    static const u16 SGB_LICENSEE_CODE_BYTE2_OFFSET = 0x014B; //TODO: FIXME
+    static const u16 SGB_LICENSEE_CODE_BYTE1_OFFSET = 0x0144;
+    static const u16 SGB_LICENSEE_CODE_BYTE2_OFFSET = 0x0145;
 
     static const u16 SGB_FLAG                       = 0x0146;
 
@@ -150,7 +173,32 @@ public:
     static const u16 GLOBAL_CHECKSUM_LO_OFFSET      = 0x014B;
 
 
-    static const u8 MAGIC_NUM[MAGIC_NUM_LENGTH];
+    static const u8 MAGIC_NUM[MAGIC_NUM_LENGTH] = {
+            0xCE,0xED,0x66,0x66,0xCC,0x0D,0x00,0x0B,
+            0x03,0x73,0x00,0x83,0x00,0x0C,0x00,0x0D,
+            0x00,0x08,0x11,0x1F,0x88,0x89,0x00,0x0E,
+            0xDC,0xCC,0x6E,0xE6,0xDD,0xDD,0xD9,0x99,
+            0xBB,0xBB,0x67,0x63,0x6E,0x0E,0xEC,0xCC,
+            0xDD,0xDC,0x99,0x9F,0xBB,0xB9,0x33,0x3E };
+}
+
+/**
+ * MBC Interface
+ */
+struct MemoryBankController {
+    virtual u8 read(u16 offset) = 0;
+    virtual void write(u16 offset, u8 data) = 0;
+    virtual void tick() {};
+protected:
+    MemoryBankController(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom_data, std::vector<u8> ram_data) :
+    cart_type(cart_type),
+    rom_data(rom_data),
+    ram_data(ram_data) {}
+
+    Cartridge_Constants::cart_type_t cart_type;
+
+    std::vector<u8> rom_data;
+    std::vector<u8> ram_data;
 };
 
 class Cartridge {
@@ -158,15 +206,15 @@ public:
     Cartridge(Silver::File *f);
     ~Cartridge();
 
-    u16 getCodeOffset();
+
     bool checkMagicNumber();
 
     std::string getCartTitle();
     u8 getCartVersion();
     Cartridge_Constants::cart_type_t getCartType();
 
-    u32 getROMSize();
-    u32 getRAMSize();
+    Cartridge_Constants::rom_size_t getROMSize();
+    Cartridge_Constants::ram_size_t getRAMSize();
 
     bool isCGBCart();
     bool isCGBOnlyCart();
@@ -176,15 +224,11 @@ public:
     bool checkHeaderChecksum();
     bool checkGlobalChecksum();
 
-    u8 read_rom(u16 loc);
-    void write_rom(u16 loc, u8 data);
-
-    u8 read_ram(u16 loc);
-    void write_ram(u16 loc, u8 data);
+    u8 read(u16 loc);
+    void write(u16 loc, u8 data);
 
 private:
     Silver::File *rom_file;
-    Silver::File *ram_file;
 
     MemoryBankController *controller;
 

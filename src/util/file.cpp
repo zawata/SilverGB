@@ -1,3 +1,6 @@
+#include <iterator>
+#include <vector>
+
 #include "util/file.hpp"
 
 #include "util/crc.hpp"
@@ -24,6 +27,7 @@ File *File::openFile(std::string filename, bool write) {
             std::ifstream::in |
             std::ifstream::out |
             std::ifstream::binary))) {
+        ret->file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         return ret;
     } else {
         delete ret;
@@ -64,7 +68,7 @@ u8 File::getByte(u32 offset) {
 
 size_t File::getBuffer(u32 offset, u8 *buf, size_t len) {
     seekFile_g(offset);
-    file.get((char *)buf, len);
+    file.read((char *)buf, len);
     return this->file.gcount();
 }
 
@@ -82,6 +86,20 @@ void File::setBuffer(u32 offset, u8 *buf, size_t len) {
 
 std::string File::getFilename() {
     return filename;
+}
+
+void File::toVector(std::vector<u8> &vec) {
+    u32 size = this->getSize();
+    vec.clear();
+    vec.resize(size);
+
+    //std::copy(std::istream_iterator<u8>(file), std::istream_iterator<u8>(), std::back_inserter(vec));
+    getBuffer(0, vec.data(), size);
+}
+
+void File::fromVector(std::vector<u8> const& vec) {
+    seekFile_p(0);
+    std::copy(vec.begin(), vec.end(), std::ostream_iterator<char>(file));
 }
 
 /**

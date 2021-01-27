@@ -29,14 +29,14 @@
 #define SP_REG this->SP
 #define PC_REG this->PC
 
-inline bool check_half_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x10; }
-inline bool check_half_carry_8(u8 x, u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x10; }
-inline bool check_carry_8(u8 x, u8 y, u16 r) { return (x^y^r) & 0x100; }
-inline bool check_carry_8(u8 x, u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x100;   }
-inline bool check_half_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x1000; }
+inline bool check_half_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x10; }
+inline bool check_half_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x10; }
+inline bool      check_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x100; }
+inline bool      check_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x100; }
+inline bool check_half_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x1000; }
 inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x1000; }
-inline bool check_carry_16(u16 x, u16 y, u32 r) { return (x^y^r) & 0x10000; }
-inline bool check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
+inline bool      check_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x10000; }
+inline bool      check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
 CPU::CPU(IO_Bus *io, bool bootrom_enabled = false) :
 io(io),

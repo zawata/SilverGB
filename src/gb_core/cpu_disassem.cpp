@@ -6,7 +6,7 @@ std::string CPU::i8(u16 PC) {
     return itoh(io->read(PC), 2);
 }
 std::string CPU::i16(u16 PC) {
-    return itoh((u16)(io->read(PC) | (u16)(io->read(PC+1) << 8)), 4);
+    return itoh((u16)(io->read(PC+1) | (u16)(io->read(PC+2) << 8)), 4);
 }
 
 std::string CPU::format(std::string fmt, u16 PC) {
