@@ -3,7 +3,7 @@
 #include "ints.hpp"
 
 static struct {
-    inline static u8    test(u64 reg,  u8 i) { return (reg >> i) & 1; }
+    inline static bool  test(u64 reg,  u8 i) { return (reg >> i) & 1; }
 
     inline static void   set(u8  *reg, u8 i) { *reg |=  (1 << i); }
     inline static void   set(u16 *reg, u8 i) { *reg |=  (1U << i); }

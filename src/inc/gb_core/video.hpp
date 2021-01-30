@@ -30,16 +30,6 @@ public:
         VBLANK        = 1,
     } v_mode_t;
 
-    enum {
-        TILE_MAP_1 = 0, //9800h-9BFFh
-        TILE_MAP_2,     //9C00h-9FFFh
-    } bg_tile_map_t;
-
-    enum {
-        MODE_0_1 = 1, //8000 method
-        MODE_2_1 = 0, //8800 method
-    } tile_addr_mode;
-
     typedef struct {
         u8 pos_y;
         u8 pos_x;
@@ -54,9 +44,17 @@ public:
         DARKGREY,
         BLACK,
         TRANSPARENT,
-        RED
     } color_id_t;
 
+    union sprite_fifo_color_t {
+        struct {
+            u8   color_idx      : 6;
+            bool is_transparent : 1;
+            bool bg_priority    : 1;
+        };
+        u8 byte;
+    };
+    static_assert(sizeof(sprite_fifo_color_t) == 1, "");
 
     //using html codes for now
     // TODO: make this user-configurable
@@ -65,8 +63,6 @@ public:
         {0xD3, 0xD3, 0xD3}, // lightgrey
         {0x69, 0x69, 0x69}, // dimgrey
         {0x00, 0x00, 0x00}, // black
-        {0x00, 0x00, 0xFF}, // transparent, (Blue)
-        {0xFF, 0x00, 0x00}  // red, for debugging
     };
 
     Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
@@ -106,8 +102,8 @@ private:
     /**
      * PPU Variables
      */
-    CircularQueue<u8> *bg_fifo  = new CircularQueue<u8>(160);
-    CircularQueue<u8> *sp_fifo = new CircularQueue<u8>(160);
+    CircularQueue<u8> *bg_fifo                  = new CircularQueue<u8>(160);
+    CircularQueue<sprite_fifo_color_t> *sp_fifo = new CircularQueue<sprite_fifo_color_t>(160);
     u8 process_step;
 
     int frame_clock_count = 0; // count of clocks in a frame
@@ -164,7 +160,7 @@ private:
         new_frame = false,     // the first clock tick of a new frame
         first_line = false,    // the first clock tick of the first line
         new_line = false,      // the first clock tick of a new line
-        start_of_line = false, // the first VRAM access of a new line
+        skip_fetch = false,    // the first VRAM access of a new line
         in_window = false;     // are we in window mode
 
 

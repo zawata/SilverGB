@@ -37,6 +37,8 @@ public:
     u8 const* getScreenBuffer();
 
     std::vector<u8> getOAMEntry(int index);
+    void getBGBuffer(u8 *buf);
+    void getWNDBuffer(u8 *buf);
 
     void set_bp(u16 bp, bool en = false);
     u16 get_bp();

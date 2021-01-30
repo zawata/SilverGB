@@ -146,51 +146,76 @@ bool GB_Core::get_bp_active()        { return bp_active; }
 
 
 
-// u8 *GB_Core::getVRAMBuffer() {
-//     u8 *map = (u8 *)malloc(64*128);
-//     for(int y = 0; y < 64; y++) {
-//         for(int x = 0; x < 128; x++) {
-//             u8 tile_start_x = x / 8,
-//                tile_start_y = y / 8,
-//                tile_x =       x % 8,
-//                tile_y =       y % 8;
+void GB_Core::getBGBuffer(u8 *buf) {
+    #define reg(X) (io->registers.X)
 
-//             u16 tile_addr = (tile_start_x*0x10) + (tile_start_y * 0x100);
+    for(int y = 0; y < 256; y++) {
+        for(int x = 0; x < 32; x++) {
 
-//             // std::cout << "x,y: " << x << " " << y << std::endl;
-//             // std::cout << "tile_: " << as_hex(tile_addr) << std::endl;
-//             // std::cout << "tile_byte_: " << as_hex(tile_addr + (tile_y*2)) << std::endl;
-//             // std::cout << "tile_bit_: " << as_hex(tile_x) << std::endl;
+            u8 y_tile = y / 8;
 
-//             u8 byte_1 = io->video_ram_char[tile_addr + (tile_y*2)],
-//                byte_2 = io->video_ram_char[tile_addr + (tile_y*2) + 1];
+            u16 base = Bit.test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
+            u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
 
-//             //std::cout << "tile_data: " << as_hex(byte_1) << " " << as_hex(byte_2) << std::endl;
-//             //std::cout << "tile_out: " << as_hex(((byte_1 >> (tile_x-1))) | (byte_2 >> tile_x)) << std::endl;
-//             map[(y*128) + x] = ((byte_1 >> (7 - tile_x)) & 1) << 1;
-//             map[(y*128) + x] |= ((byte_2 >> (7 - tile_x)) & 1);
-//         }
-//     }
+            u16 tile_addr = 0;
+            if(Bit.test(bg_idx, 7)) {
+                tile_addr = 0x0800;
+            }
+            else if(!Bit.test(reg(LCDC), 4)) {
+                tile_addr = 0x1000;
+            }
 
-//     for(int y = 0; y < 64; y++) {
-//         for(int x = 0; x < 128; x++) {
-//             u8 byte = map[(y*128) + x];
-//             //std::cout << "x,y: d " << x << " " << y << ": " << as_hex(byte) << std::endl;
+            tile_addr +=
+                    ((bg_idx & 0x7F) << 4) |
+                    ((y & 0x7) << 1);
 
-//             switch(byte) {
-//             case 0:
-//                 output_file << "255 255 255 ";
-//                 break;
-//             case 1:
-//                 output_file << "0 0 0 ";
-//                 break;
-//             case 2:
-//                 output_file << "0 0 0 ";
-//                 break;
-//             case 3:
-//                 output_file << "0 0 0 ";
-//                 break;
-//             }
-//         }
-//     }
-// }
+            u8 byte_1 = io->read_vram(0x8000 + tile_addr, true),
+               byte_2 = io->read_vram(0x8000 + tile_addr + 1, true);
+
+            for(int tile_x = 0; tile_x < 8; tile_x++) {
+                u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);
+                tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
+                tile_idx *= 2;
+
+                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], Video_Controller::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+            }
+        }
+    }
+}
+
+void GB_Core::getWNDBuffer(u8 *buf) {
+    #define reg(X) (io->registers.X)
+
+    for(int y = 0; y < 256; y++) {
+        for(int x = 0; x < 32; x++) {
+
+            u8 y_tile = y / 8;
+
+            u16 base = Bit.test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
+            u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
+
+            u16 tile_addr = 0;
+            if(Bit.test(bg_idx, 7)) {
+                tile_addr = 0x0800;
+            }
+            else if(!Bit.test(reg(LCDC), 4)) {
+                tile_addr = 0x1000;
+            }
+
+            tile_addr +=
+                    ((bg_idx & 0x7F) << 4) |
+                    ((y & 0x7) << 1);
+
+            u8 byte_1 = io->read_vram(0x8000 + tile_addr, true),
+               byte_2 = io->read_vram(0x8000 + tile_addr + 1, true);
+
+            for(int tile_x = 0; tile_x < 8; tile_x++) {
+                u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);
+                tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
+                tile_idx *= 2;
+
+                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], Video_Controller::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+            }
+        }
+    }
+}

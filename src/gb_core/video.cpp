@@ -10,19 +10,19 @@
 
 #define reg(X) (io->registers.X)
 
-#define LCD_ENABLED         (Bit.test(reg(LCDC), 7))
-#define WINDOW_TILE_MAP     (Bit.test(reg(LCDC), 6))
-#define WINDOW_ENABLED      (Bit.test(reg(LCDC), 5))
-#define BG_WND_TILE_DATA    (Bit.test(reg(LCDC), 4))
-#define BG_TILE_MAP         (Bit.test(reg(LCDC), 3))
-#define BIG_SPRITES         (Bit.test(reg(LCDC), 2))
-#define OBJ_ENABLED         (Bit.test(reg(LCDC), 1))
-#define BG_WND_BLANK        (Bit.test(reg(LCDC), 0)) //TODO: DMG only
+#define LCD_ENABLED          (Bit.test(reg(LCDC), 7))
+#define WINDOW_TILE_MAP      (Bit.test(reg(LCDC), 6))
+#define WINDOW_ENABLED       (Bit.test(reg(LCDC), 5))
+#define BG_WND_TILE_DATA     (Bit.test(reg(LCDC), 4))
+#define BG_TILE_MAP          (Bit.test(reg(LCDC), 3))
+#define BIG_SPRITES          (Bit.test(reg(LCDC), 2))
+#define OBJ_ENABLED          (Bit.test(reg(LCDC), 1))
+#define BG_WND_ENABLED       (Bit.test(reg(LCDC), 0)) //TODO: DMG only
 
-#define OBJ_PRIORITY(obj)   (Bit.test((obj).attrs, 7))
-#define OBJ_Y_FLIP(obj)     (Bit.test((obj).attrs, 6))
-#define OBJ_X_FLIP(obj)     (Bit.test((obj).attrs, 5))
-#define OBJ_PALLETTE_1(obj) (Bit.test((obj).attrs, 4)) //false if obj pallette 0
+#define OBJ_BG_PRIORITY(obj) (Bit.test((obj).attrs, 7))
+#define OBJ_Y_FLIP(obj)      (Bit.test((obj).attrs, 6))
+#define OBJ_X_FLIP(obj)      (Bit.test((obj).attrs, 5))
+#define OBJ_PALLETTE_1(obj)  (Bit.test((obj).attrs, 4)) //false if obj pallette 0
 
 Video_Controller::Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
@@ -109,7 +109,7 @@ bool Video_Controller::ppu_tick() {
      */
     if(new_line) {
         new_line = false;
-        start_of_line = true;
+        skip_fetch = true;
 
         if(first_line) {
             first_line = false;
@@ -143,13 +143,13 @@ bool Video_Controller::ppu_tick() {
 
             bg_map_addr =
                 (0x9800) |
-                ((BG_TILE_MAP == TILE_MAP_1) ? 0 : 0x0400) |
-                ((u16)((y_line+y_sc) & 0xf8) << 2) |
+                ((BG_TILE_MAP) ? 0x0400 : 0) |
+                (((y_line+y_sc) & 0xf8) << 2) |
                 (x_sc >> 3);
 
             wnd_map_addr =
                 0x9800 |
-                ((WINDOW_TILE_MAP == TILE_MAP_1) ? 0 : 0x0400) |
+                ((WINDOW_TILE_MAP) ? 0x0400 : 0) |
                 ((y_line + y_sc) & 0xf8) << 2;
 
         } else if(y_line < 154) {
@@ -263,7 +263,7 @@ bool Video_Controller::ppu_tick() {
 
             //increment bg_map_addr, but only the bottom 5 bits.
             // this will wrap around the edge of the tile map
-            if(!start_of_line) {
+            if(!skip_fetch) {
                 bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
             }
 
@@ -272,12 +272,12 @@ bool Video_Controller::ppu_tick() {
 
         // Background map clk 2
         case BM_1:
-            tile_addr = 0;
+            tile_addr = 0x8000;
             if(Bit.test(bg_map_byte, 7)) {
-                tile_addr = 0x0800;
+                tile_addr += 0x0800;
             }
-            else if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) {
-                tile_addr = 0x1000;
+            else if(!BG_WND_TILE_DATA) {
+                tile_addr += 0x1000;
             }
 
             tile_addr +=
@@ -298,12 +298,12 @@ bool Video_Controller::ppu_tick() {
 
         // window map clk 2
         case WM_1:
-            tile_addr = 0;
+            tile_addr = 0x8000;
             if(Bit.test(wnd_map_byte, 7)) {
-                tile_addr = 0x0800;
+                tile_addr += 0x0800;
             }
-            else if(BG_WND_TILE_DATA == Video_Controller::MODE_2_1) {
-                tile_addr = 0x1000;
+            else if(!BG_WND_TILE_DATA) {
+                tile_addr += 0x1000;
             }
 
             tile_addr +=
@@ -315,7 +315,7 @@ bool Video_Controller::ppu_tick() {
 
         // tile data 1 clk 1
         case TD_0_0:
-            tile_byte_1 = io->read_vram(0x8000 + tile_addr, true);
+            tile_byte_1 = io->read_vram(tile_addr, true);
             tile_addr++;
 
             vram_fetch_step = TD_0_1;
@@ -329,7 +329,7 @@ bool Video_Controller::ppu_tick() {
 
         // tile data 2 clk 1
         case TD_1_0:
-            tile_byte_2 = io->read_vram(0x8000 + tile_addr, true);
+            tile_byte_2 = io->read_vram(tile_addr, true);
             tile_addr++;
 
             vram_fetch_step = TD_1_1;
@@ -338,10 +338,10 @@ bool Video_Controller::ppu_tick() {
         // tile data 2 clk 2
         case TD_1_1:
             //Do nothing
-            if(start_of_line) {
+            if(skip_fetch) {
                 // According to the NGVT doc, we perform a fetch and
-                // toss the result at the start of the line
-                start_of_line = false;
+                // toss the result at the start of a new fetch sequence
+                skip_fetch = false;
 
                 vram_fetch_step = BM_0;
             } else {
@@ -362,9 +362,15 @@ bool Video_Controller::ppu_tick() {
                 obj_sprite_t curr_sprite = *(displayed_sprites.end() - 1);
                 displayed_sprites.erase(displayed_sprites.end() - 1);
 
-                u8 pixel_line = y_line - (curr_sprite.pos_y - 16);
+                s8 pixel_line = y_line - (curr_sprite.pos_y - 16);
+                u8 tile_num = curr_sprite.tile_num & (BIG_SPRITES ? ~1 : ~0);
+
+                if (OBJ_Y_FLIP(curr_sprite)) {
+                    pixel_line = (BIG_SPRITES ? 15 : 7) - pixel_line;
+                }
+
                 u16 addr = 0x8000 |
-                            (curr_sprite.tile_num << 4) |
+                            (tile_num << 4) |
                             (pixel_line << 1);
 
                 u8 sprite_tile_1 = io->read_vram(addr, true),
@@ -373,19 +379,24 @@ bool Video_Controller::ppu_tick() {
                 u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
                 for(int i = 0; i < 8; i++) {
-                    u8 tile_idx = ((sprite_tile_1 >> (7 - i)) & 1);
-                    tile_idx   |= ((sprite_tile_2 >> (7 - i)) & 1) << 1;
+                    u8 pix_idx = i;
+                    if (OBJ_X_FLIP(curr_sprite)) {
+                        pix_idx = 7 - pix_idx;
+                    }
+
+                    u8 tile_idx = ((sprite_tile_1 >> (7 - pix_idx)) & 1);
+                    tile_idx   |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
                     tile_idx *= 2;
 
-                    u8 color = TRANSPARENT;
-                    if(tile_idx != 0) {
-                        color = (pallette >> tile_idx) & 0x3;
-                    }
+                    sprite_fifo_color_t color{};
+                    color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
+                    color.is_transparent = tile_idx == 0;
+                    color.bg_priority = OBJ_BG_PRIORITY(curr_sprite);
 
                     if(sp_fifo->size() > i) {
                         //lower idx sprites have priority, only replace pixels
                         // if one is transparent
-                        if(color != TRANSPARENT && sp_fifo->at(i) == 4) {
+                        if(!color.is_transparent && sp_fifo->at(i).is_transparent) {
                             sp_fifo->replace(i, color);
                         }
                     }
@@ -404,7 +415,7 @@ bool Video_Controller::ppu_tick() {
                 if(bg_fifo->size() == 0) {
                     for(int i = 0; i < 8; i++) {
                         u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
-                        tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1; 
+                        tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
                         tile_idx *= 2;
 
                         u8 color = (reg(BGP) >> tile_idx) & 0x3;
@@ -431,23 +442,34 @@ bool Video_Controller::ppu_tick() {
         /**
          * Actual PPU logic
          */
-        // std::cout << "fifo " << bg_fifo->size() << " " << vram_fetch_step << std::endl;
         if(bg_fifo->size() > 0 && !pause_bg_fifo) {
             u8 color_idx = bg_fifo->dequeue();
 
-            if(sp_fifo->size() > 0) {
-                u8 s_color_idx = sp_fifo->dequeue();
+            //if background is disabled, force write a 0
+            if(!BG_WND_ENABLED) {
+                color_idx = 0;
+            }
 
-                if(s_color_idx != TRANSPARENT) {
-                    color_idx = s_color_idx;
+            //if drawing a sprite, dequeue a sprite pixel
+            if(sp_fifo->size() > 0) {
+                sprite_fifo_color_t s_color = sp_fifo->dequeue();
+
+                //if the color in the sprite pixel isn't transparent
+                // or has priority, replace the background color
+                if(!s_color.is_transparent) {
+                    if(!s_color.bg_priority || color_idx == 0) {
+                        color_idx = s_color.color_idx;
+                    }
                 }
             }
 
+            // if frame is disabled, don't draw pixel data
             if(!frame_disable) {
                 memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
                 current_byte += 3;
             }
 
+            //after drawing a pixel, increase current x line
             x_line++;
 
             if(OBJ_ENABLED ) {
@@ -462,7 +484,8 @@ bool Video_Controller::ppu_tick() {
                 }
             }
 
-            if(x_line == reg(WX) && WINDOW_ENABLED) {
+            if(WINDOW_ENABLED && x_line == (reg(WX) - 7) && !in_window) {
+                std::cout << "starting window at: " << as_hex(x_line) << "," << as_hex(y_line) << ": map" << (WINDOW_TILE_MAP ? "0x9C00" : "0x9800") << " tile" << (BG_WND_TILE_DATA ? "0x8800-0x9000" : "0x8000-0x8800") << std::endl;
                 in_window = true;
                 vram_fetch_step = WM_1;
                 bg_fifo->clear();
