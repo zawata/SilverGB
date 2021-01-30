@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     #ifdef __linux__
         rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
     #elif _WIN32
-        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\dmg-acid2.gb");
+        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
     #else
 
     #endif

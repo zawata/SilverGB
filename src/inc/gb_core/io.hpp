@@ -98,7 +98,7 @@ public:
         //Interupt Flags
         u8 IF;
 
-        //Video
+        //ppu
         u8 LCDC;
         u8 STAT;
         u8 SCY;
@@ -141,7 +141,7 @@ private:
 
     std::vector<u8> work_ram;
     std::vector<u8> high_ram;
-    std::vector<u8> video_ram_char;
-    std::vector<u8> video_ram_back;
+    std::vector<u8> ppu_ram_char;
+    std::vector<u8> ppu_ram_back;
     std::vector<u8> oam_ram;
 };

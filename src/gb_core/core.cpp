@@ -3,7 +3,7 @@
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/input.hpp"
-#include "gb_core/video.hpp"
+#include "gb_core/ppu.hpp"
 #include "util/bit.hpp"
 
 GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
@@ -12,7 +12,7 @@ GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
     cart = new Cartridge(rom);
     io = new IO_Bus(cart, false, bootrom);
     cpu = new CPU(io, bootrom != nullptr);
-    vpu = new Video_Controller(io, screen_buffer, bootrom != nullptr);
+    vpu = new PPU(io, screen_buffer, bootrom != nullptr);
 }
 
 GB_Core::~GB_Core() {
@@ -107,7 +107,7 @@ u8 const* GB_Core::getScreenBuffer() {
 std::vector<u8> GB_Core::getOAMEntry(int index) {
     if(index >= 40 ) { return {}; }
 
-    Video_Controller::obj_sprite_t sprite = vpu->oam_fetch_sprite(index);
+    PPU::obj_sprite_t sprite = vpu->oam_fetch_sprite(index);
 
     u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
 
@@ -121,7 +121,7 @@ std::vector<u8> GB_Core::getOAMEntry(int index) {
             u8 out_color = ((b1 >> (7 - i)) & 1);
             out_color   |= ((b2 >> (7 - i)) & 1) << 1;
 
-            const u8 *pixel_colors = Video_Controller::pixel_colors[(pallette >> (out_color * 2)) & 0x3];
+            const u8 *pixel_colors = PPU::pixel_colors[(pallette >> (out_color * 2)) & 0x3];
             ret_vec.push_back(pixel_colors[0]);
             ret_vec.push_back(pixel_colors[1]);
             ret_vec.push_back(pixel_colors[2]);
@@ -177,7 +177,7 @@ void GB_Core::getBGBuffer(u8 *buf) {
                 tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
                 tile_idx *= 2;
 
-                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], Video_Controller::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
             }
         }
     }
@@ -214,7 +214,7 @@ void GB_Core::getWNDBuffer(u8 *buf) {
                 tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
                 tile_idx *= 2;
 
-                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], Video_Controller::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
             }
         }
     }

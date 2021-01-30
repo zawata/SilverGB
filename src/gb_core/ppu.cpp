@@ -1,9 +1,10 @@
+#include <cassert>
 #include <cstring>
 #include <iostream>
 
 #include "gb_core/defs.hpp"
 #include "gb_core/io_reg.hpp"
-#include "gb_core/video.hpp"
+#include "gb_core/ppu.hpp"
 
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -24,7 +25,7 @@
 #define OBJ_X_FLIP(obj)      (Bit.test((obj).attrs, 5))
 #define OBJ_PALLETTE_1(obj)  (Bit.test((obj).attrs, 4)) //false if obj pallette 0
 
-Video_Controller::Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
+PPU::PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
 screen_buffer(scrn_buf) {
     if(!bootrom_enabled) {
@@ -36,9 +37,9 @@ screen_buffer(scrn_buf) {
     }
 }
 
-Video_Controller::~Video_Controller() {}
+PPU::~PPU() {}
 
-bool Video_Controller::tick() {
+bool PPU::tick() {
     io->dma_tick();
     return ppu_tick();
 }
@@ -47,10 +48,10 @@ bool Video_Controller::tick() {
  * Internal Stuff
  */
 
-Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
+PPU::obj_sprite_t PPU::oam_fetch_sprite(int index) {
     int loc = 0xFE00 + (index * 4);
 
-    Video_Controller::obj_sprite_t o;
+    PPU::obj_sprite_t o;
     return o = {
             io->read_oam(loc + 0, true),
             io->read_oam(loc + 1, true),
@@ -58,13 +59,61 @@ Video_Controller::obj_sprite_t Video_Controller::oam_fetch_sprite(int index) {
             io->read_oam(loc + 3, true)};
 }
 
+void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
+    s8 pixel_line = y_line - (curr_sprite.pos_y - 16);
+    u8 tile_num = curr_sprite.tile_num & (BIG_SPRITES ? ~1 : ~0);
+
+    if (OBJ_Y_FLIP(curr_sprite)) {
+        pixel_line = (BIG_SPRITES ? 15 : 7) - pixel_line;
+    }
+
+    u16 addr = 0x8000 |
+                (tile_num << 4) |
+                (pixel_line << 1);
+
+    u8 sprite_tile_1 = io->read_vram(addr, true),
+        sprite_tile_2 = io->read_vram(addr + 1, true);
+
+    u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
+
+    for(int i = 0; i < 8; i++) {
+        u8 pix_idx = i;
+        if (OBJ_X_FLIP(curr_sprite)) {
+            pix_idx = 7 - pix_idx;
+        }
+
+        u8 tile_idx = ((sprite_tile_1 >> (7 - pix_idx)) & 1);
+        tile_idx   |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
+        tile_idx *= 2;
+
+        sprite_fifo_color_t color{};
+        color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
+        color.is_transparent = tile_idx == 0;
+        color.bg_priority = OBJ_BG_PRIORITY(curr_sprite);
+
+        if(sp_fifo->size() > i) {
+            //lower idx sprites have priority, only replace pixels
+            // if one is transparent
+            if(!color.is_transparent && sp_fifo->at(i).is_transparent) {
+                sp_fifo->replace(i, color);
+            }
+        }
+        else {
+            sp_fifo->enqueue(color);
+        }
+    }
+}
+
+bool PPU::ppu_tick() {
 /**
  * TODO:
- * looks like the GB Die has finally been extracted so eventually it would be wise
+ *  - Looks like the GB Die has finally been extracted so eventually it would be wise
  * to decode the PPU logic into here
+ *
+ *  - How many of the PPU variables can we make static?
  */
-bool Video_Controller::ppu_tick() {
-    //TODO: How many of the PPU variables can we make static?
+
+    //TODO: 
 
     if(!LCD_ENABLED) {
         //TODO: detail any further behavior?
@@ -359,54 +408,11 @@ bool Video_Controller::ppu_tick() {
         // sprite data clk 2
         case SP_1:
             if(displayed_sprites.size() > 0) {
-                obj_sprite_t curr_sprite = *(displayed_sprites.end() - 1);
+                enqueue_sprite_data(*(displayed_sprites.end() - 1));
                 displayed_sprites.erase(displayed_sprites.end() - 1);
 
-                s8 pixel_line = y_line - (curr_sprite.pos_y - 16);
-                u8 tile_num = curr_sprite.tile_num & (BIG_SPRITES ? ~1 : ~0);
-
-                if (OBJ_Y_FLIP(curr_sprite)) {
-                    pixel_line = (BIG_SPRITES ? 15 : 7) - pixel_line;
-                }
-
-                u16 addr = 0x8000 |
-                            (tile_num << 4) |
-                            (pixel_line << 1);
-
-                u8 sprite_tile_1 = io->read_vram(addr, true),
-                   sprite_tile_2 = io->read_vram(addr + 1, true);
-
-                u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
-
-                for(int i = 0; i < 8; i++) {
-                    u8 pix_idx = i;
-                    if (OBJ_X_FLIP(curr_sprite)) {
-                        pix_idx = 7 - pix_idx;
-                    }
-
-                    u8 tile_idx = ((sprite_tile_1 >> (7 - pix_idx)) & 1);
-                    tile_idx   |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
-                    tile_idx *= 2;
-
-                    sprite_fifo_color_t color{};
-                    color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
-                    color.is_transparent = tile_idx == 0;
-                    color.bg_priority = OBJ_BG_PRIORITY(curr_sprite);
-
-                    if(sp_fifo->size() > i) {
-                        //lower idx sprites have priority, only replace pixels
-                        // if one is transparent
-                        if(!color.is_transparent && sp_fifo->at(i).is_transparent) {
-                            sp_fifo->replace(i, color);
-                        }
-                    }
-                    else {
-                        sp_fifo->enqueue(color);
-                    }
-                }
-            }
-
-            if(displayed_sprites.empty()) {
+                vram_fetch_step = SP_0;
+            } else {
                 pause_bg_fifo = false;
 
                 // on the 8th clk of a BO1S cycle, shift in bg pixels,
@@ -430,13 +436,13 @@ bool Video_Controller::ppu_tick() {
                         vram_fetch_step = BM_0;
                     }
                 }
-            } else {
-                vram_fetch_step = SP_0;
             }
             break;
 
         default:
+            //invalid VRAM fetch step
             std::cerr << "vram step error" << vram_fetch_step << std::endl;
+            assert(false);
         }
 
         /**
@@ -485,7 +491,7 @@ bool Video_Controller::ppu_tick() {
             }
 
             if(WINDOW_ENABLED && x_line == (reg(WX) - 7) && !in_window) {
-                std::cout << "starting window at: " << as_hex(x_line) << "," << as_hex(y_line) << ": map" << (WINDOW_TILE_MAP ? "0x9C00" : "0x9800") << " tile" << (BG_WND_TILE_DATA ? "0x8800-0x9000" : "0x8000-0x8800") << std::endl;
+                //std::cout << "starting window at: " << as_hex(x_line) << "," << as_hex(y_line) << ": map" << (WINDOW_TILE_MAP ? "0x9C00" : "0x9800") << " tile" << (BG_WND_TILE_DATA ? "0x8800-0x9000" : "0x8000-0x8800") << std::endl;
                 in_window = true;
                 vram_fetch_step = WM_1;
                 bg_fifo->clear();

@@ -21,7 +21,7 @@
 #define STAT_COIN_BIT       2
 #define STAT_MODE_FLAG      (0x3)
 
-class Video_Controller {
+class PPU {
 public:
     enum {
         SCANLINE_OAM  = 2,
@@ -65,12 +65,14 @@ public:
         {0x00, 0x00, 0x00}, // black
     };
 
-    Video_Controller(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
-    ~Video_Controller();
+    PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
+    ~PPU();
 
     bool tick();
 
     obj_sprite_t oam_fetch_sprite(int index);
+    void enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite);
+
     bool ppu_tick();
 
 private:

@@ -6,4 +6,4 @@ add_library(gb_core
 		"cpu_disassem.cpp"
 		"input.cpp"
 		"io.cpp"
-		"video.cpp")
+		"ppu.cpp")

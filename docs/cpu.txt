@@ -1,12 +1,12 @@
 The CPU
 
-The CPU is slightly customized Intel 8080 with some nifty features from the zilog z80.
+The GB CPU is slightly customized Intel 8080 with some nifty features from the zilog z80.
 
-The 8080 was the precursor to the 8086 which was the precursor to the 8086,
+The 8080 was the precursor to the 8084 which was the precursor to the 8086,
     the starting point of the x86 CPU architecture
 
 The zilog z80 is still in use today, the most common application I see for it is
-    the Texas Instrument's Graphic Calculators. All of them (Ti-81+) use the z80 as 
+    the Texas Instrument's Graphic Calculators. All of them (Ti-81+) use the z80 as
     their CPU
 
 
@@ -20,11 +20,7 @@ Execution is as follows:
     There are between 3 and 5 T-cycles per M-Cycle depending on the complexity of the M-Cycle
 
 
- - T-Cycle may not be neccessary to emulate as no additional execution may happen
-    to the level of a T-Cycle.
-
-
-The M-Cycles
+The T-Cycles
     1. FETCH
         The first and most obvious of the M-Cycles, FETCH, is the retrieval and
         decoding the OpCode.

@@ -57,15 +57,15 @@ bootrom_mode(bios_file != nullptr) {
 
     if(gbc_mode) {
         work_ram.resize(GBC_WORK_RAM_SIZE);
-        video_ram_char.resize(GBC_VRAM_CHAR_SIZE);
+        ppu_ram_char.resize(GBC_VRAM_CHAR_SIZE);
     }
     else {
         work_ram.resize(DMG_WORK_RAM_SIZE);
-        video_ram_char.resize(DMG_VRAM_CHAR_SIZE);
+        ppu_ram_char.resize(DMG_VRAM_CHAR_SIZE);
     }
 
     high_ram.resize(HIGH_RAM_SIZE);
-    video_ram_back.resize(VRAM_BACK_SIZE);
+    ppu_ram_back.resize(VRAM_BACK_SIZE);
     oam_ram.resize(OAM_RAM_SIZE);
 }
 
@@ -99,7 +99,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         return cart->read(offset); //cart will handle banking
     }
     else if(offset <= 0x9FFF) {
-    // 8KB Video RAM (VRAM)
+    // 8KB ppu RAM (VRAM)
         return read_vram(offset);
     }
     else if(offset <= 0xBFFF) {
@@ -164,7 +164,7 @@ void IO_Bus::write(u16 offset, u8 data) {
         return;
     }
     else if(offset <= 0x9FFF) {
-    // 8KB Video RAM (VRAM)
+    // 8KB ppu RAM (VRAM)
         write_vram(offset, data);
         return;
     }
@@ -447,14 +447,14 @@ u8 IO_Bus::read_vram(u16 offset, bool bypass) {
 
         if(offset < VRAM_BANK_SIZE) {
             if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
-                return video_ram_char[VRAM_BANK_SIZE + offset];
+                return ppu_ram_char[VRAM_BANK_SIZE + offset];
             }
             else {
-                return video_ram_char[offset];
+                return ppu_ram_char[offset];
             }
         }
         else {
-            return video_ram_back[offset-VRAM_BANK_SIZE];
+            return ppu_ram_back[offset-VRAM_BANK_SIZE];
         }
     }
     else {
@@ -469,14 +469,14 @@ void IO_Bus::write_vram(u16 offset, u8 data) {
 
         if(offset < VRAM_BANK_SIZE) {
             if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
-                video_ram_char[VRAM_BANK_SIZE + offset] = data;
+                ppu_ram_char[VRAM_BANK_SIZE + offset] = data;
             }
             else {
-                video_ram_char[offset] = data;
+                ppu_ram_char[offset] = data;
             }
         }
         else {
-            video_ram_back[offset-VRAM_BANK_SIZE] = data;
+            ppu_ram_back[offset-VRAM_BANK_SIZE] = data;
         }
     }
     else {
@@ -580,7 +580,7 @@ void IO_Bus::request_interrupt(IO_Bus::Interrupt i) {
     registers.IF |= i;
 }
 
-//called by Video_Controller
+//called by ppu_Controller
 void IO_Bus::dma_tick() {
     if(dma_start) {
         dma_start = false;

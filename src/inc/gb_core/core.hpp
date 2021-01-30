@@ -3,7 +3,7 @@
 #include "util/file.hpp"
 #include "gb_core/cpu.hpp"
 #include "gb_core/io.hpp"
-#include "gb_core/video.hpp"
+#include "gb_core/ppu.hpp"
 
 #include <thread>
 #include <atomic>
@@ -51,7 +51,7 @@ private:
     Cartridge *cart;
     IO_Bus *io;
     CPU *cpu;
-    Video_Controller *vpu;
+    PPU *vpu;
 
     u8 *screen_buffer = NULL;
 
