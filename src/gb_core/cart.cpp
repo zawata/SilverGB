@@ -51,6 +51,9 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
             if((ram_file = Silver::File::createFile(ram_file_name)) == nullptr) {
                 ram_file = Silver::File::openFile(ram_file_name);
             }
+            else {
+                goto ContinueLoad;
+            }
 
             //check that file could be opened
             if(!ram_file) {
@@ -61,6 +64,7 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
 
             //check that file size matches cart ram size
             auto ram_size = ram_file->getSize();
+            std::cout << "file: " << ram_size << " ram: " << getRAMSize() << std::endl;
             if(ram_size != getRAMSize()) {
                 std::cerr << "Ram File " << ram_file_name << " does not match cart type" << std::endl
                           << "Data will not be loaded" << std::endl;
@@ -111,7 +115,10 @@ ContinueLoad:
     }
 }
 
-Cartridge::~Cartridge() = default;
+Cartridge::~Cartridge() = {
+    //get ram file name
+            std::string ram_file_name = get_ram_file_name(rom_file->getFilename());
+};
 
 bool Cartridge::checkMagicNumber() {
     u8 buf[Cartridge_Constants::MAGIC_NUM_LENGTH];

@@ -1,10 +1,10 @@
 #if 0
 #include "util/ints.hpp"
 
-#define C_FLAG (Bit.test(AF.b_AF.i_F, 3))
-#define H_FLAG (Bit.test(AF.b_AF.i_F, 2))
-#define N_FLAG (Bit.test(AF.b_AF.i_F, 1))
-#define Z_FLAG (Bit.test(AF.b_AF.i_F, 0))
+#define C_FLAG (Bit::test(AF.b_AF.i_F, 3))
+#define H_FLAG (Bit::test(AF.b_AF.i_F, 2))
+#define N_FLAG (Bit::test(AF.b_AF.i_F, 1))
+#define Z_FLAG (Bit::test(AF.b_AF.i_F, 0))
 
 #define A_REG  (AF.b_AF.A)
 #define F_REG  (AF.b_AF.i_F)

@@ -112,7 +112,7 @@ std::vector<u8> GB_Core::getOAMEntry(int index) {
     u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
 
     std::vector<u8> ret_vec;
-    u8 pallette = io->read_reg( Bit.test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
+    u8 pallette = io->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
     for( int i = 0; i < 16; i += 2 ) {
         u8 b1 = io->read_oam(base_addr | i),
            b2 = io->read_oam(base_addr | i + 1);
@@ -154,14 +154,14 @@ void GB_Core::getBGBuffer(u8 *buf) {
 
             u8 y_tile = y / 8;
 
-            u16 base = Bit.test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
+            u16 base = Bit::test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
             u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
 
             u16 tile_addr = 0;
-            if(Bit.test(bg_idx, 7)) {
+            if(Bit::test(bg_idx, 7)) {
                 tile_addr = 0x0800;
             }
-            else if(!Bit.test(reg(LCDC), 4)) {
+            else if(!Bit::test(reg(LCDC), 4)) {
                 tile_addr = 0x1000;
             }
 
@@ -191,14 +191,14 @@ void GB_Core::getWNDBuffer(u8 *buf) {
 
             u8 y_tile = y / 8;
 
-            u16 base = Bit.test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
+            u16 base = Bit::test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
             u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
 
             u16 tile_addr = 0;
-            if(Bit.test(bg_idx, 7)) {
+            if(Bit::test(bg_idx, 7)) {
                 tile_addr = 0x0800;
             }
-            else if(!Bit.test(reg(LCDC), 4)) {
+            else if(!Bit::test(reg(LCDC), 4)) {
                 tile_addr = 0x1000;
             }
 

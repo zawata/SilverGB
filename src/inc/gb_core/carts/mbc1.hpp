@@ -38,7 +38,7 @@ struct MBC1_Controller : public MBC1_Base {
             addl_bank_num = data & 0x03;
         }
         else if(bounded(offset, 0x6000_u16, 0x7FFF_u16)) {
-            bool set = Bit.test(data, 0);
+            bool set = Bit::test(data, 0);
 
             using namespace Cartridge_Constants;
             if(rom_data.size() >= Cartridge_Constants::ROM_SZ_1M) {

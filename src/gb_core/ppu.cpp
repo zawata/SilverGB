@@ -11,19 +11,40 @@
 
 #define reg(X) (io->registers.X)
 
-#define LCD_ENABLED          (Bit.test(reg(LCDC), 7))
-#define WINDOW_TILE_MAP      (Bit.test(reg(LCDC), 6))
-#define WINDOW_ENABLED       (Bit.test(reg(LCDC), 5))
-#define BG_WND_TILE_DATA     (Bit.test(reg(LCDC), 4))
-#define BG_TILE_MAP          (Bit.test(reg(LCDC), 3))
-#define BIG_SPRITES          (Bit.test(reg(LCDC), 2))
-#define OBJ_ENABLED          (Bit.test(reg(LCDC), 1))
-#define BG_WND_ENABLED       (Bit.test(reg(LCDC), 0)) //TODO: DMG only
+#define LCDC_LCD_ENABLED_BIT      7
+#define LCDC_WINDOW_TILE_MAP_BIT  6
+#define LCDC_WINDOW_ENABLED_BIT   5
+#define LCDC_BG_WND_TILE_DATA_BIT 4
+#define LCDC_BG_TILE_MAP_BIT      3
+#define LCDC_BIG_SPRITES_BIT      2
+#define LCDC_OBJ_ENABLED_BIT      1
+#define LCDC_BG_ENABLED_BIT   0
 
-#define OBJ_BG_PRIORITY(obj) (Bit.test((obj).attrs, 7))
-#define OBJ_Y_FLIP(obj)      (Bit.test((obj).attrs, 6))
-#define OBJ_X_FLIP(obj)      (Bit.test((obj).attrs, 5))
-#define OBJ_PALLETTE_1(obj)  (Bit.test((obj).attrs, 4)) //false if obj pallette 0
+#define OBG_BG_PRIORITY_BIT   7
+#define OBG_Y_FLIP_BIT        6
+#define OBG_X_FLIP_BIT        5
+#define OBG_GB_PALLETTE_BIT   4
+
+#define STAT_COIN_INT_BIT   6
+#define STAT_MODE_2_INT_BIT 5
+#define STAT_MODE_1_INT_BIT 4
+#define STAT_MODE_0_INT_BIT 3
+#define STAT_COIN_BIT       2
+#define STAT_MODE_FLAG      (0x3)
+
+#define LCDC_LCD_ENABLED          (Bit::test(reg(LCDC), LCDC_LCD_ENABLED_BIT))
+#define LCDC_WINDOW_TILE_MAP      (Bit::test(reg(LCDC), LCDC_WINDOW_TILE_MAP_BIT))
+#define LCDC_WINDOW_ENABLED       (Bit::test(reg(LCDC), LCDC_WINDOW_ENABLED_BIT))
+#define LCDC_BG_WND_TILE_DATA     (Bit::test(reg(LCDC), LCDC_BG_WND_TILE_DATA_BIT))
+#define LCDC_BG_TILE_MAP          (Bit::test(reg(LCDC), LCDC_BG_TILE_MAP_BIT))
+#define LCDC_BIG_SPRITES          (Bit::test(reg(LCDC), LCDC_BIG_SPRITES_BIT))
+#define LCDC_OBJ_ENABLED          (Bit::test(reg(LCDC), LCDC_OBJ_ENABLED_BIT))
+#define LCDC_BG_ENABLED           (Bit::test(reg(LCDC), LCDC_BG_ENABLED_BIT)) //TODO: DMG only
+
+#define OBJ_BG_PRIORITY(obj) (Bit::test((obj).attrs, OBG_BG_PRIORITY_BIT))
+#define OBJ_Y_FLIP(obj)      (Bit::test((obj).attrs, OBG_Y_FLIP_BIT))
+#define OBJ_X_FLIP(obj)      (Bit::test((obj).attrs, OBG_X_FLIP_BIT))
+#define OBJ_PALLETTE_1(obj)  (Bit::test((obj).attrs, OBG_GB_PALLETTE_BIT)) //false if obj pallette 0
 
 PPU::PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
@@ -35,6 +56,8 @@ screen_buffer(scrn_buf) {
 
        frame_clock_count = 0;
     }
+
+    wnd_enabled_bit = new Bit::BitWatcher<u8>(&reg(LCDC), LCDC_WINDOW_ENABLED_BIT);
 }
 
 PPU::~PPU() {}
@@ -60,11 +83,11 @@ PPU::obj_sprite_t PPU::oam_fetch_sprite(int index) {
 }
 
 void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
-    s8 pixel_line = y_line - (curr_sprite.pos_y - 16);
-    u8 tile_num = curr_sprite.tile_num & (BIG_SPRITES ? ~1 : ~0);
+    s8 pixel_line = y_cntr - (curr_sprite.pos_y - 16);
+    u8 tile_num = curr_sprite.tile_num & (LCDC_BIG_SPRITES ? ~1 : ~0);
 
     if (OBJ_Y_FLIP(curr_sprite)) {
-        pixel_line = (BIG_SPRITES ? 15 : 7) - pixel_line;
+        pixel_line = (LCDC_BIG_SPRITES ? 15 : 7) - pixel_line;
     }
 
     u16 addr = 0x8000 |
@@ -113,9 +136,7 @@ bool PPU::ppu_tick() {
  *  - How many of the PPU variables can we make static?
  */
 
-    //TODO: 
-
-    if(!LCD_ENABLED) {
+    if(!LCDC_LCD_ENABLED) {
         //TODO: detail any further behavior?
         reg(LY) = 0;
         reg(STAT) &= ~STAT_MODE_FLAG; //clear mode bits
@@ -126,6 +147,22 @@ bool PPU::ppu_tick() {
         frame_clock_count = 0;
 
         return false;
+    }
+
+    //check if video registers were written too:
+    /**TODO: we only do this in this way because we're trying to avoid cyclic dependencies and ppu has to access IO members.
+     *  this relationship can be reversed with the following changes:
+     * - moving interrupt handling to either the CPU or it's own class
+     * - move VRAM storage to PPU
+     * - find someway to continue to tick the DMA, maybe put it in either misc ticking or cpu.
+     **/
+    if(wnd_enabled_bit->risen()) {
+        std::cout << "wnd_enabled rising edge" << std::endl;
+        wnd_y_cntr = 0;
+        wnd_map_addr =
+            0x9800 |
+            ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
+            wnd_y_cntr << 2;
     }
 
     /**
@@ -145,8 +182,8 @@ bool PPU::ppu_tick() {
 
         current_byte = 0;
 
-        bg_map_addr = 0x9800;
-        y_line = 0;
+        wnd_y_cntr = 0;
+        y_cntr = 0;
         new_line = true;
         first_line = true;
 
@@ -163,25 +200,25 @@ bool PPU::ppu_tick() {
         if(first_line) {
             first_line = false;
         } else {
-            y_line++;
+            y_cntr++;
         }
 
-        x_line = 0;
+        x_cntr = 0;
+        pix_clock_count = 0;
         line_clock_count = 0;
 
         sprite_counter = 0;
+        active_sprites.clear();
+        displayed_sprites.clear();
 
         bg_fifo->clear();
         pause_bg_fifo = false;
 
-        active_sprites.clear();
-        displayed_sprites.clear();
-
         in_window = false;
 
-        reg(LY) = y_line; //set LY
+        reg(LY) = y_cntr; //set LY
 
-        if(y_line < 144) {
+        if(y_cntr < 144) {
             //lock scroll for the current line
             x_sc = reg(SCX);
             y_sc = reg(SCY);
@@ -192,27 +229,26 @@ bool PPU::ppu_tick() {
 
             bg_map_addr =
                 (0x9800) |
-                ((BG_TILE_MAP) ? 0x0400 : 0) |
-                (((y_line+y_sc) & 0xf8) << 2) |
+                ((LCDC_BG_TILE_MAP) ? 0x0400 : 0) |
+                (((y_cntr+y_sc) & 0xf8) << 2) |
                 (x_sc >> 3);
 
             wnd_map_addr =
                 0x9800 |
-                ((WINDOW_TILE_MAP) ? 0x0400 : 0) |
-                ((y_line + y_sc) & 0xf8) << 2;
-
-        } else if(y_line < 154) {
+                ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
+                (wnd_y_cntr & 0xf8) << 2;
+            
+        } else if(y_cntr < 154) {
             process_step = VBLANK;
-            //TODO: anything else?
         } else {
-            std::cerr << "y_line OOB: " << y_line << std::endl;
+            std::cerr << "y_cntr OOB: " << y_cntr << std::endl;
         }
     }
 
     /**
      * Occurs on every clock
      */
-    if(frame_disable && y_line == 0 && process_step == SCANLINE_OAM) {
+    if(frame_disable && y_cntr == 0 && process_step == SCANLINE_OAM) {
         //frame disable is true for the first frame after the LCD is reenabled.
 
         /**
@@ -232,23 +268,23 @@ bool PPU::ppu_tick() {
      * STAT Coin Bit sets instantaneously, but stat-IF isn't set until LY changes
      */
     if(reg(LY) == reg(LYC)) {
-        Bit.set(&reg(STAT), STAT_COIN_BIT);
+        Bit::set(&reg(STAT), STAT_COIN_BIT);
     } else {
-        Bit.reset(&reg(STAT), STAT_COIN_BIT);
+        Bit::reset(&reg(STAT), STAT_COIN_BIT);
     }
 
     bool coin_int =
-            Bit.test(reg(STAT), STAT_COIN_INT_BIT) &&
-            Bit.test(reg(STAT), STAT_COIN_BIT)     &&
+            Bit::test(reg(STAT), STAT_COIN_INT_BIT) &&
+            Bit::test(reg(STAT), STAT_COIN_BIT)     &&
             !coin_bit_signal                       &&
             old_LY != reg(LY);
     old_LY  = reg(LY);
-    coin_bit_signal = Bit.test(reg(STAT), STAT_COIN_BIT);
+    coin_bit_signal = Bit::test(reg(STAT), STAT_COIN_BIT);
 
     bool
-        mode2_int = (Bit.test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
-        mode1_int = (Bit.test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
-        mode0_int = (Bit.test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK),
+        mode2_int = (Bit::test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
+        mode1_int = (Bit::test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
+        mode0_int = (Bit::test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK),
         throw_stat =
             coin_int                                    ||
             (mode2_int && (mode2_int != old_mode2_int)) ||
@@ -278,8 +314,8 @@ bool PPU::ppu_tick() {
         case OAM_1:
             if(active_sprites.size() < 10 &&
             current_sprite.pos_x > 0 &&
-            y_line + 16 >= current_sprite.pos_y &&
-            y_line + 16 < current_sprite.pos_y + ((BIG_SPRITES) ? 16 : 8)) {
+            y_cntr + 16 >= current_sprite.pos_y &&
+            y_cntr + 16 < current_sprite.pos_y + ((LCDC_BIG_SPRITES) ? 16 : 8)) {
                 active_sprites.push_back(current_sprite);
             }
 
@@ -315,6 +351,7 @@ bool PPU::ppu_tick() {
             if(!skip_fetch) {
                 bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
             }
+            skip_fetch = false;
 
             vram_fetch_step = BM_1;
             break;
@@ -322,23 +359,22 @@ bool PPU::ppu_tick() {
         // Background map clk 2
         case BM_1:
             tile_addr = 0x8000;
-            if(Bit.test(bg_map_byte, 7)) {
+            if(Bit::test(bg_map_byte, 7)) {
                 tile_addr += 0x0800;
             }
-            else if(!BG_WND_TILE_DATA) {
+            else if(!LCDC_BG_WND_TILE_DATA) {
                 tile_addr += 0x1000;
             }
 
             tile_addr +=
                     ((bg_map_byte & 0x7F) << 4) |
-                    (((y_line + y_sc) & 0x7) << 1);
+                    (((y_cntr + y_sc) & 0x7) << 1);
 
             vram_fetch_step = TD_0_0;
             break;
 
         // window map clk 1
         case WM_0:
-
             wnd_map_byte = io->read_vram(wnd_map_addr, true);
             wnd_map_addr++;
 
@@ -348,16 +384,16 @@ bool PPU::ppu_tick() {
         // window map clk 2
         case WM_1:
             tile_addr = 0x8000;
-            if(Bit.test(wnd_map_byte, 7)) {
+            if(Bit::test(wnd_map_byte, 7)) {
                 tile_addr += 0x0800;
             }
-            else if(!BG_WND_TILE_DATA) {
+            else if(!LCDC_BG_WND_TILE_DATA) {
                 tile_addr += 0x1000;
             }
 
             tile_addr +=
                     ((wnd_map_byte & 0x7F) << 4) |
-                    (((y_line + y_sc) & 0x7) << 1);
+                    ((wnd_y_cntr & 0x7) << 1);
 
             vram_fetch_step = TD_0_0;
             break;
@@ -387,15 +423,7 @@ bool PPU::ppu_tick() {
         // tile data 2 clk 2
         case TD_1_1:
             //Do nothing
-            if(skip_fetch) {
-                // According to the NGVT doc, we perform a fetch and
-                // toss the result at the start of a new fetch sequence
-                skip_fetch = false;
-
-                vram_fetch_step = BM_0;
-            } else {
-                vram_fetch_step = SP_0;
-            }
+            vram_fetch_step = SP_0;
             break;
 
         // sprite data clk 1
@@ -415,8 +443,8 @@ bool PPU::ppu_tick() {
             } else {
                 pause_bg_fifo = false;
 
-                // on the 8th clk of a BO1S cycle, shift in bg pixels,
-                // this will no occur on subsequent sprite reads as the bg_fifo
+                // shift in bg pixels when the bg fifo is empty.
+                // this will not occur on subsequent sprite reads as the bg_fifo
                 // should be disabled until the sprite fetches are done
                 if(bg_fifo->size() == 0) {
                     for(int i = 0; i < 8; i++) {
@@ -424,9 +452,7 @@ bool PPU::ppu_tick() {
                         tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
                         tile_idx *= 2;
 
-                        u8 color = (reg(BGP) >> tile_idx) & 0x3;
-
-                        bg_fifo->enqueue(color);
+                        bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
                     }
 
                     if(in_window) {
@@ -452,7 +478,7 @@ bool PPU::ppu_tick() {
             u8 color_idx = bg_fifo->dequeue();
 
             //if background is disabled, force write a 0
-            if(!BG_WND_ENABLED) {
+            if(!LCDC_BG_ENABLED) {
                 color_idx = 0;
             }
 
@@ -469,43 +495,48 @@ bool PPU::ppu_tick() {
                 }
             }
 
-            // if frame is disabled, don't draw pixel data
-            if(!frame_disable) {
-                memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
-                current_byte += 3;
+            if (x_cntr > 8 + (x_sc & 0x7_u8)) {
+                pix_clock_count++;
+
+                // if frame is disabled, don't draw pixel data
+                if (!frame_disable) {
+                    memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
+                    current_byte += 3;
+                }
             }
 
-            //after drawing a pixel, increase current x line
-            x_line++;
 
-            if(OBJ_ENABLED ) {
+            if(LCDC_OBJ_ENABLED ) {
                 for(auto sprite : active_sprites) {
-                    if(x_line == sprite.pos_x - 8) {
+                    if(x_cntr == sprite.pos_x) {
+                        pause_bg_fifo = true;
                         displayed_sprites.push_back(sprite);
                     }
                 }
+            }
 
-                if(!displayed_sprites.empty()) {
-                    pause_bg_fifo = true;
+            if (!in_window) {
+                if (LCDC_WINDOW_ENABLED && x_cntr >= reg(WX) && y_cntr >= reg(WY)) {
+                    in_window = true;
+                    vram_fetch_step = WM_0;
+                    bg_fifo->clear();
                 }
             }
 
-            if(WINDOW_ENABLED && x_line == (reg(WX) - 7) && !in_window) {
-                //std::cout << "starting window at: " << as_hex(x_line) << "," << as_hex(y_line) << ": map" << (WINDOW_TILE_MAP ? "0x9C00" : "0x9800") << " tile" << (BG_WND_TILE_DATA ? "0x8800-0x9000" : "0x8000-0x8800") << std::endl;
-                in_window = true;
-                vram_fetch_step = WM_1;
-                bg_fifo->clear();
-            } else if(x_line == 160) {
+            if(pix_clock_count == 160) {
+                if (in_window) {
+                    wnd_y_cntr++;
+                }
                 process_step = HBLANK;
             }
+
+            x_cntr++;
         }
 
     /**
      * HBLANK
      */
     } else if(process_step == HBLANK) {
-        bg_fifo->clear();
-        sp_fifo->clear();
         if(line_clock_count >= 455) {
             new_line = true;
         }

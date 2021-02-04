@@ -346,7 +346,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
 #endif
         return snd->write_wavram(loc, data);
     case LCDC_REG :
-        if(!Bit.test(data, 7) && !check_mode(MODE_VBLANK))
+        if(!Bit::test(data, 7) && !check_mode(MODE_VBLANK))
             std::cerr << "LCD Disable outside VBLANK" << std::endl;
         registers.LCDC = data & LCDC_WRITE_MASK;
         break;

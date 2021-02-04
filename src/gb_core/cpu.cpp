@@ -91,10 +91,10 @@ CPU::registers_t CPU::getRegisters() {
 //TODO: stop
 bool CPU::tick() {
     new_div = io->cpu_inc_DIV();
-    if(Bit.fallen(old_div, new_div, 3)) on_div16();
-    if(Bit.fallen(old_div, new_div, 5)) on_div64();
-    if(Bit.fallen(old_div, new_div, 7)) on_div256();
-    if(Bit.fallen(old_div, new_div, 9)) on_div1024();
+    if(Bit::fallen(old_div, new_div, 3)) on_div16();
+    if(Bit::fallen(old_div, new_div, 5)) on_div64();
+    if(Bit::fallen(old_div, new_div, 7)) on_div256();
+    if(Bit::fallen(old_div, new_div, 9)) on_div1024();
     old_div = new_div;
 
     if(!inst_clocks) { //used to properly time the instruction execution
@@ -174,7 +174,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    // std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
+     //std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -1089,7 +1089,7 @@ u8 CPU::rla_r(u8 *r1) {
 //CHNZ
     u8 old_c = C_FLAG;
 
-    C_FLAG = Bit.test(*r1, 7);
+    C_FLAG = Bit::test(*r1, 7);
     H_FLAG = 0;
     N_FLAG = 0;
     Z_FLAG = 0;
@@ -1115,7 +1115,7 @@ u8 CPU::rra_r(u8 *r1) {
 
 u8 CPU::rlca_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit.test(*r1, 7);
+    C_FLAG = Bit::test(*r1, 7);
     H_FLAG = 0;
     N_FLAG = 0;
     Z_FLAG = 0;
@@ -1127,7 +1127,7 @@ u8 CPU::rlca_r(u8 *r1) {
 
 u8 CPU::rrca_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit.test(*r1, 0);
+    C_FLAG = Bit::test(*r1, 0);
     H_FLAG = 0;
     N_FLAG = 0;
     Z_FLAG = 0;
@@ -1139,7 +1139,7 @@ u8 CPU::rrca_r(u8 *r1) {
 
 u8 CPU::rlc_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit.test(*r1, 7);
+    C_FLAG = Bit::test(*r1, 7);
     H_FLAG = 0;
     N_FLAG = 0;
     *r1 <<= 1;
@@ -1154,7 +1154,7 @@ u8 CPU::rlc_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit.test(r, 7);
+    C_FLAG = Bit::test(r, 7);
     H_FLAG = 0;
     N_FLAG = 0;
     r <<= 1;
@@ -1170,7 +1170,7 @@ u8 CPU::rlc_ll(u16 loc) {
 u8 CPU::rrc_r(u8 *r1) {
 //CHNZ
 
-    C_FLAG = Bit.test(*r1, 0);
+    C_FLAG = Bit::test(*r1, 0);
     H_FLAG = 0;
     N_FLAG = 0;
     *r1 >>= 1;
@@ -1185,7 +1185,7 @@ u8 CPU::rrc_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit.test(r, 0);
+    C_FLAG = Bit::test(r, 0);
     H_FLAG = 0;
     N_FLAG = 0;
     r >>= 1;
@@ -1202,7 +1202,7 @@ u8 CPU::rl_r(u8 *r1) {
 //CHNZ
     u8 old_c = C_FLAG;
 
-    C_FLAG = Bit.test(*r1, 7);
+    C_FLAG = Bit::test(*r1, 7);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1219,7 +1219,7 @@ u8 CPU::rl_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 old_c = C_FLAG;
 
-    C_FLAG = Bit.test(r, 7);
+    C_FLAG = Bit::test(r, 7);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1237,7 +1237,7 @@ u8 CPU::rr_r(u8 *r1) {
 //CHNZ
     u8 old_c = C_FLAG;
 
-    C_FLAG = Bit.test(*r1, 0);
+    C_FLAG = Bit::test(*r1, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1254,7 +1254,7 @@ u8 CPU::rr_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 old_c = C_FLAG;
 
-    C_FLAG = Bit.test(r, 0);
+    C_FLAG = Bit::test(r, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1273,7 +1273,7 @@ u8 CPU::rr_ll(u16 loc) {
 //====================
 u8 CPU::sla_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit.test(*r1, 7);
+    C_FLAG = Bit::test(*r1, 7);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1288,7 +1288,7 @@ u8 CPU::sla_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit.test(r, 7);
+    C_FLAG = Bit::test(r, 7);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1305,7 +1305,7 @@ u8 CPU::sra_r(u8 *r1) {
 //CHNZ
     u8 a = *r1 & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = Bit.test(*r1, 0);
+    C_FLAG = Bit::test(*r1, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1322,7 +1322,7 @@ u8 CPU::sra_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 a = r & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = Bit.test(r, 0);
+    C_FLAG = Bit::test(r, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1339,7 +1339,7 @@ u8 CPU::sra_ll(u16 loc) {
 u8 CPU::srl_r(u8 *r1) {
 //CHNZ
 
-    C_FLAG = Bit.test(*r1, 0);
+    C_FLAG = Bit::test(*r1, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1355,7 +1355,7 @@ u8 CPU::srl_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit.test(r, 0);
+    C_FLAG = Bit::test(r, 0);
     H_FLAG = 0;
     N_FLAG = 0;
 
@@ -1409,7 +1409,7 @@ u8 CPU::bit_b_r(u8 bit, u8 *r1) {
 
     H_FLAG = 1;
     N_FLAG = 0;
-    Z_FLAG = !Bit.test(*r1, bit);
+    Z_FLAG = !Bit::test(*r1, bit);
 
     return 8;
 }
@@ -1420,7 +1420,7 @@ u8 CPU::bit_b_ll(u8 bit, u16 loc) {
 
     H_FLAG = 1;
     N_FLAG = 0;
-    Z_FLAG = !Bit.test(r1, bit);
+    Z_FLAG = !Bit::test(r1, bit);
 
     return 12;
 }
@@ -1429,14 +1429,14 @@ u8 CPU::bit_b_ll(u8 bit, u16 loc) {
 // Reset Bit
 //====================
 u8 CPU::res_b_r(u8 bit, u8 *reg) {
-    Bit.reset(reg, bit);
+    Bit::reset(reg, bit);
     return 8;
 }
 
 u8 CPU::res_b_ll(u8 bit, u16 loc) {
     u8 r = io->read(loc);
 
-    Bit.reset(&r, bit);
+    Bit::reset(&r, bit);
     io->write(loc, r);
 
     return 16;
@@ -1446,14 +1446,14 @@ u8 CPU::res_b_ll(u8 bit, u16 loc) {
 // Set Bit
 //====================
 u8 CPU::set_b_r(u8 bit, u8 *reg) {
-    Bit.set(reg, bit);
+    Bit::set(reg, bit);
     return 8;
 }
 
 u8 CPU::set_b_ll(u8 bit, u16 loc) {
     u8 r = io->read(loc);
 
-    Bit.set(&r, bit);
+    Bit::set(&r, bit);
     io->write(loc, r);
 
     return 16;

@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    bool enable_bg_window = true;
-    bool enable_wnd_window = true;
+    bool enable_bg_window = false;
+    bool enable_wnd_window = false;
 
     SDL_Window* window_screen = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160, 144, SDL_WINDOW_RESIZABLE);
     SDL_Renderer* renderer_screen = SDL_CreateRenderer(window_screen, -1, SDL_RENDERER_ACCELERATED);

@@ -41,7 +41,7 @@ struct MBC3_Controller : public MBC1_Base {
             MBC1_Base::set_rom_bank(rom_bank_num);
         }
         else if(bounded(offset, 0x4000_u16, 0x5FFF_u16)) {
-            if(Bit.test(data, 3) && data <= 0xC) {
+            if(Bit::test(data, 3) && data <= 0xC) {
                 read_ram = false;
                 active_reg = data - 0x8;
             } else {
@@ -53,7 +53,7 @@ struct MBC3_Controller : public MBC1_Base {
             static bool latch = false;
 
             //simulate rising edge detection;
-            bool new_latch = Bit.test(data, 0);
+            bool new_latch = Bit::test(data, 0);
             if(!latch && new_latch) {
                 latched = active;
             }

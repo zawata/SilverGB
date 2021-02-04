@@ -21,8 +21,8 @@ Input_Manager::button_states_t Input_Manager::get_input_state() {
 u8 Input_Manager::read() {
     u8 bits = 0;
 
-    if(read_dir_keys)    Bit.set(&bits, 4);
-    if(read_button_keys) Bit.set(&bits, 5);
+    if(read_dir_keys)    Bit::set(&bits, 4);
+    if(read_button_keys) Bit::set(&bits, 5);
 
     if(read_dir_keys) {
         bits |=
@@ -44,6 +44,6 @@ u8 Input_Manager::read() {
 }
 
 void Input_Manager::write(u8 data) {
-    read_dir_keys = Bit.test(data, 5);
-    read_button_keys = Bit.test(data, 4);
+    read_dir_keys = Bit::test(data, 5);
+    read_button_keys = Bit::test(data, 4);
 }

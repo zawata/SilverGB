@@ -4,22 +4,9 @@
 
 #include "defs.hpp"
 
+#include "util/bit.hpp"
 #include "util/ints.hpp"
 #include "util/CircularQueue.hpp"
-
-#define OBG_ATTR_BG_PRIORITY   7
-#define OBG_ATTR_Y_FLIP        6
-#define OBG_ATTR_X_FLIP        5
-#define OBG_ATTR_GB_PALLETTE   4
-#define OBG_ATTR_GBC_TILE_BANK 3
-#define OBG_ATTR_GBC_PALLETTE  0x7
-
-#define STAT_COIN_INT_BIT   6
-#define STAT_MODE_2_INT_BIT 5
-#define STAT_MODE_1_INT_BIT 4
-#define STAT_MODE_0_INT_BIT 3
-#define STAT_COIN_BIT       2
-#define STAT_MODE_FLAG      (0x3)
 
 class PPU {
 public:
@@ -65,6 +52,14 @@ public:
         {0x00, 0x00, 0x00}, // black
     };
 
+    //green version
+    // static constexpr u8 pixel_color[4][3] = {
+    //     {0xE1, 0xF7, 0xD1}, // white
+    //     {0x87, 0xC3, 0x72}, // lightgrey
+    //     {0x33, 0x70, 0x53}, // dimgrey
+    //     {0x09, 0x20, 0x21}, // black
+    // };
+
     PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
     ~PPU();
 
@@ -74,6 +69,8 @@ public:
     void enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite);
 
     bool ppu_tick();
+    void process_oam_fetch();
+    void process_vram_fetch();
 
 private:
     IO_Bus *io;
@@ -100,7 +97,6 @@ private:
         u8 VBK;
     } registers;
 
-
     /**
      * PPU Variables
      */
@@ -108,8 +104,11 @@ private:
     CircularQueue<sprite_fifo_color_t> *sp_fifo = new CircularQueue<sprite_fifo_color_t>(160);
     u8 process_step;
 
+    Bit::BitWatcher<u8> *wnd_enabled_bit;
+
     int frame_clock_count = 0; // count of clocks in a frame
     int line_clock_count = 0;  // count of clocks in a line
+    int pix_clock_count = 0; //pixels clocked in currenrt line
 
     enum __OAM_fetch_steps {
         OAM_0,
@@ -132,8 +131,7 @@ private:
         SP_0,   //Sprite Data clk 1
         SP_1,   //Sprite Data clk 2
     };
-    __VRAM_fetch_steps vram_fetch_step = (__VRAM_fetch_steps)0,
-                       future_step     = (__VRAM_fetch_steps)0;
+    __VRAM_fetch_steps vram_fetch_step = (__VRAM_fetch_steps)0;
 
     u8 old_LY  = 0;
     bool
@@ -143,8 +141,10 @@ private:
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map
         wnd_map_addr;   // addr of the current tile in the wnd tile map
+
     s16
         tile_addr;      // relative addr of the current tile data to fetch
+
     u8
         bg_map_byte,    // byte from the current tile in the bg tile map
         wnd_map_byte,   // byte from the current tile in the wnd tile map
@@ -152,10 +152,12 @@ private:
         tile_byte_2;    // 1st byte from the current tile fetched
 
     u8
-        y_line, // y counter for current_pixel
-        x_line, // x counter for current pixel
+        wnd_y_cntr, // window y counter
+        y_cntr, // y counter
+        x_cntr, // x counter
         x_sc,   // x_scroll locked at beginning of line
         y_sc;   // y_scroll locked as beginning of line
+
     bool
         first_frame = false,   // first frame after lcd enable
         frame_disable = false, // disable pixel output for current frame(used with first frame)
@@ -164,7 +166,6 @@ private:
         new_line = false,      // the first clock tick of a new line
         skip_fetch = false,    // the first VRAM access of a new line
         in_window = false;     // are we in window mode
-
 
     int sprite_counter = 0;
     obj_sprite_t current_sprite;
