@@ -29,6 +29,49 @@ std::string get_ram_file_name(std::string rom_file_name) {
     return ram_file_name;
 }
 
+bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer) {
+    if(!Silver::File::fileExists(ram_file_name)) {
+        std::cout<< "SAV File: does not exist" << std::endl;
+        return false;
+    }
+
+    Silver::File *ram_file = Silver::File::openFile(ram_file_name);
+    if(ram_file == nullptr) {
+        std::cout<< "SAV File: could not be opened" << std::endl;
+        return false;
+    }
+
+    if(ram_file->getSize() != getRAMSize()) {
+        std::cout<< "SAV File: incorrect size" << std::endl;
+        return false;
+    }
+
+    ram_file->toVector(ram_buffer);
+
+    std::cout<< "SAV File: loaded" << std::endl;
+    return true;
+}
+
+bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer) {
+    Silver::File *ram_file;
+    if(Silver::File::fileExists(ram_file_name)) {
+        ram_file = Silver::File::openFile(ram_file_name, true, true);
+    }
+    else {
+        ram_file = Silver::File::createFile(ram_file_name);
+    }
+
+    if(ram_file == nullptr) {
+        std::cout<< "SAV File: could not be opened/created" << std::endl;
+        return false;
+    }
+
+    std::cout<< "SAV File: saved" << std::endl;
+    ram_file->fromVector(ram_buffer);
+
+    return true;
+}
+
 Cartridge::Cartridge(Silver::File *f) :
 rom_file(f),
 cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
@@ -40,44 +83,13 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
 
     //open ram info
     if(cart_type.RAM && getRAMSize() > 0) {
-        ram.reserve(getRAMSize());
+        ram.resize(getRAMSize());
 
         if(cart_type.BATTERY) {
-            //get ram file name
-            std::string ram_file_name = get_ram_file_name(rom_file->getFilename());
-
-            //open ram file
-            Silver::File *ram_file;
-            if((ram_file = Silver::File::createFile(ram_file_name)) == nullptr) {
-                ram_file = Silver::File::openFile(ram_file_name);
-            }
-            else {
-                goto ContinueLoad;
-            }
-
-            //check that file could be opened
-            if(!ram_file) {
-                std::cerr << "Error Opening " << ram_file_name << std::endl;
-                std::cerr << "Ram Data will not be saved." << std::endl;
-                goto ContinueLoad; //TODO: no
-            }
-
-            //check that file size matches cart ram size
-            auto ram_size = ram_file->getSize();
-            std::cout << "file: " << ram_size << " ram: " << getRAMSize() << std::endl;
-            if(ram_size != getRAMSize()) {
-                std::cerr << "Ram File " << ram_file_name << " does not match cart type" << std::endl
-                          << "Data will not be loaded" << std::endl;
-                goto ContinueLoad; //TODO: no
-            }
-
-            //load ram data from file
-            ram_file->toVector(ram);
+            loadRAMFile(get_ram_file_name(rom_file->getFilename()), ram);
         }
     }
 
-//TODO: I haaaaate gotos. clean this up when i care more
-ContinueLoad:
     if(cart_type.ROM) {
         controller = new ROM_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC1) {
@@ -115,9 +127,10 @@ ContinueLoad:
     }
 }
 
-Cartridge::~Cartridge() = {
-    //get ram file name
-            std::string ram_file_name = get_ram_file_name(rom_file->getFilename());
+Cartridge::~Cartridge() {
+    if(cart_type.BATTERY) {
+        saveRAMFile(get_ram_file_name(rom_file->getFilename()), controller->ram_data);
+    }
 };
 
 bool Cartridge::checkMagicNumber() {

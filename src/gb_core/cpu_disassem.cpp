@@ -3,7 +3,7 @@
 #include "util/util.hpp"
 
 std::string CPU::i8(u16 PC) {
-    return itoh(io->read(PC), 2);
+    return itoh(io->read(PC+1), 2);
 }
 std::string CPU::i16(u16 PC) {
     return itoh((u16)(io->read(PC+1) | (u16)(io->read(PC+2) << 8)), 4);

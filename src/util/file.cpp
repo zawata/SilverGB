@@ -21,11 +21,12 @@ File *File::createFile(std::string filename) {
     return openFile(filename, true);
 }
 
-File *File::openFile(std::string filename, bool write) {
+File *File::openFile(std::string filename, bool write, bool trunc) {
     auto ret = new File(filename);
     if((ret->file = std::fstream(filename,
             std::ifstream::in |
-            std::ifstream::out |
+            ((write) ? std::ifstream::out : 0) |
+            ((trunc) ? std::ifstream::trunc : 0) |
             std::ifstream::binary))) {
         ret->file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         return ret;

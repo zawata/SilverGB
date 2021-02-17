@@ -9,7 +9,10 @@
 
 struct MBC1_Controller : public MBC1_Base {
     MBC1_Controller(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
-    MBC1_Base(cart_type, rom, ram) {}
+    MBC1_Base(cart_type, rom, ram) {
+        MBC1_Base::set_rom_0_bank(0);
+        MBC1_Base::set_rom_bank(1);
+    }
 
     u8 read(u16 offset) override {
         if(bounded(offset, 0x0000_u16, 0x7FFF_u16)) {

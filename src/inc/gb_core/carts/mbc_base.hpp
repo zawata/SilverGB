@@ -57,7 +57,7 @@ struct MBC1_Base : public MemoryBankController {
         else if(bounded(offset, 0xA000_u16, 0xBFFF_u16)) {
             offset -= 0xA000;
 
-            u32 addr = (u32)offset + (rom_bank * ROM_BANK_SIZE);
+            u32 addr = (u32)offset + (ram_bank * RAM_BANK_SIZE);
 
             if(cart_type.RAM && ram_enable && addr < ram_data.size()) {
                 return ram_data[addr];
@@ -76,7 +76,7 @@ struct MBC1_Base : public MemoryBankController {
         if(bounded(offset, 0xA000_u16, 0xBFFF_u16)) {
             offset -= 0xA000;
 
-            u32 addr = (u32)offset + (rom_bank * ROM_BANK_SIZE);
+            u32 addr = (u32)offset + (ram_bank * RAM_BANK_SIZE);
 
             if(cart_type.RAM && ram_enable && addr < ram_data.size()) {
                 ram_data[addr] = data;

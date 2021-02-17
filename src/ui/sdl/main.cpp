@@ -9,6 +9,11 @@
 
 #include <SDL2/SDL.h>
 
+bool tick_frame = false, tick_instr = false;
+bool enable_bg_window = true;
+bool enable_wnd_window = true;
+bool single_step = false;
+
 void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
     switch(event->keysym.sym) {
     case SDLK_UP:        // DPAD up
@@ -35,6 +40,23 @@ void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *even
     case SDLK_BACKSPACE: // Select Button
         buttons->select = event->type == SDL_KEYDOWN;
         break;
+
+    case SDLK_f:
+        tick_frame = event->type == SDL_KEYDOWN;
+        break;
+
+    case SDLK_t:
+        tick_instr = event->type == SDL_KEYDOWN;
+        break;
+
+    case SDLK_s:
+        single_step = event->type == SDL_KEYDOWN;
+        break;
+
+    case SDLK_r:
+        single_step = false;
+        break;
+
     }
 }
 
@@ -44,9 +66,6 @@ int main(int argc, char *argv[]) {
         std::cout << SDL_GetError() << std::endl;
         return -1;
     }
-
-    bool enable_bg_window = false;
-    bool enable_wnd_window = false;
 
     SDL_Window* window_screen = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160, 144, SDL_WINDOW_RESIZABLE);
     SDL_Renderer* renderer_screen = SDL_CreateRenderer(window_screen, -1, SDL_RENDERER_ACCELERATED);
@@ -79,7 +98,13 @@ int main(int argc, char *argv[]) {
     #ifdef __linux__
         rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
     #elif _WIN32
-        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
+        if (argc > 1) {
+            rom_file = Silver::File::openFile(argv[1]);
+        }
+        else {
+            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokeblue_debug.gb");
+        }
+        
     #else
 
     #endif
@@ -88,6 +113,8 @@ int main(int argc, char *argv[]) {
     Input_Manager::button_states_t button_state;
 
     u8 *buf = (u8 *)malloc(256 * 256 * 3);
+
+    //core->set_bp(0x266E, true);
 
     SDL_Event event;
     while (isRunning) {
@@ -103,9 +130,28 @@ int main(int argc, char *argv[]) {
             }
         }
 
-
         core->set_input_state(button_state);
-        core->tick_frame();
+
+        if(single_step){
+            try {
+                if(tick_frame) {
+                    tick_frame = false;
+                    core->tick_frame();
+                }
+                else if(tick_instr) {
+                    tick_instr = false;
+                    core->tick_instr();
+                }
+            }
+            catch (breakpoint_exception) {}
+        } else {
+            try {
+                core->tick_frame();
+            }
+            catch (breakpoint_exception) {
+                single_step = true;
+            }
+        }
 
         void *screen_dest;
         int screen_pitch;
@@ -139,6 +185,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    delete core;
     SDL_Quit();
 
     return 0;

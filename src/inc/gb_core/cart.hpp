@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gb_core/cart.hpp"
 #include "util/file.hpp"
 
 #include "util/ints.hpp"
@@ -186,6 +187,8 @@ namespace Cartridge_Constants {
  * MBC Interface
  */
 struct MemoryBankController {
+    friend class Cartridge;
+
     virtual u8 read(u16 offset) = 0;
     virtual void write(u16 offset, u8 data) = 0;
     virtual void tick() {};
@@ -206,6 +209,8 @@ public:
     Cartridge(Silver::File *f);
     ~Cartridge();
 
+    bool loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer);
+    bool saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer);
 
     bool checkMagicNumber();
 

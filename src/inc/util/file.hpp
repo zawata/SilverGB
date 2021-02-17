@@ -13,7 +13,7 @@ public:
 
     ~File();
 
-    static File *openFile(std::string filename, bool write=false);
+    static File *openFile(std::string filename, bool write=false, bool trunc=false);
     static File *createFile(std::string filename);
 
     static bool fileExists(std::string);
