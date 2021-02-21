@@ -3,6 +3,7 @@
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/input.hpp"
+#include "gb_core/io_reg.hpp"
 #include "gb_core/ppu.hpp"
 #include "util/bit.hpp"
 
@@ -10,7 +11,9 @@ GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
     screen_buffer = (u8 *)malloc(GB_S_P_SZ);
 
     cart = new Cartridge(rom);
-    io = new IO_Bus(cart, false, bootrom);
+    apu = new APU(bootrom != nullptr);
+
+    io = new IO_Bus(apu, cart, false, bootrom);
     cpu = new CPU(io, bootrom != nullptr);
     vpu = new PPU(io, screen_buffer, bootrom != nullptr);
 }
@@ -31,12 +34,14 @@ void GB_Core::tick_once() {
     //can't check breakpoints on single tick functions
     cpu->tick();
     vpu->tick();
+    apu->tick();
 }
 
 void GB_Core::tick_instr() {
     for(int i = 0; i < 4; i++) {
         cpu->tick();
         vpu->tick();
+        apu->tick();
     }
 
     if(cpu->getRegisters().PC == breakpoint && bp_active){
@@ -51,7 +56,25 @@ void GB_Core::tick_frame() {
             bp_active = false;
             throw breakpoint_exception();
         }
+        apu->tick();
     } while(!vpu->tick());
+}
+
+void GB_Core::tick_audio_buffer(u8* buf, int buf_len) {
+    int rem_buf_sz = buf_len,
+        tick_cntr = 0;
+
+    while(rem_buf_sz > 0) {
+        tick_cntr++;
+        cpu->tick();
+        vpu->tick();
+        apu->tick();
+
+        if (tick_cntr++ == 87) { //TODO: demagic
+            *buf++ = apu->sample();
+            tick_cntr = 0;
+        }
+    }
 }
 
 /**
@@ -77,7 +100,7 @@ u8 GB_Core::getByteFromIO(u16 addr) {
 
     output_file << "P3 160 144 255\n" << std::flush;
 
-    int x = 0, y = 0, p = 0;
+    //int x = 0, y = 0, p = 0;
     for(int i = 0; i < (160 * 144 * 3); i++) {
         // p = i%3;
         // y = (i/3)/160;
@@ -144,7 +167,9 @@ u16 GB_Core::get_bp() { return breakpoint; }
 void GB_Core::set_bp_active(bool en) { bp_active = en; }
 bool GB_Core::get_bp_active()        { return bp_active; }
 
-
+//void GB_Core::__fetch_tile(u16 tile_addr, u8 x, u16 &tile_byte_1, u16 tile_byte_2) {
+//    
+//}
 
 void GB_Core::getBGBuffer(u8 *buf) {
     #define reg(X) (io->registers.X)

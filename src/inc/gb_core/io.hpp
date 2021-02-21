@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "gb_core/audio.hpp"
+#include "gb_core/apu.hpp"
 #include "gb_core/cart.hpp"
 #include "gb_core/input.hpp"
 
@@ -39,7 +39,7 @@ public:
         JOYPAD_INT   = 1<<4,
     };
 
-    IO_Bus(Cartridge *cart, bool gbc_mode, Silver::File *bios_file);
+    IO_Bus(APU *apu, Cartridge *cart, bool gbc_mode, Silver::File *bios_file);
     ~IO_Bus();
 
     u8   read(u16 offset, bool bypass = false);
@@ -78,7 +78,7 @@ public:
     Interrupt cpu_check_interrupts();
     void      cpu_unset_interrupt(Interrupt i);
 
-    Sound_Controller *snd;
+    APU *apu;
     Input_Manager    *input;
 
     struct io_registers_t {

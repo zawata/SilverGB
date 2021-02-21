@@ -23,11 +23,20 @@ File *File::createFile(std::string filename) {
 
 File *File::openFile(std::string filename, bool write, bool trunc) {
     auto ret = new File(filename);
-    if((ret->file = std::fstream(filename,
-            std::ifstream::in |
-            ((write) ? std::ifstream::out : 0) |
-            ((trunc) ? std::ifstream::trunc : 0) |
-            std::ifstream::binary))) {
+
+    std::ios::openmode mode = std::ifstream::binary;
+
+    if(write) {
+        mode |= std::ifstream::out;
+
+        if(trunc) {
+            mode |= std::ifstream::trunc;
+        }
+    } else {
+        mode |= std::ifstream::in;
+    }
+
+    if((ret->file = std::fstream(filename, mode))) {
         ret->file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
         return ret;
     } else {

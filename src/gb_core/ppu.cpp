@@ -237,7 +237,7 @@ bool PPU::ppu_tick() {
                 0x9800 |
                 ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
                 (wnd_y_cntr & 0xf8) << 2;
-            
+
         } else if(y_cntr < 154) {
             process_step = VBLANK;
         } else {
@@ -436,8 +436,8 @@ bool PPU::ppu_tick() {
         // sprite data clk 2
         case SP_1:
             if(displayed_sprites.size() > 0) {
-                enqueue_sprite_data(*(displayed_sprites.end() - 1));
-                displayed_sprites.erase(displayed_sprites.end() - 1);
+                enqueue_sprite_data(displayed_sprites.front());
+                displayed_sprites.pop_front();
 
                 vram_fetch_step = SP_0;
             } else {
@@ -446,6 +446,8 @@ bool PPU::ppu_tick() {
                 // shift in bg pixels when the bg fifo is empty.
                 // this will not occur on subsequent sprite reads as the bg_fifo
                 // should be disabled until the sprite fetches are done
+                //TODO: this should be moved out of the idle clocking as it makes
+                // the first fetch 2 clock cycles too long
                 if(bg_fifo->size() == 0) {
                     for(int i = 0; i < 8; i++) {
                         u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);

@@ -174,7 +174,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-     //std::cout << "Instruction 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
+     //std::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP

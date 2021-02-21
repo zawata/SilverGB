@@ -1,5 +1,5 @@
 add_library(gb_core
-		"audio.cpp"
+		"apu.cpp"
 		"cart.cpp"
 		"core.cpp"
 		"cpu.cpp"

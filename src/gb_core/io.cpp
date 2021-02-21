@@ -11,8 +11,8 @@
 #define MODE_VRAM   3
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
-IO_Bus::IO_Bus(Cartridge *cart, bool gbc_mode, Silver::File *bios_file = nullptr) :
-snd(new Sound_Controller()),
+IO_Bus::IO_Bus(APU *apu, Cartridge *cart, bool gbc_mode, Silver::File *bios_file = nullptr) :
+apu(apu),
 input(new Input_Manager()),
 cart(cart),
 gbc_mode(gbc_mode),
@@ -70,7 +70,7 @@ bootrom_mode(bios_file != nullptr) {
 }
 
 IO_Bus::~IO_Bus() {
-    delete snd;
+    delete apu;
     delete input;
 }
 
@@ -245,7 +245,7 @@ u8  IO_Bus::read_reg(u8 loc) {
     case NR30_REG: case NR31_REG: case NR32_REG: case NR33_REG: case NR34_REG:
                    case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
     case NR50_REG: case NR51_REG: case NR52_REG:
-        return snd->read_reg(loc);
+        return apu->read_reg(loc);
 
     case LCDC_REG:
         return registers.LCDC & LCDC_READ_MASK;
@@ -332,7 +332,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case NR30_REG: case NR31_REG: case NR32_REG: case NR33_REG: case NR34_REG:
                    case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
     case NR50_REG: case NR51_REG: case NR52_REG:
-        return snd->write_reg(loc, data);
+        return apu->write_reg(loc, data);
 
 #if _MSC_VER && !__INTEL_COMPILER
     case 0x30: case 0x31: case 0x32: case 0x33:
@@ -344,7 +344,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     // if MSVC does support this I'll keep it because it's so much cleaner
     case 0x30 ... 0x3F:
 #endif
-        return snd->write_wavram(loc, data);
+        return apu->write_wavram(loc, data);
     case LCDC_REG :
         if(!Bit::test(data, 7) && !check_mode(MODE_VBLANK))
             std::cerr << "LCD Disable outside VBLANK" << std::endl;

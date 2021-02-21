@@ -3,18 +3,18 @@ GameBoy CPU Timing v0.01                                     13.04.2000/GPZ-HIT
 
 standard gameboy:
 
-Clock Speed:   4.194304 MHz   - 0,2384 µs per cycle
+Clock Speed:   4.194304 MHz   - 0,2384 Î¼s per cycle
 
                cycles=microseconds/0,2384
                microseconds=cycles*0,2384
 
-Horiz Sync:    9198 KHz       - 456 Cycles per line (109µs)
+Horiz Sync:    9198 KHz       - 456 Cycles per line (109Î¼s)
 Vert Sync:     59.73 Hz       - 70224 Cycles per frame (16.6ms)
 
 color gameboy at 2x speed:
 
-Clock Speed:   8.388688 MHz   - 0,1192 µs per cycle
-Horiz Sync:    9198 KHz       - 912 Cycles per line (109µs)
+Clock Speed:   8.388688 MHz   - 0,1192 Î¼s per cycle
+Horiz Sync:    9198 KHz       - 912 Cycles per line (109Î¼s)
 Vert Sync:     59.73 Hz       - 140448 Cycles per frame (16.6ms)
 
 super gameboy:

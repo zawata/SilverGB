@@ -10,8 +10,8 @@
 #include <SDL2/SDL.h>
 
 bool tick_frame = false, tick_instr = false;
-bool enable_bg_window = true;
-bool enable_wnd_window = true;
+bool enable_bg_window = false;
+bool enable_wnd_window = false;
 bool single_step = false;
 
 void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
@@ -60,6 +60,12 @@ void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *even
     }
 }
 
+extern "C"
+void _audio_callback(void* userdata, uint8_t* stream, int len) {
+    std::cout << "audio callback" << std::endl;
+    static_cast<GB_Core *>(userdata)->tick_audio_buffer(stream, len);
+}
+
 int main(int argc, char *argv[]) {
     // Initialize SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
@@ -95,26 +101,40 @@ int main(int argc, char *argv[]) {
 
     //load GBCore
     Silver::File *rom_file = nullptr;
+    Silver::File *bios_file = nullptr;
     #ifdef __linux__
-        rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
+        rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/super-mario-land.gb");
+        bios_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/DMG_ROM.bin");
     #elif _WIN32
         if (argc > 1) {
             rom_file = Silver::File::openFile(argv[1]);
         }
         else {
             rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokeblue_debug.gb");
+            bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
         }
-        
     #else
 
     #endif
 
-    GB_Core *core = new GB_Core(rom_file, nullptr);
+    GB_Core *core = new GB_Core(rom_file, bios_file);
     Input_Manager::button_states_t button_state;
 
     u8 *buf = (u8 *)malloc(256 * 256 * 3);
 
-    //core->set_bp(0x266E, true);
+    SDL_AudioSpec desired;
+    desired.freq = 48000.0f;
+    desired.format = AUDIO_U8;
+    desired.channels = 1;
+    desired.samples = 1024;
+    desired.userdata = core;
+    desired.callback = _audio_callback;
+    // desired.callback = NULL;
+
+    if (SDL_OpenAudio(&desired, NULL))
+        std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
+
+    SDL_PauseAudio(0);
 
     SDL_Event event;
     while (isRunning) {
@@ -132,29 +152,30 @@ int main(int argc, char *argv[]) {
 
         core->set_input_state(button_state);
 
-        if(single_step){
-            try {
-                if(tick_frame) {
-                    tick_frame = false;
-                    core->tick_frame();
-                }
-                else if(tick_instr) {
-                    tick_instr = false;
-                    core->tick_instr();
-                }
-            }
-            catch (breakpoint_exception) {}
-        } else {
-            try {
-                core->tick_frame();
-            }
-            catch (breakpoint_exception) {
-                single_step = true;
-            }
-        }
+        // if(single_step){
+        //     try {
+        //         if(tick_frame) {
+        //             tick_frame = false;
+        //             core->tick_frame();
+        //         }
+        //         else if(tick_instr) {
+        //             tick_instr = false;
+        //             core->tick_instr();
+        //         }
+        //     }
+        //     catch (breakpoint_exception) {}
+        // } else {
+        //     try {
+        //         core->tick_frame();
+        //     }
+        //     catch (breakpoint_exception) {
+        //         single_step = true;
+        //     }
+        // }
 
         void *screen_dest;
         int screen_pitch;
+        std::cout << "display screen" << std::endl;
         SDL_LockTexture(screen_texture, NULL, &screen_dest, &screen_pitch);
         memcpy(screen_dest, core->getScreenBuffer(), GB_S_P_SZ);
         SDL_UnlockTexture(screen_texture);

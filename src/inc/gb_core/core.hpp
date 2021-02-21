@@ -28,6 +28,7 @@ public:
     void tick_once();
     void tick_instr();
     void tick_frame();
+    void tick_audio_buffer(u8* buf, int buf_len);
 
     void set_input_state(Input_Manager::button_states_t const& state);
 
@@ -50,6 +51,7 @@ public:
 private:
     Cartridge *cart;
     IO_Bus *io;
+    APU *apu;
     CPU *cpu;
     PPU *vpu;
 

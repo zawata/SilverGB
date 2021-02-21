@@ -1,5 +1,7 @@
 #pragma once
 
+#include <deque>
+
 #include "io.hpp"
 
 #include "defs.hpp"
@@ -169,8 +171,8 @@ private:
 
     int sprite_counter = 0;
     obj_sprite_t current_sprite;
-    std::vector<obj_sprite_t> active_sprites;
-    std::vector<obj_sprite_t> displayed_sprites;
+    std::deque<obj_sprite_t> active_sprites;
+    std::deque<obj_sprite_t> displayed_sprites;
 
     u32 current_byte = 0;
 

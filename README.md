@@ -6,20 +6,20 @@ SilverGB is gameboy emulator I'm writing to apply the knowledge and concepts of 
 
 I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me when I first tried to start this project(as a sophmore in highschool ha!): minor knowledge of programming but major interest in doing something cool.  
 
-The emulator features a GUI created with "Dear ImGui" which is an absolutely fantastic GUI Library. It utilizes SDL for media interfaces(Input, Audio, Window Management) and OpenGL for graphics. It attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing) but I'm developing and testing it on Linux so that is where it's "guaranteed" to work.(note the quotes...)  
+The emulator attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing).  
 
 ## Major TODOs
 
 Slight TODOs are littered throughout the code, the bigger ones are placed here:  
- - Implmenet Friendlier UI (See Below)
- - Audio Processing Unit(See the `sound_impl` branch, which is massively out of date now)
+ - Implement Friendlier UI (See Below)
+ - Audio Processing Unit
  - M-Cycle accurate CPU rewrite(see `src/gb/new_cpu.c`)
    - Basic structure is done and designed, just need to actually implement all 499 instructions
  - Accurate PPU timing
    - Most of this isn't centrally documented but spread across 3-4 documents and dozens of test-roms. So yay.
  - core-clocking rewrite
-   - I'm gonna need to do some research on this one...the current implementation is fucked and I'm not experienced enough in this area to know how to fix it.
-   - As the project currently doesn't play games this isn't a concern but eventually yes. 
+   - Currently timed by window updates in SDL which runs slightly too fast.
+   - Saw a recommendation to time the emulator by audio buffer updates, will probably implement with APU support.
 
 
 ### UI
@@ -66,14 +66,14 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 &nbsp;&nbsp;&nbsp;&nbsp;✔ ️Main Window  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ View Port  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ Prettification  
-➕ CPU  
+✔ CPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ OpCodes  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ OpCode Disassembly  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Timers  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Interrupt Handling  
-&nbsp;&nbsp;&nbsp;&nbsp;➕ IO Registers  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ IO Registers  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Core Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ Input Registers  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Input Registers  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Sound Registers  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Video Registers  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Memory Layout  
@@ -87,14 +87,14 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ RTC  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 Others  
 ➕ Sound  
-&nbsp;&nbsp;&nbsp;&nbsp;➕ (See the `sound_impl` branch)  
-➕ Video  
+&nbsp;&nbsp;&nbsp;&nbsp;➕ TODO
+➕ PPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ VRAM  
-&nbsp;&nbsp;&nbsp;&nbsp;➕ Pixel Fifo  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ Pixel Fifo  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ OAM Search  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ VRAM Process  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ VRAM Process  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Background  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ Window  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Window  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Tile Fetching  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Sprite Fetching  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;️✔ HBLANK  
@@ -105,6 +105,14 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Input  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫 Interrupts  
 
+## Current Issues
+PPU  
+&nbsp;&nbsp;&nbsp;&nbsp; - Sprites do not scroll with the SCX register and instead jump ~8pixels at a time.  
+&nbsp;&nbsp;&nbsp;&nbsp; - Window Seems to be 1 pixel to the left and possibly 1 pixel down too.  
+&nbsp;&nbsp;&nbsp;&nbsp; - The first VRAM Fetch of a new line may take 2 more clocks than it should.  
+UI  
+&nbsp;&nbsp;&nbsp;&nbsp; - Screen is always stretched to the window bounds.
+
 ## Features
 
 Blargg Rom Tests:  
@@ -113,7 +121,7 @@ Blargg Rom Tests:
 
 Gekkio's Acceptance Tests:  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ bits  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 mem_oam.gb  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ mem_oam.gb  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ reg_f.gb  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 unused_hwio-GS.gb  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ instr  
