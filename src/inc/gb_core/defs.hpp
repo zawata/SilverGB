@@ -8,3 +8,5 @@
 #define GB_S_H    144                          // screen height
 #define GB_S_P    (GB_S_W * GB_S_H)            // screen pixel count
 #define GB_S_P_SZ (GB_S_P * IMAGE_FORMAT_SIZE) // screen pixel buffer size
+
+#define TICKS_PER_FRAME 70224

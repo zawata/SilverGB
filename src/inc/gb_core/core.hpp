@@ -5,8 +5,7 @@
 #include "gb_core/io.hpp"
 #include "gb_core/ppu.hpp"
 
-#include <thread>
-#include <atomic>
+#include "util/SPSCQueue.h"
 
 struct breakpoint_exception {
     breakpoint_exception() {}
@@ -31,6 +30,7 @@ public:
     void tick_audio_buffer(u8* buf, int buf_len);
 
     void set_input_state(Input_Manager::button_states_t const& state);
+    void do_audio_callback(float *buff, int copy_cnt);
 
     CPU::registers_t getRegistersFromCPU();
     IO_Bus::io_registers_t getregistersfromIO();
@@ -46,8 +46,6 @@ public:
     void set_bp_active(bool en);
     bool get_bp_active();
 
-    //void dump_io_registers();
-
 private:
     Cartridge *cart;
     IO_Bus *io;
@@ -55,10 +53,10 @@ private:
     CPU *cpu;
     PPU *vpu;
 
-    u8 *screen_buffer = NULL;
+    u8 *screen_buffer = nullptr;
+    rigtorp::SPSCQueue<std::vector<float>> *audio_queue = nullptr;
+    std::vector<float> audio_vector;
 
     u16 breakpoint = 0;
     bool bp_active = false;
-
-    std::thread core_thread;
 };

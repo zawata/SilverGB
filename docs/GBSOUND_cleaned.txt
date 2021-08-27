@@ -60,16 +60,19 @@ Each channel has 5 registers associated with it, and, like the NES, they are in 
 < Set 1 >
 \-------/
 Master on/off and Sweep Register
+
 Channel 1 - $FF10(NR10)[sq1]
 ---------------------------------------------
 7	Unused
 6-4	Sweep time(update rate) (if 0, sweeping is off)
 3	Sweep Direction (1: decrease, 0: increase)
 2-0	Sweep RtShift amount (if 0, sweeping is off)
+
 Channel 3 - $FF1A(NR30)[wave]
 ---------------------------------------------
 7	Channel 3 Master on/off
 6-0	Unused
+
 Channels 2,4 - $FF15(NR20)[sq2], $FF1F(NR40)[noise]
 ---------------------------------------------
 7-0	Unused
@@ -78,10 +81,12 @@ Channels 2,4 - $FF15(NR20)[sq2], $FF1F(NR40)[noise]
 < Set 2 >
 \-------/
 Wave pattern duty and Sound length Register
+
 Channels 1,2,4 - $FF11(NR11)[sq1], $FF16(NR21)[sq2], $FF20(NR41)[noise]
 ---------------------------------------------
 7-6	Wave pattern duty (only on channels 1 and 2)
 5-0	Length counter load register
+
 Channel 3 - $FF1B(NR31)[wave]
 ---------------------------------------------
 7-0	Length counter load register
@@ -90,12 +95,14 @@ Channel 3 - $FF1B(NR31)[wave]
 < Set 3 >
 \-------/
 Volume Envelope Control register
+
 Channels 1,2,4 - $FF12(NR12)[sq1], $FF17(NR22)[sq2], $FF21(NR42)[noise]
 ---------------------------------------------
 7-4	(Initial) Channel Volume
 3	Volume sweep direction (0: down; 1: up)
 2-0	Length of each step in sweep (if 0, sweeping is off)
 NOTE: each step is n/64 seconds long, where n is 1-7
+
 Channel 3 - $FF1C(NR32)[wave]
 ---------------------------------------------
 7	Unused
@@ -106,9 +113,11 @@ Channel 3 - $FF1C(NR32)[wave]
 < Set 4 >
 \-------/
 Frequency LSbs and Noise options
+
 Channels 1,2,3 - $FF13(NR13)[sq1], $FF18(NR23)[sq2], $FF1D(NR33)[wave]
 ---------------------------------------------
 7-0	8 Least Significant bits of frequency (3 MSbs are in set 5)
+
 Channel 4 - $FF22(NR43)[noise]
 ---------------------------------------------
 7-4	Shift clock frequency (s)
@@ -122,8 +131,7 @@ Frequency = 524288 Hz / r / 2^(s+1)     ;For r=0 use r=0.5 instead
 \-------/
 Playback flags and frequency MSbs
 
-Channels 1,2,3,4 - $FF14(NR14)[sq1], $FF19(NR24)[sq2], $FF1E(NR34)[wave],
-$FF23(NR44)[noise]
+Channels 1,2,3,4 - $FF14(NR14)[sq1], $FF19(NR24)[sq2], $FF1E(NR34)[wave], $FF23(NR44)[noise]
 ---------------------------------------------
 7	Initialize (trigger channel start, AKA channel INIT)  (Write only)
 6	Consecutive select/length counter enable              (Read/Write)
@@ -274,13 +282,13 @@ The down counter is clocked at 2097152 hz, divided from the processor's 4.194304
 
 clock freq:  \\\\\\\\\\\\\\\\\\\\\\\\\\\\ 2097152 hz
 ratio of:  0 _-_-_-_-_-_-_-_-_-_-_-_-_-_- 1048576 hz
-	   1 __--__--__--__--__--__--__--  524288 hz
-	   2 ___---___---___---___---___- ~370727.6 hz
-	   3 ____----____----____----____  262144 hz
-	   4 _____-----_____-----_____--- ~220435.95 hz
-	   5 ______------______------____ ~185363.8 hz
-	   6 _______-------_______------- ~155871.75 hz
-	   7 ________--------________----  131072 hz
+           1 __--__--__--__--__--__--__--  524288 hz
+           2 ___---___---___---___---___- ~370727.6 hz
+           3 ____----____----____----____  262144 hz
+           4 _____-----_____-----_____--- ~220435.95 hz
+           5 ______------______------____ ~185363.8 hz
+           6 _______-------_______------- ~155871.75 hz
+           7 ________--------________----  131072 hz
 
 The terminal count/output of the counter is the clock input to the shift clock.
 

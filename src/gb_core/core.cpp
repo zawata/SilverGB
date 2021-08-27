@@ -6,9 +6,17 @@
 #include "gb_core/io_reg.hpp"
 #include "gb_core/ppu.hpp"
 #include "util/bit.hpp"
+#include "util/util.hpp"
 
 GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
-    screen_buffer = (u8 *)malloc(GB_S_P_SZ);
+    screen_buffer = new u8[GB_S_P_SZ];
+
+    // the Aduio buffering system is threaded because it's simpler
+    // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
+    // so we use an SPSC queue to buffer entire audio buffers at a time
+    audio_queue = new rigtorp::SPSCQueue<std::vector<float>>(4);
+    audio_vector = std::vector<float>();
+    audio_vector.reserve(2048);
 
     cart = new Cartridge(rom);
     apu = new APU(bootrom != nullptr);
@@ -24,7 +32,7 @@ GB_Core::~GB_Core() {
     delete io;
     delete cart;
 
-    free(screen_buffer);
+    delete[] screen_buffer;
 }
 
 /**
@@ -51,30 +59,31 @@ void GB_Core::tick_instr() {
 }
 
 void GB_Core::tick_frame() {
+    u8 tick_cntr = 0;
+
     do {
         if(cpu->tick() && cpu->getRegisters().PC == breakpoint && bp_active) {
             bp_active = false;
             throw breakpoint_exception();
         }
+
         apu->tick();
-    } while(!vpu->tick());
-}
-
-void GB_Core::tick_audio_buffer(u8* buf, int buf_len) {
-    int rem_buf_sz = buf_len,
-        tick_cntr = 0;
-
-    while(rem_buf_sz > 0) {
-        tick_cntr++;
-        cpu->tick();
-        vpu->tick();
-        apu->tick();
-
-        if (tick_cntr++ == 87) { //TODO: demagic
-            *buf++ = apu->sample();
+        //TODO: this should be dynamic. probably adjusting the live sampling rate ot keep the buffer from over or underflowing.
+        // 90 tends to underflow every couple frames, while 85 keeps buffer sizes at 2-3x higher than the callback copy size.
+        // the ideal rate right now seems to be 87, it will underflow every couple seconds
+        if(tick_cntr++ == 87) {
+            float left,right;
+            apu->sample(&left,&right);
+            audio_vector.push_back(left);
             tick_cntr = 0;
         }
-    }
+
+        if(audio_vector.size() == 2048) { //TODO: make constant
+            audio_queue->push(audio_vector);
+            audio_vector.clear();
+        }
+
+    } while(!vpu->tick());
 }
 
 /**
@@ -82,6 +91,22 @@ void GB_Core::tick_audio_buffer(u8* buf, int buf_len) {
  */
 void GB_Core::set_input_state(Input_Manager::button_states_t const& state) {
     io->input->set_input_state(state);
+}
+
+void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
+    if(!audio_queue->front()) {
+        std::cerr << "audio buffer underflow" << std::endl;
+        memset(buff, 0, copy_cnt * 4);
+    } else {
+        auto audio_buffer = *audio_queue->front();
+        audio_queue->pop();
+
+        assert(copy_cnt == audio_buffer.size());
+
+        int type_sz = sizeof(decltype(audio_buffer)::value_type);
+
+        memcpy(buff, audio_buffer.data(), audio_buffer.size() * type_sz);
+    }
 }
 
 /**
@@ -95,33 +120,7 @@ IO_Bus::io_registers_t GB_Core::getregistersfromIO() {
     return io->registers;
 }
 
-u8 GB_Core::getByteFromIO(u16 addr) {
-    std::ofstream output_file("test.ppm");
-
-    output_file << "P3 160 144 255\n" << std::flush;
-
-    //int x = 0, y = 0, p = 0;
-    for(int i = 0; i < (160 * 144 * 3); i++) {
-        // p = i%3;
-        // y = (i/3)/160;
-        // x = (i/3)%160;
-
-        // if(!p) {
-        //     if(!x && y%8 == 0) {
-        //         for(int j = 0; j < 180; j++)
-        //             output_file << "255 0 0 ";
-        //     }
-
-        //     if(x%8 == 0) {
-        //         output_file << "255 0 0 ";
-        //     }
-        // }
-
-        output_file << (int)screen_buffer[i] << " ";
-    }
-    output_file.close();
-    return 0;
-}
+u8 GB_Core::getByteFromIO(u16 addr) { return 0;  }
 
 u8 const* GB_Core::getScreenBuffer() {
     return screen_buffer;
@@ -167,9 +166,6 @@ u16 GB_Core::get_bp() { return breakpoint; }
 void GB_Core::set_bp_active(bool en) { bp_active = en; }
 bool GB_Core::get_bp_active()        { return bp_active; }
 
-//void GB_Core::__fetch_tile(u16 tile_addr, u8 x, u16 &tile_byte_1, u16 tile_byte_2) {
-//    
-//}
 
 void GB_Core::getBGBuffer(u8 *buf) {
     #define reg(X) (io->registers.X)

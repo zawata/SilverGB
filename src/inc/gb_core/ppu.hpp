@@ -71,8 +71,8 @@ public:
     void enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite);
 
     bool ppu_tick();
-    void process_oam_fetch();
-    void process_vram_fetch();
+    void ppu_tick_oam();
+    void ppu_tick_vram();
 
 private:
     IO_Bus *io;
@@ -142,9 +142,7 @@ private:
 
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map
-        wnd_map_addr;   // addr of the current tile in the wnd tile map
-
-    s16
+        wnd_map_addr,   // addr of the current tile in the wnd tile map
         tile_addr;      // relative addr of the current tile data to fetch
 
     u8

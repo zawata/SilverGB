@@ -127,6 +127,240 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
     }
 }
 
+void PPU::ppu_tick_oam() {
+    switch(oam_fetch_step) {
+
+    // oam clk 1
+    case OAM_0:
+        current_sprite = oam_fetch_sprite(sprite_counter);
+
+        oam_fetch_step = OAM_1;
+        break;
+
+    // oam clk 2
+    case OAM_1:
+        if(active_sprites.size() < 10 &&
+        current_sprite.pos_x > 0 &&
+        y_cntr + 16 >= current_sprite.pos_y &&
+        y_cntr + 16 < current_sprite.pos_y + ((LCDC_BIG_SPRITES) ? 16 : 8)) {
+            active_sprites.push_back(current_sprite);
+        }
+
+        sprite_counter++;
+        oam_fetch_step = OAM_0;
+        break;
+    }
+
+    //quit after scanning all 40 sprites
+    if(sprite_counter == 40) {
+        //reuse sprite_counter for rendering
+        sprite_counter = 0;
+        process_step = SCANLINE_VRAM;
+    }
+}
+
+void PPU::ppu_tick_vram() {
+    /**
+     * VRAM fetches take 2 cycles to occur.
+     *
+     * to simplify logic, we use 2 enums per section
+     */
+    switch(vram_fetch_step) {
+
+    // Background map clk 1
+    case BM_0:
+        bg_map_byte = io->read_vram(bg_map_addr, true);
+
+        //increment bg_map_addr, but only the bottom 5 bits.
+        // this will wrap around the edge of the tile map
+        if(!skip_fetch) {
+            bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
+        }
+        skip_fetch = false;
+
+        vram_fetch_step = BM_1;
+        break;
+
+    // Background map clk 2
+    case BM_1:
+        tile_addr = 0x8000;
+        if(Bit::test(bg_map_byte, 7)) {
+            tile_addr += 0x0800;
+        }
+        else if(!LCDC_BG_WND_TILE_DATA) {
+            tile_addr += 0x1000;
+        }
+
+        tile_addr +=
+                ((bg_map_byte & 0x7F) << 4) |
+                (((y_cntr + y_sc) & 0x7) << 1);
+
+        vram_fetch_step = TD_0_0;
+        break;
+
+    // window map clk 1
+    case WM_0:
+        wnd_map_byte = io->read_vram(wnd_map_addr, true);
+        wnd_map_addr++;
+
+        vram_fetch_step = WM_1;
+        break;
+
+    // window map clk 2
+    case WM_1:
+        tile_addr = 0x8000;
+        if(Bit::test(wnd_map_byte, 7)) {
+            tile_addr += 0x0800;
+        }
+        else if(!LCDC_BG_WND_TILE_DATA) {
+            tile_addr += 0x1000;
+        }
+
+        tile_addr +=
+                ((wnd_map_byte & 0x7F) << 4) |
+                ((wnd_y_cntr & 0x7) << 1);
+
+        vram_fetch_step = TD_0_0;
+        break;
+
+    // tile data 1 clk 1
+    case TD_0_0:
+        tile_byte_1 = io->read_vram(tile_addr, true);
+        tile_addr++;
+
+        vram_fetch_step = TD_0_1;
+        break;
+
+    // tile data 1 clk 2
+    case TD_0_1:
+        //Do nothing
+        vram_fetch_step = TD_1_0;
+        break;
+
+    // tile data 2 clk 1
+    case TD_1_0:
+        tile_byte_2 = io->read_vram(tile_addr, true);
+        tile_addr++;
+
+        vram_fetch_step = TD_1_1;
+        break;
+
+    // tile data 2 clk 2
+    case TD_1_1:
+        //Do nothing
+        vram_fetch_step = SP_0;
+        break;
+
+    // sprite data clk 1
+    // Doubles as IDLE
+    case SP_0:
+        //Do nothing for the sake of simplicity
+        vram_fetch_step = SP_1;
+        break;
+
+    // sprite data clk 2
+    case SP_1:
+        if(displayed_sprites.size() > 0) {
+            enqueue_sprite_data(displayed_sprites.front());
+            displayed_sprites.pop_front();
+
+            vram_fetch_step = SP_0;
+        } else {
+            pause_bg_fifo = false;
+
+            // shift in bg pixels when the bg fifo is empty.
+            // this will not occur on subsequent sprite reads as the bg_fifo
+            // should be disabled until the sprite fetches are done
+            //TODO: this should be moved out of the idle clocking as it makes
+            // the first fetch 2 clock cycles too long
+            if(bg_fifo->size() == 0) {
+                for(int i = 0; i < 8; i++) {
+                    u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
+                    tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
+                    tile_idx *= 2;
+
+                    bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
+                }
+
+                if(in_window) {
+                    vram_fetch_step = WM_0;
+                }
+                else {
+                    vram_fetch_step = BM_0;
+                }
+            }
+        }
+        break;
+
+    default:
+        //invalid VRAM fetch step
+        std::cerr << "vram step error" << vram_fetch_step << std::endl;
+        assert(false);
+    }
+
+    /**
+     * Actual PPU logic
+     */
+    if(bg_fifo->size() > 0 && !pause_bg_fifo) {
+        u8 color_idx = bg_fifo->dequeue();
+
+        //if background is disabled, force write a 0
+        if(!LCDC_BG_ENABLED) {
+            color_idx = 0;
+        }
+
+        //if drawing a sprite, dequeue a sprite pixel
+        if(sp_fifo->size() > 0) {
+            sprite_fifo_color_t s_color = sp_fifo->dequeue();
+
+            //if the color in the sprite pixel isn't transparent
+            // or has priority, replace the background color
+            if(!s_color.is_transparent) {
+                if(!s_color.bg_priority || color_idx == 0) {
+                    color_idx = s_color.color_idx;
+                }
+            }
+        }
+
+        if (x_cntr > 8 + (x_sc & 0x7_u8)) {
+            pix_clock_count++;
+
+            // if frame is disabled, don't draw pixel data
+            if (!frame_disable) {
+                memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
+                current_byte += 3;
+            }
+        }
+
+
+        if(LCDC_OBJ_ENABLED ) {
+            for(auto sprite : active_sprites) {
+                if(x_cntr == sprite.pos_x) {
+                    pause_bg_fifo = true;
+                    displayed_sprites.push_back(sprite);
+                }
+            }
+        }
+
+        if (!in_window) {
+            if (LCDC_WINDOW_ENABLED && x_cntr >= reg(WX) && y_cntr >= reg(WY)) {
+                in_window = true;
+                vram_fetch_step = WM_0;
+                bg_fifo->clear();
+            }
+        }
+
+        if(pix_clock_count == 160) {
+            if (in_window) {
+                wnd_y_cntr++;
+            }
+            process_step = HBLANK;
+        }
+
+        x_cntr++;
+    }
+}
+
 bool PPU::ppu_tick() {
 /**
  * TODO:
@@ -276,7 +510,7 @@ bool PPU::ppu_tick() {
     bool coin_int =
             Bit::test(reg(STAT), STAT_COIN_INT_BIT) &&
             Bit::test(reg(STAT), STAT_COIN_BIT)     &&
-            !coin_bit_signal                       &&
+            !coin_bit_signal                        &&
             old_LY != reg(LY);
     old_LY  = reg(LY);
     coin_bit_signal = Bit::test(reg(STAT), STAT_COIN_BIT);
@@ -297,255 +531,14 @@ bool PPU::ppu_tick() {
         io->request_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
     }
 
-    /**
-     * OAM Fetch Mode
-     */
     if(process_step == SCANLINE_OAM) {
-        switch(oam_fetch_step) {
-
-        // oam clk 1
-        case OAM_0:
-            current_sprite = oam_fetch_sprite(sprite_counter);
-
-            oam_fetch_step = OAM_1;
-            break;
-
-        // oam clk 2
-        case OAM_1:
-            if(active_sprites.size() < 10 &&
-            current_sprite.pos_x > 0 &&
-            y_cntr + 16 >= current_sprite.pos_y &&
-            y_cntr + 16 < current_sprite.pos_y + ((LCDC_BIG_SPRITES) ? 16 : 8)) {
-                active_sprites.push_back(current_sprite);
-            }
-
-            sprite_counter++;
-            oam_fetch_step = OAM_0;
-            break;
-        }
-
-        //quit after scanning all 40 sprites
-        if(sprite_counter == 40) {
-            //reuse sprite_counter for rendering
-            sprite_counter = 0;
-            process_step = SCANLINE_VRAM;
-        }
-
-    /**
-     * VRAM Fetch Mode
-     */
+        ppu_tick_oam();
     } else if(process_step == SCANLINE_VRAM) {
-        /**
-         * VRAM fetches take 2 cycles to occur.
-         *
-         * to simplify logic, we use 2 enums per section
-         */
-        switch(vram_fetch_step) {
-
-        // Background map clk 1
-        case BM_0:
-            bg_map_byte = io->read_vram(bg_map_addr, true);
-
-            //increment bg_map_addr, but only the bottom 5 bits.
-            // this will wrap around the edge of the tile map
-            if(!skip_fetch) {
-                bg_map_addr = (bg_map_addr & 0xFFE0) | ((bg_map_addr+1) & 0x001F);
-            }
-            skip_fetch = false;
-
-            vram_fetch_step = BM_1;
-            break;
-
-        // Background map clk 2
-        case BM_1:
-            tile_addr = 0x8000;
-            if(Bit::test(bg_map_byte, 7)) {
-                tile_addr += 0x0800;
-            }
-            else if(!LCDC_BG_WND_TILE_DATA) {
-                tile_addr += 0x1000;
-            }
-
-            tile_addr +=
-                    ((bg_map_byte & 0x7F) << 4) |
-                    (((y_cntr + y_sc) & 0x7) << 1);
-
-            vram_fetch_step = TD_0_0;
-            break;
-
-        // window map clk 1
-        case WM_0:
-            wnd_map_byte = io->read_vram(wnd_map_addr, true);
-            wnd_map_addr++;
-
-            vram_fetch_step = WM_1;
-            break;
-
-        // window map clk 2
-        case WM_1:
-            tile_addr = 0x8000;
-            if(Bit::test(wnd_map_byte, 7)) {
-                tile_addr += 0x0800;
-            }
-            else if(!LCDC_BG_WND_TILE_DATA) {
-                tile_addr += 0x1000;
-            }
-
-            tile_addr +=
-                    ((wnd_map_byte & 0x7F) << 4) |
-                    ((wnd_y_cntr & 0x7) << 1);
-
-            vram_fetch_step = TD_0_0;
-            break;
-
-        // tile data 1 clk 1
-        case TD_0_0:
-            tile_byte_1 = io->read_vram(tile_addr, true);
-            tile_addr++;
-
-            vram_fetch_step = TD_0_1;
-            break;
-
-        // tile data 1 clk 2
-        case TD_0_1:
-            //Do nothing
-            vram_fetch_step = TD_1_0;
-            break;
-
-        // tile data 2 clk 1
-        case TD_1_0:
-            tile_byte_2 = io->read_vram(tile_addr, true);
-            tile_addr++;
-
-            vram_fetch_step = TD_1_1;
-            break;
-
-        // tile data 2 clk 2
-        case TD_1_1:
-            //Do nothing
-            vram_fetch_step = SP_0;
-            break;
-
-        // sprite data clk 1
-        // Doubles as IDLE
-        case SP_0:
-            //Do nothing for the sake of simplicity
-            vram_fetch_step = SP_1;
-            break;
-
-        // sprite data clk 2
-        case SP_1:
-            if(displayed_sprites.size() > 0) {
-                enqueue_sprite_data(displayed_sprites.front());
-                displayed_sprites.pop_front();
-
-                vram_fetch_step = SP_0;
-            } else {
-                pause_bg_fifo = false;
-
-                // shift in bg pixels when the bg fifo is empty.
-                // this will not occur on subsequent sprite reads as the bg_fifo
-                // should be disabled until the sprite fetches are done
-                //TODO: this should be moved out of the idle clocking as it makes
-                // the first fetch 2 clock cycles too long
-                if(bg_fifo->size() == 0) {
-                    for(int i = 0; i < 8; i++) {
-                        u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
-                        tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
-                        tile_idx *= 2;
-
-                        bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
-                    }
-
-                    if(in_window) {
-                        vram_fetch_step = WM_0;
-                    }
-                    else {
-                        vram_fetch_step = BM_0;
-                    }
-                }
-            }
-            break;
-
-        default:
-            //invalid VRAM fetch step
-            std::cerr << "vram step error" << vram_fetch_step << std::endl;
-            assert(false);
-        }
-
-        /**
-         * Actual PPU logic
-         */
-        if(bg_fifo->size() > 0 && !pause_bg_fifo) {
-            u8 color_idx = bg_fifo->dequeue();
-
-            //if background is disabled, force write a 0
-            if(!LCDC_BG_ENABLED) {
-                color_idx = 0;
-            }
-
-            //if drawing a sprite, dequeue a sprite pixel
-            if(sp_fifo->size() > 0) {
-                sprite_fifo_color_t s_color = sp_fifo->dequeue();
-
-                //if the color in the sprite pixel isn't transparent
-                // or has priority, replace the background color
-                if(!s_color.is_transparent) {
-                    if(!s_color.bg_priority || color_idx == 0) {
-                        color_idx = s_color.color_idx;
-                    }
-                }
-            }
-
-            if (x_cntr > 8 + (x_sc & 0x7_u8)) {
-                pix_clock_count++;
-
-                // if frame is disabled, don't draw pixel data
-                if (!frame_disable) {
-                    memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
-                    current_byte += 3;
-                }
-            }
-
-
-            if(LCDC_OBJ_ENABLED ) {
-                for(auto sprite : active_sprites) {
-                    if(x_cntr == sprite.pos_x) {
-                        pause_bg_fifo = true;
-                        displayed_sprites.push_back(sprite);
-                    }
-                }
-            }
-
-            if (!in_window) {
-                if (LCDC_WINDOW_ENABLED && x_cntr >= reg(WX) && y_cntr >= reg(WY)) {
-                    in_window = true;
-                    vram_fetch_step = WM_0;
-                    bg_fifo->clear();
-                }
-            }
-
-            if(pix_clock_count == 160) {
-                if (in_window) {
-                    wnd_y_cntr++;
-                }
-                process_step = HBLANK;
-            }
-
-            x_cntr++;
-        }
-
-    /**
-     * HBLANK
-     */
+        ppu_tick_vram();
     } else if(process_step == HBLANK) {
         if(line_clock_count >= 455) {
             new_line = true;
         }
-
-    /**
-     * VBLANK
-     */
     } else if(process_step == VBLANK) {
         if(!vblank_int_requested) {
             vblank_int_requested = true;
@@ -557,10 +550,6 @@ bool PPU::ppu_tick() {
             //TODO: supposedly the first VBLANK is shorter than the rest? refer to TCAGBD and confirm
             new_line = true;
         }
-
-    /**
-     * ERROR
-     */
     } else {
         std::cerr << "process_step error: " << as_hex((int)process_step) << std::endl;
     }
@@ -568,11 +557,11 @@ bool PPU::ppu_tick() {
     line_clock_count++; //used in HBLANK and VBLANK
     frame_clock_count++;
 
-    if(frame_clock_count >= 70223) { //70224 clks per frame
+    if(frame_clock_count < TICKS_PER_FRAME) {
+        return false;
+    } else {
         frame_clock_count = 0;
         new_frame = true;
         return true;
-    } else {
-        return false;
     }
 }

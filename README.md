@@ -61,11 +61,6 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 🚫 = Not Working  
 \- = Not Tested
 
-➕GUI  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ File Handling  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ ️Main Window  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ View Port  
-&nbsp;&nbsp;&nbsp;&nbsp;➕ Prettification  
 ✔ CPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ OpCodes  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ OpCode Disassembly  
@@ -87,7 +82,22 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ RTC  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 Others  
 ➕ Sound  
-&nbsp;&nbsp;&nbsp;&nbsp;➕ TODO
+&nbsp;&nbsp;&nbsp;&nbsp;➕ APU  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ Square Channel 1  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 Frequency Sweep  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ Volume Envelope  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Frequency Timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ Square Channel 2  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ Volume Envelope  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Frequency Timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 Wave Channel  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ Noise Channel  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ Volume Envelope  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ Configurable Timer  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ LFSR  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ Async Audio Playback  
+&nbsp;&nbsp;&nbsp;&nbsp;➕ Mixing?  
+&nbsp;&nbsp;&nbsp;&nbsp;🚫 Volume Control  
 ➕ PPU  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ VRAM  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Pixel Fifo  

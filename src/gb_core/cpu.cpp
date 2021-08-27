@@ -2,47 +2,101 @@
 #include "gb_core/defs.hpp"
 
 #include "util/bit.hpp"
+#include "util/flags.hpp"
 
-#define C_FLAG (this->AF.b_AF.b_F.c)
-#define H_FLAG (this->AF.b_AF.b_F.h)
-#define N_FLAG (this->AF.b_AF.b_F.n)
-#define Z_FLAG (this->AF.b_AF.b_F.z)
+//CPU Flags
+bool
+    IME = 0,
+    is_halted = false,
+    halt_bug  = false,
+    is_stopped = false,
+    ei_ime_enable = false;
 
-#define C_COND (this->AF.b_AF.b_F.c == 1)
-#define NC_COND (!C_COND)
+//Registers
+union {
+    struct {
+        u8 F;
+        u8 A;
+    } b_AF;
+    u16 i_AF;
+} AF;
 
-#define Z_COND (this->AF.b_AF.b_F.z == 1)
-#define NZ_COND (!Z_COND)
+union {
+    struct {
+        u8 C;
+        u8 B;
+    } b_BC;
+    u16 i_BC;
+} BC;
 
-#define A_REG  this->AF.b_AF.A
-#define F_REG  this->AF.b_AF.i_F
-#define B_REG  this->BC.b_BC.B
-#define C_REG  this->BC.b_BC.C
-#define D_REG  this->DE.b_DE.D
-#define E_REG  this->DE.b_DE.E
-#define H_REG  this->HL.b_HL.H
-#define L_REG  this->HL.b_HL.L
-#define AF_REG this->AF.i_AF
-#define BC_REG this->BC.i_BC
-#define DE_REG this->DE.i_DE
-#define HL_REG this->HL.i_HL
-#define SP_REG this->SP
-#define PC_REG this->PC
+union {
+    struct {
+        u8 E;
+        u8 D;
+    } b_DE;
+    u16 i_DE;
+} DE;
 
-inline bool check_half_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x10; }
-inline bool check_half_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x10; }
-inline bool      check_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x100; }
-inline bool      check_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x100; }
-inline bool check_half_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x1000; }
-inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x1000; }
-inline bool      check_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x10000; }
-inline bool      check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
+union {
+    struct {
+        u8 L;
+        u8 H;
+    } b_HL;
+    u16 i_HL;
+} HL;
+
+u16 SP;
+u16 PC;
+
+#define A_REG  AF.b_AF.A
+#define F_REG  AF.b_AF.F
+#define B_REG  BC.b_BC.B
+#define C_REG  BC.b_BC.C
+#define D_REG  DE.b_DE.D
+#define E_REG  DE.b_DE.E
+#define H_REG  HL.b_HL.H
+#define L_REG  HL.b_HL.L
+#define AF_REG AF.i_AF
+#define BC_REG BC.i_BC
+#define DE_REG DE.i_DE
+#define HL_REG HL.i_HL
+#define SP_REG SP
+#define PC_REG PC
+
+#define BOOL(x) (!(!(x)))
+#define BitTest(arg,posn) BOOL((arg) & (1L << (posn)))
+#define BitSet(arg,posn) ((arg) | (1L << (posn)))
+#define BitChange(arg,posn,stt) (((arg) & ~(1UL << (posn))) | ((stt) << (posn)))
+#define BitReset(arg,posn) ((arg) & ~(1L << (posn)))
+#define BitFlip(arg,posn) ((arg) ^ (1L << (posn)))
+
+#define make_reg_funcs(name, bit) \
+ __force_inline bool get_##name() { return BitTest(F_REG, bit); } \
+ __force_inline void set_##name() { F_REG = BitSet(F_REG, bit); } \
+ __force_inline void change_##name(bool state) { F_REG = BitChange(F_REG, bit, (u8)state);} \
+ __force_inline void reset_##name() { F_REG = BitReset(F_REG, bit); } \
+ __force_inline void flip_##name() { F_REG = BitFlip(F_REG, bit); };
+
+make_reg_funcs(C_FLAG, 4);
+make_reg_funcs(H_FLAG, 5);
+make_reg_funcs(N_FLAG, 6);
+make_reg_funcs(Z_FLAG, 7);
+
+__force_inline bool check_half_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x10; }
+__force_inline bool check_half_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x10; }
+__force_inline bool      check_carry_8 ( u8 x,  u8 y,        u16 r) { return (x^y^r)   & 0x100; }
+__force_inline bool      check_carry_8 ( u8 x,  u8 y, u8  z, u16 r) { return (x^y^z^r) & 0x100; }
+__force_inline bool check_half_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x1000; }
+__force_inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x1000; }
+__force_inline bool      check_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x10000; }
+__force_inline bool      check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
 CPU::CPU(IO_Bus *io, bool bootrom_enabled = false) :
 io(io),
 inst_clocks(0),
-cpu_counter(0),
-IME(true) {
+cpu_counter(0) {
+    IME = true;
+
     if(bootrom_enabled) {
         AF_REG = 0x0000;
         BC_REG = 0x0000;
@@ -100,19 +154,21 @@ bool CPU::tick() {
     if(!inst_clocks) { //used to properly time the instruction execution
         u8 int_pc = 0, int_val = 0;
         bool int_set = false;
-        if(io->cpu_check_interrupts() & IO_Bus::Interrupt::VBLANK_INT) {
+
+        IO_Bus::Interrupt curr_interupts = io->cpu_check_interrupts();
+        if(curr_interupts & IO_Bus::Interrupt::VBLANK_INT) {
             int_pc = VBLANK_INT_OFFSET;
             int_val = IO_Bus::Interrupt::VBLANK_INT;
-        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::LCD_STAT_INT) {
-             int_pc = LCD_STAT_INT_OFFSET;
+        } else if(curr_interupts & IO_Bus::Interrupt::LCD_STAT_INT) {
+            int_pc = LCD_STAT_INT_OFFSET;
             int_val = IO_Bus::Interrupt::LCD_STAT_INT;
-        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::TIMER_INT) {
+        } else if(curr_interupts & IO_Bus::Interrupt::TIMER_INT) {
             int_pc = TIMER_INT_OFFSET;
             int_val = IO_Bus::Interrupt::TIMER_INT;
-        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::SERIAL_INT) {
+        } else if(curr_interupts & IO_Bus::Interrupt::SERIAL_INT) {
             int_pc = SERIAL_INT_OFFSET;
             int_val = IO_Bus::Interrupt::SERIAL_INT;
-        } else if(io->cpu_check_interrupts() & IO_Bus::Interrupt::JOYPAD_INT) {
+        } else if(curr_interupts & IO_Bus::Interrupt::JOYPAD_INT) {
             int_pc = JOYPAD_INT_OFFSET;
             int_val = IO_Bus::Interrupt::JOYPAD_INT;
         }
@@ -129,8 +185,8 @@ bool CPU::tick() {
             if(IME) {
                 IME = 0;
                 stack_push(PC_REG);
-                io->cpu_unset_interrupt((IO_Bus::Interrupt)int_val);
                 PC_REG = int_pc;
+                io->cpu_unset_interrupt((IO_Bus::Interrupt)int_val);
                 inst_clocks = 20;
                 int_set = true;
             }
@@ -174,7 +230,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-     //std::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
+    //  std::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -209,7 +265,7 @@ u8 CPU::decode(u8 op) {
         case 0x1d: return dec_r(&E_REG);                 //   4  DEC E
         case 0x1e: return load_r_n(&E_REG);              //   8  LD E, xx
         case 0x1f: return rra_r(&A_REG);                 //   4  RRA
-        case 0x20: return jump_rel_cond_n(NZ_COND);      //  ??  JR NZ, xx
+        case 0x20: return jump_rel_cond_n(!get_Z_FLAG());//  ??  JR NZ, xx
         case 0x21: return load_rr_nn(&HL_REG);           //  12  LD HL, yyxx
         case 0x22: return loadi_rr_r(&HL_REG, &A_REG);   //   8  LDI (HL),A
         case 0x23: return inc_rr(&HL_REG);               //   8  INC HL
@@ -217,7 +273,7 @@ u8 CPU::decode(u8 op) {
         case 0x25: return dec_r(&H_REG);                 //   4  DEC H
         case 0x26: return load_r_n(&H_REG);              //   8  LD H, xx
         case 0x27: return daa_r(&A_REG);                 //   4  DAA
-        case 0x28: return jump_rel_cond_n(Z_COND);       //  ??  JR Z, xx
+        case 0x28: return jump_rel_cond_n(get_Z_FLAG()); //  ??  JR Z, xx
         case 0x29: return add_rr_rr(&HL_REG, &HL_REG);   //   8  ADD HL, HL
         case 0x2a: return loadi_r_rr(&A_REG, &HL_REG);   //   8  LDI A, (HL)
         case 0x2b: return dec_rr(&HL_REG);               //   8  DEC HL
@@ -225,7 +281,7 @@ u8 CPU::decode(u8 op) {
         case 0x2d: return dec_r(&L_REG);                 //   4  DEC L
         case 0x2e: return load_r_n(&L_REG);              //   8  LD L, xx
         case 0x2f: return cpl_r(&A_REG);                 //   4  CPL
-        case 0x30: return jump_rel_cond_n(NC_COND);      //  ??  JR NC, xx
+        case 0x30: return jump_rel_cond_n(!get_C_FLAG());//  ??  JR NC, xx
         case 0x31: return load_rr_nn(&SP_REG);           //  12  LD SP, yyxx
         case 0x32: return loadd_rr_r(&HL_REG, &A_REG);   //   8  LDD (HL), A
         case 0x33: return inc_rr(&SP_REG);               //   8  INC SP
@@ -233,7 +289,7 @@ u8 CPU::decode(u8 op) {
         case 0x35: return dec_ll(HL_REG);                //  12  DEC (HL)
         case 0x36: return load_ll_n(HL_REG);             //  12  LD (HL), xx
         case 0x37: return scf();                         //   4  SCF
-        case 0x38: return jump_rel_cond_n(C_COND);       //  ??  JR C, xx
+        case 0x38: return jump_rel_cond_n(get_C_FLAG()); //  ??  JR C, xx
         case 0x39: return add_rr_rr(&HL_REG, &SP_REG);   //   8  ADD HL, SP
         case 0x3a: return loadd_r_rr(&A_REG, &HL_REG);   //   8  LDD A, (HL)
         case 0x3b: return dec_rr(&SP_REG);               //   8  DEC SP
@@ -369,17 +425,17 @@ u8 CPU::decode(u8 op) {
         case 0xbd: return cp_r_r(&A_REG, &L_REG);        //   4  CP L
         case 0xbe: return cp_r_ll(&A_REG, HL_REG);       //   8  CP (HL)
         case 0xbf: return cp_r_r(&A_REG, &A_REG);        //   4  CP A
-        case 0xc0: return ret_cond(NZ_COND);             //  ??  RET NZ
+        case 0xc0: return ret_cond(!get_Z_FLAG());       //  ??  RET NZ
         case 0xc1: return pop_rr(&BC_REG);               //  12  POP BC
-        case 0xc2: return jump_cond_ll(NZ_COND);         //  ??  JP NZ yyxx
+        case 0xc2: return jump_cond_ll(!get_Z_FLAG());   //  ??  JP NZ yyxx
         case 0xc3: return jump_nn();                     //  16  JP yyxx
-        case 0xc4: return call_cond_nn(NZ_COND);         //  ??  CALL NZ yyxx
+        case 0xc4: return call_cond_nn(!get_Z_FLAG());   //  ??  CALL NZ yyxx
         case 0xc5: return push_rr(&BC_REG);              //  16  PUSH BC
         case 0xc6: return add_r_n(&A_REG);               //   8  ADD A, xx
         case 0xc7: return rst_l(0x00);                   //  16  RST 00h
-        case 0xc8: return ret_cond(Z_COND);              //  ??  RET Z
+        case 0xc8: return ret_cond(get_Z_FLAG());        //  ??  RET Z
         case 0xc9: return ret();                         //  16  RET
-        case 0xca: return jump_cond_ll(Z_COND);          //  ??  JP Z yyxx
+        case 0xca: return jump_cond_ll(get_Z_FLAG());    //  ??  JP Z yyxx
         case 0xcb: {
             u8 data = fetch_8();
 
@@ -441,23 +497,23 @@ u8 CPU::decode(u8 op) {
             }
         }
         break;
-        case 0xcc: return call_cond_nn(Z_COND);          //  ??  CALL Z, yyxx
+        case 0xcc: return call_cond_nn(get_Z_FLAG());    //  ??  CALL Z, yyxx
         case 0xcd: return call_nn();                     //  24  CALL yyxx
         case 0xce: return adc_r_n(&A_REG);               //   8  ADC A, xx
         case 0xcf: return rst_l(0x08);                   //  16  RST 08h
-        case 0xd0: return ret_cond(NC_COND);             //  ??  RET NC
+        case 0xd0: return ret_cond(!get_C_FLAG());       //  ??  RET NC
         case 0xd1: return pop_rr(&DE_REG);               //  12  POP DE
-        case 0xd2: return jump_cond_ll(NC_COND);         //  ??  JP NC, yyxx
+        case 0xd2: return jump_cond_ll(!get_C_FLAG());   //  ??  JP NC, yyxx
         case 0xd3: return invalid_op(0xd3);              //  --  ----
-        case 0xd4: return call_cond_nn(NC_COND);         //  ??  CALL NC yyxx
+        case 0xd4: return call_cond_nn(!get_C_FLAG());   //  ??  CALL NC yyxx
         case 0xd5: return push_rr(&DE_REG);              //  12  PUSH DE
         case 0xd6: return sub_r_n(&A_REG);               //   8  SUB xx
         case 0xd7: return rst_l(0x10);                   //  16  RST 10h
-        case 0xd8: return ret_cond(C_COND);              //  ??  RET C
+        case 0xd8: return ret_cond(get_C_FLAG());        //  ??  RET C
         case 0xd9: return reti();                        //  16  RETI
-        case 0xda: return jump_cond_ll(C_COND);          //  ??  JP C yyxx
+        case 0xda: return jump_cond_ll(get_C_FLAG());    //  ??  JP C yyxx
         case 0xdb: return invalid_op(0xdb);              //  --  ----
-        case 0xdc: return call_cond_nn(C_COND);          //  ??  CALL C yyxx
+        case 0xdc: return call_cond_nn(get_C_FLAG());    //  ??  CALL C yyxx
         case 0xdd: return invalid_op(0xdd);              //  --  ----
         case 0xde: return sbc_r_n(&A_REG);               //   8  SBC A, xx
         case 0xdf: return rst_l(0x18);                   //  16  RST 18h
@@ -518,7 +574,7 @@ void CPU::stack_push(u16 n) {
     io->write(--SP_REG, (u8)n);
 }
 
-u16  CPU::stack_pop() {
+u16 CPU::stack_pop() {
     u8 q1 = io->read(SP_REG++);
     u8 q2 = io->read(SP_REG++);
     return (u16)q2 << 8 | q1;
@@ -629,12 +685,12 @@ u8 CPU::load_rr_rrn(u16 *r1, u16 *r2) {
 //CHNZ
     s8 e = (s8)fetch_8(); //signed
 
-    Z_FLAG = 0;
-    N_FLAG = 0;
+    reset_Z_FLAG();
+    reset_N_FLAG();
 
     //stupid signed operand breaks existing carry calculations
-    H_FLAG = (*r2 & 0xF) + (e & 0xF) > 0xF;
-    C_FLAG = (*r2 & 0xFF) + (e & 0xFF) > 0xFF;
+    change_H_FLAG((*r2 & 0xF) + (e & 0xF) > 0xF);
+    change_C_FLAG((*r2 & 0xFF) + (e & 0xFF) > 0xFF);
 
     *r1 = *r2 + e;
     return 12;
@@ -650,9 +706,9 @@ u8 CPU::load_r_llnn(u8 *r1) {
 //====================
 u8 CPU::inc_r(u8 *r1) {
 //HNZ
-    Z_FLAG = !(u8)(*r1 + 1);
-    H_FLAG = check_half_carry_8(1, *r1, (u16)*r1 + 1);
-    N_FLAG = 0;
+    change_Z_FLAG(!(u8)(*r1 + 1));
+    change_H_FLAG(check_half_carry_8(1, *r1, (u16)*r1 + 1));
+    reset_N_FLAG();
 
     *r1+=1;
     return 4;
@@ -660,9 +716,9 @@ u8 CPU::inc_r(u8 *r1) {
 
 u8 CPU::dec_r(u8 *r1) {
 //HNZ
-    Z_FLAG = !(*r1 - 1);
-    H_FLAG = check_half_carry_8(1, *r1, *r1 - 1);
-    N_FLAG = 1;
+    change_Z_FLAG(!(*r1 - 1));
+    change_H_FLAG(check_half_carry_8(1, *r1, *r1 - 1));
+    set_N_FLAG();
 
     *r1-=1;
     return 4;
@@ -682,9 +738,9 @@ u8 CPU::inc_ll(u16 loc) {
 //HNZ
     u8 r1 = io->read(loc);
 
-    Z_FLAG = !(u8)(r1 + 1);
-    H_FLAG = check_half_carry_8(1, r1, (u16)(r1 + 1));
-    N_FLAG = 0;
+    change_Z_FLAG(!(u8)(r1 + 1));
+    change_H_FLAG(check_half_carry_8(1, r1, (u16)(r1 + 1)));
+    reset_N_FLAG();
 
     io->write(loc, r1+1);
     return 12;
@@ -694,9 +750,9 @@ u8 CPU::dec_ll(u16 loc) {
 //HNZ
     u8 r1 = io->read(loc);
 
-    Z_FLAG = !(r1 - 1);
-    H_FLAG = check_half_carry_8(r1, 1, (r1 - 1));
-    N_FLAG = 1;
+    change_Z_FLAG(!(r1 - 1));
+    change_H_FLAG(check_half_carry_8(r1, 1, (r1 - 1)));
+    set_N_FLAG();
 
     io->write(loc, r1-1);
     return 12;
@@ -709,10 +765,10 @@ u8 CPU::add_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(u8)(*r1 + r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
+    change_Z_FLAG(!(u8)(*r1 + r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1 + r2));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1 + r2));
 
     *r1 += r2;
     return 8;
@@ -720,10 +776,10 @@ u8 CPU::add_r_n(u8 *r1) {
 
 u8 CPU::add_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(u8)(*r1 + *r2);
-    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1 + *r2);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1 + *r2);
+    change_Z_FLAG(!(u8)(*r1 + *r2));
+    change_H_FLAG(check_half_carry_8(*r1, *r2, (u16)*r1 + *r2));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, *r2, (u16)*r1 + *r2));
     *r1 += *r2;
     return 4;
 }
@@ -732,10 +788,10 @@ u8 CPU::add_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(u8)(*r1 + r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 + r2);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 + r2);
+    change_Z_FLAG(!(u8)(*r1 + r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1 + r2));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1 + r2));
 
     *r1 += r2;
     return 8;
@@ -745,12 +801,12 @@ u8 CPU::add_rr_n(u16 *r1) {
 //CHNZ
     s8 r2 = (s8)fetch_8();
 
-    Z_FLAG = 0;
-    N_FLAG = 0;
+    reset_Z_FLAG();
+    reset_N_FLAG();
 
     //stupid signed operand breaks existing carry calculations
-    H_FLAG = (*r1 & 0xF) + (r2 & 0xF) > 0xF;
-    C_FLAG = (*r1 & 0xFF) + (r2 & 0xFF) > 0xFF;
+    change_H_FLAG((*r1 & 0xF) + (r2 & 0xF) > 0xF);
+    change_C_FLAG((*r1 & 0xFF) + (r2 & 0xFF) > 0xFF);
 
     *r1 += r2;
 
@@ -759,9 +815,9 @@ u8 CPU::add_rr_n(u16 *r1) {
 
 u8 CPU::add_rr_rr(u16 *r1, u16 *r2) {
 //CHN
-    H_FLAG = check_half_carry_16(*r1, *r2, (u32)*r1 + *r2);
-    N_FLAG = 0;
-    C_FLAG = check_carry_16(*r1, *r2, (u32)*r1 + *r2);
+    change_H_FLAG(check_half_carry_16(*r1, *r2, (u32)*r1 + *r2));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_16(*r1, *r2, (u32)*r1 + *r2));
 
     *r1 += *r2;
     return 8;
@@ -774,12 +830,12 @@ u8 CPU::adc_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 + r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
+    change_Z_FLAG(!(u8)(*r1 + r2 + old_c));
+    change_H_FLAG(check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c));
 
     *r1 += r2 + old_c;
     return 8;
@@ -787,12 +843,12 @@ u8 CPU::adc_r_n(u8 *r1) {
 
 u8 CPU::adc_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 + *r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c);
+    change_Z_FLAG(!(u8)(*r1 + *r2 + old_c));
+    change_H_FLAG(check_half_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, *r2, old_c, (u16)*r1 + *r2 + old_c));
 
     *r1 += *r2 + old_c;
     return 4;
@@ -802,12 +858,12 @@ u8 CPU::adc_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 + r2 + old_c);
-    H_FLAG = check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
-    N_FLAG = 0;
-    C_FLAG = check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c);
+    change_Z_FLAG(!(u8)(*r1 + r2 + old_c));
+    change_H_FLAG(check_half_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c));
+    reset_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, old_c, (u16)*r1 + r2 + old_c));
 
     *r1 += r2 + old_c;
     return 8;
@@ -820,10 +876,10 @@ u8 CPU::sub_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(u8)(*r1 - r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 - r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 - r2);
+    change_Z_FLAG(!(u8)(*r1 - r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1 - r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1 - r2));
 
     *r1 -= r2;
     return 8;
@@ -832,10 +888,10 @@ u8 CPU::sub_r_n(u8 *r1) {
 u8 CPU::sub_r(u8 *r1, u8 *r2) {
 //CHNZ
 
-    Z_FLAG = !(u8)(*r1 - *r2);
-    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1 - *r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1 - *r2);
+    change_Z_FLAG(!(u8)(*r1 - *r2));
+    change_H_FLAG(check_half_carry_8(*r1, *r2, (u16)*r1 - *r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, *r2, (u16)*r1 - *r2));
 
     *r1 -= *r2;
     return 4;
@@ -845,10 +901,10 @@ u8 CPU::sub_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(u8)(*r1 - r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1 - r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1 - r2);
+    change_Z_FLAG(!(u8)(*r1 - r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1 - r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1 - r2));
 
     *r1 -= r2;
     return 8;
@@ -861,12 +917,12 @@ u8 CPU::sbc_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 - r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
+    change_Z_FLAG(!(u8)(*r1 - r2 - old_c));
+    change_H_FLAG(check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c));
 
     *r1 -= r2;
     *r1 -= old_c;
@@ -876,12 +932,12 @@ u8 CPU::sbc_r_n(u8 *r1) {
 
 u8 CPU::sbc_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 - *r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c);
+    change_Z_FLAG(!(u8)(*r1 - *r2 - old_c));
+    change_H_FLAG(check_half_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, *r2, old_c, *r1 - *r2 - old_c));
 
     *r1 -= *r2;
     *r1 -= old_c;
@@ -893,12 +949,12 @@ u8 CPU::sbc_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    u8 old_c = C_FLAG; //save the old C_FLAG so we can set the flags first
+    u8 old_c = get_C_FLAG(); //save the old C_FLAG so we can set the flags first
 
-    Z_FLAG = !(u8)(*r1 - r2 - old_c);
-    H_FLAG = check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c);
+    change_Z_FLAG(!(u8)(*r1 - r2 - old_c));
+    change_H_FLAG(check_half_carry_8(*r1, r2, old_c, *r1 - r2 - old_c));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, old_c, *r1 - r2 - old_c));
 
     *r1 -= r2;
     *r1 -= old_c;
@@ -913,10 +969,10 @@ u8 CPU::and_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(*r1 & r2);
-    H_FLAG = 1;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 & r2));
+    set_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 &= r2;
     return 8;
@@ -924,10 +980,10 @@ u8 CPU::and_r_n(u8 *r1) {
 
 u8 CPU::and_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(*r1 & *r2);
-    H_FLAG = 1;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 & *r2));
+    set_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 &= *r2;
     return 4;
@@ -937,10 +993,10 @@ u8 CPU::and_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(*r1 & r2);
-    H_FLAG = 1;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 & r2));
+    set_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 &= r2;
     return 8;
@@ -953,10 +1009,10 @@ u8 CPU::or_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(*r1 | r2);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 | r2));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 |= r2;
     return 8;
@@ -964,10 +1020,10 @@ u8 CPU::or_r_n(u8 *r1) {
 
 u8 CPU::or_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(*r1 | *r2);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 | *r2));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 |= *r2;
     return 4;
@@ -977,10 +1033,10 @@ u8 CPU::or_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(*r1 | r2);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 | r2));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 |= r2;
     return 8;
@@ -993,10 +1049,10 @@ u8 CPU::xor_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(*r1 ^ r2);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 ^ r2));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 ^= r2;
     return 8;
@@ -1004,10 +1060,10 @@ u8 CPU::xor_r_n(u8 *r1) {
 
 u8 CPU::xor_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(*r1 ^ *r2);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 ^ *r2));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_C_FLAG();
 
     *r1 ^= *r2;
     return 4;
@@ -1017,10 +1073,10 @@ u8 CPU::xor_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(*r1 ^ r2);
-    N_FLAG = 0;
-    H_FLAG = 0;
-    C_FLAG = 0;
+    change_Z_FLAG(!(*r1 ^ r2));
+    reset_N_FLAG();
+    reset_H_FLAG();
+    reset_C_FLAG();
 
     *r1 ^= r2;
     return 8;
@@ -1033,20 +1089,20 @@ u8 CPU::cp_r_n(u8 *r1) {
 //CHNZ
     u8 r2 = fetch_8();
 
-    Z_FLAG = !(*r1-r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+    change_Z_FLAG(!(*r1-r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1-r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1-r2));
 
     return 8;
 }
 
 u8 CPU::cp_r_r(u8 *r1, u8 *r2) {
 //CHNZ
-    Z_FLAG = !(*r1-*r2);
-    H_FLAG = check_half_carry_8(*r1, *r2, (u16)*r1-*r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, *r2, (u16)*r1-*r2);
+    change_Z_FLAG(!(*r1-*r2));
+    change_H_FLAG(check_half_carry_8(*r1, *r2, (u16)*r1-*r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, *r2, (u16)*r1-*r2));
 
     return 4;
 }
@@ -1055,10 +1111,10 @@ u8 CPU::cp_r_ll(u8 *r1, u16 loc) {
 //CHNZ
     u8 r2 = io->read(loc);
 
-    Z_FLAG = !(*r1-r2);
-    H_FLAG = check_half_carry_8(*r1, r2, (u16)*r1-r2);
-    N_FLAG = 1;
-    C_FLAG = check_carry_8(*r1, r2, (u16)*r1-r2);
+    change_Z_FLAG(!(*r1-r2));
+    change_H_FLAG(check_half_carry_8(*r1, r2, (u16)*r1-r2));
+    set_N_FLAG();
+    change_C_FLAG(check_carry_8(*r1, r2, (u16)*r1-r2));
 
     return 8;
 }
@@ -1087,12 +1143,12 @@ u8 CPU::push_rr(u16 *r1) {
 //====================
 u8 CPU::rla_r(u8 *r1) {
 //CHNZ
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = Bit::test(*r1, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_Z_FLAG();
     *r1 <<= 1;
     *r1 |= old_c;
 
@@ -1101,12 +1157,12 @@ u8 CPU::rla_r(u8 *r1) {
 
 u8 CPU::rra_r(u8 *r1) {
 //CHNZ
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = *r1 & 1;
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = 0;
+    change_C_FLAG(*r1 & 1);
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_Z_FLAG();
     *r1 >>= 1;
     *r1 |= old_c<<7;
 
@@ -1115,37 +1171,37 @@ u8 CPU::rra_r(u8 *r1) {
 
 u8 CPU::rlca_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit::test(*r1, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_Z_FLAG();
     *r1 <<= 1;
-    *r1 |= C_FLAG;
+    *r1 |= ((u8)get_C_FLAG());
 
     return 4;
 }
 
 u8 CPU::rrca_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit::test(*r1, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
+    reset_Z_FLAG();
     *r1 >>= 1;
-    *r1 |= C_FLAG<<7;
+    *r1 |= ((u8)get_C_FLAG())<<7;
 
     return 4;
 }
 
 u8 CPU::rlc_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit::test(*r1, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
     *r1 <<= 1;
-    *r1 |= C_FLAG;
+    *r1 |= ((u8)get_C_FLAG());
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1154,13 +1210,13 @@ u8 CPU::rlc_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit::test(r, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
     r <<= 1;
-    r |= C_FLAG;
+    r |= ((u8)get_C_FLAG());
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1170,13 +1226,13 @@ u8 CPU::rlc_ll(u16 loc) {
 u8 CPU::rrc_r(u8 *r1) {
 //CHNZ
 
-    C_FLAG = Bit::test(*r1, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
     *r1 >>= 1;
-    *r1 |= C_FLAG<<7;
+    *r1 |= ((u8)get_C_FLAG())<<7;
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1185,13 +1241,13 @@ u8 CPU::rrc_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit::test(r, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
     r >>= 1;
-    r |= C_FLAG<<7;
+    r |= ((u8)get_C_FLAG())<<7;
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1200,16 +1256,16 @@ u8 CPU::rrc_ll(u16 loc) {
 
 u8 CPU::rl_r(u8 *r1) {
 //CHNZ
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = Bit::test(*r1, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     *r1 <<= 1;
     *r1 |= old_c;
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1217,16 +1273,16 @@ u8 CPU::rl_r(u8 *r1) {
 u8 CPU::rl_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = Bit::test(r, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     r <<= 1;
     r |= old_c;
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1235,16 +1291,16 @@ u8 CPU::rl_ll(u16 loc) {
 
 u8 CPU::rr_r(u8 *r1) {
 //CHNZ
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = Bit::test(*r1, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     *r1 >>= 1;
     *r1 |= old_c<<7;
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1252,16 +1308,16 @@ u8 CPU::rr_r(u8 *r1) {
 u8 CPU::rr_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
-    u8 old_c = C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    C_FLAG = Bit::test(r, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     r >>= 1;
     r |= old_c<<7;
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1273,13 +1329,13 @@ u8 CPU::rr_ll(u16 loc) {
 //====================
 u8 CPU::sla_r(u8 *r1) {
 //CHNZ
-    C_FLAG = Bit::test(*r1, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     *r1 <<= 1;
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1288,13 +1344,13 @@ u8 CPU::sla_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit::test(r, 7);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 7));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     r <<= 1;
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1305,14 +1361,14 @@ u8 CPU::sra_r(u8 *r1) {
 //CHNZ
     u8 a = *r1 & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = Bit::test(*r1, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     *r1 >>= 1;
     *r1 |= a; //set eighth bit for arithmetic shift;
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1322,14 +1378,14 @@ u8 CPU::sra_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 a = r & 0x80; //save eight bit for arithmetic shift
 
-    C_FLAG = Bit::test(r, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     r >>= 1;
     r |= a; //set eighth bit for arithmetic shift;
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1339,14 +1395,14 @@ u8 CPU::sra_ll(u16 loc) {
 u8 CPU::srl_r(u8 *r1) {
 //CHNZ
 
-    C_FLAG = Bit::test(*r1, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(*r1, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     *r1 >>= 1;
     *r1 &= 0x7F; // logical shift, force the last bit to zero
 
-    Z_FLAG = !*r1;
+    change_Z_FLAG(!*r1);
 
     return 8;
 }
@@ -1355,14 +1411,14 @@ u8 CPU::srl_ll(u16 loc) {
 //CHNZ
     u8 r = io->read(loc);
 
-    C_FLAG = Bit::test(r, 0);
-    H_FLAG = 0;
-    N_FLAG = 0;
+    change_C_FLAG(Bit::test(r, 0));
+    reset_H_FLAG();
+    reset_N_FLAG();
 
     r >>= 1;
     r &= 0x7F; // logical shift, force the last bit to zero
 
-    Z_FLAG = !r;
+    change_Z_FLAG(!r);
 
     io->write(loc, r);
 
@@ -1375,10 +1431,10 @@ u8 CPU::srl_ll(u16 loc) {
 u8 CPU::swap_r(u8 *r1) {
     u8 t = *r1 >> 4;
 
-    C_FLAG = 0;
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = !*r1; //swapping a 0x00 will still be 0x00
+    reset_C_FLAG();
+    reset_H_FLAG();
+    reset_N_FLAG();
+    change_Z_FLAG(!*r1); //swapping a 0x00 will still be 0x0
 
     *r1 = (*r1 << 4) | t;
 
@@ -1389,10 +1445,10 @@ u8 CPU::swap_ll(u16 loc) {
     u8 r = io->read(loc);
     u8 t = r >> 4;
 
-    C_FLAG = 0;
-    H_FLAG = 0;
-    N_FLAG = 0;
-    Z_FLAG = !r; //swapping a 0x00 will still be 0x00
+    reset_C_FLAG();
+    reset_H_FLAG();
+    reset_N_FLAG();
+    change_Z_FLAG(!r); //swapping a 0x00 will still be 0x0
 
     r = (r << 4) | t;
 
@@ -1407,9 +1463,9 @@ u8 CPU::swap_ll(u16 loc) {
 u8 CPU::bit_b_r(u8 bit, u8 *r1) {
 //HNZ
 
-    H_FLAG = 1;
-    N_FLAG = 0;
-    Z_FLAG = !Bit::test(*r1, bit);
+    set_H_FLAG();
+    reset_N_FLAG();
+    change_Z_FLAG(!Bit::test(*r1, bit));
 
     return 8;
 }
@@ -1418,9 +1474,9 @@ u8 CPU::bit_b_ll(u8 bit, u16 loc) {
 //HNZ
     u8 r1 = io->read(loc);
 
-    H_FLAG = 1;
-    N_FLAG = 0;
-    Z_FLAG = !Bit::test(r1, bit);
+    set_H_FLAG();
+    reset_N_FLAG();
+    change_Z_FLAG(!Bit::test(r1, bit));
 
     return 12;
 }
@@ -1466,30 +1522,30 @@ u8 CPU::daa_r(u8 *r1) {
 //CHZ
 
     u8 old_a = *r1;
-    u8 old_c =  C_FLAG;
+    u8 old_c = get_C_FLAG();
 
-    if(!N_FLAG) { // addition
+    if(!get_N_FLAG()) { // addition
         // mostly DAA from x86 but gb doesn't set H_FLAG
-        if(((*r1 & 0xF) > 9) || H_FLAG) {
+        if(((*r1 & 0xF) > 9) || get_H_FLAG()) {
             *r1 += 6;
-            C_FLAG = 1;
+            set_C_FLAG();
         }
 
         if((old_a > 0x99) || old_c) {
             *r1 += 0x60;
-            C_FLAG = 1;
+            set_C_FLAG();
         } else {
-            C_FLAG = 0;
+            reset_C_FLAG();
         }
     } else { // subtraction
         //derived from Gameboy Programmers Manual P.122
-        if     ( C_FLAG &&  H_FLAG) *r1 += 0x9a;
-        else if( C_FLAG && !H_FLAG) *r1 += 0xa0;
-        else if(!C_FLAG &&  H_FLAG) *r1 += 0xfa;
+        if     ( get_C_FLAG() &&  get_H_FLAG()) *r1 += 0x9a;
+        else if( get_C_FLAG() && !get_H_FLAG()) *r1 += 0xa0;
+        else if(!get_C_FLAG() &&  get_H_FLAG()) *r1 += 0xfa;
     }
 
-    H_FLAG = 0;
-    Z_FLAG = !*r1;
+    reset_H_FLAG();
+    change_Z_FLAG(!*r1);
 
     return 4;
 }
@@ -1499,8 +1555,8 @@ u8 CPU::daa_r(u8 *r1) {
 //====================
 u8 CPU::cpl_r(u8 *r1) {
 //HN
-    H_FLAG = 1;
-    N_FLAG = 1;
+    set_H_FLAG();
+    set_N_FLAG();
 
     *r1 = ~*r1;
     return 4;
@@ -1510,17 +1566,17 @@ u8 CPU::cpl_r(u8 *r1) {
 // Set/Clear Carry
 //====================
 u8 CPU::scf() {
-    N_FLAG = 0;
-    H_FLAG = 0;
-    C_FLAG = 1;
+    reset_N_FLAG();
+    reset_H_FLAG();
+    set_C_FLAG();
 
     return 4;
 }
 
 u8 CPU::ccf() {
-    N_FLAG = 0;
-    H_FLAG = 0;
-    C_FLAG = !C_FLAG;
+    reset_N_FLAG();
+    reset_H_FLAG();
+    flip_C_FLAG();
 
     return 4;
 }

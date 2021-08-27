@@ -74,7 +74,6 @@ public:
     u16       cpu_get_DIV();
     void      cpu_inc_TIMA();
     u16       cpu_get_TAC_cs();
-
     Interrupt cpu_check_interrupts();
     void      cpu_unset_interrupt(Interrupt i);
 
@@ -90,7 +89,7 @@ public:
         u8 SC;
 
         //Timer
-        u8 DIV;
+        // u8 DIV; // the value is emulated, it doesn't need to be saved
         u8 TIMA;
         u8 TMA;
         u8 TAC;
@@ -131,7 +130,7 @@ public:
 
 private:
     Cartridge *cart;
-    Silver::File *bootrom_file;
+    std::vector<u8> bootrom_buffer;
 
     bool gbc_mode;
     bool bootrom_mode = false;

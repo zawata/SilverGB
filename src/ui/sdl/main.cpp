@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include "SDL_events.h"
 #include "SDL_keycode.h"
@@ -9,10 +10,8 @@
 
 #include <SDL2/SDL.h>
 
-bool tick_frame = false, tick_instr = false;
 bool enable_bg_window = false;
 bool enable_wnd_window = false;
-bool single_step = false;
 
 void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
     switch(event->keysym.sym) {
@@ -41,29 +40,12 @@ void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *even
         buttons->select = event->type == SDL_KEYDOWN;
         break;
 
-    case SDLK_f:
-        tick_frame = event->type == SDL_KEYDOWN;
-        break;
-
-    case SDLK_t:
-        tick_instr = event->type == SDL_KEYDOWN;
-        break;
-
-    case SDLK_s:
-        single_step = event->type == SDL_KEYDOWN;
-        break;
-
-    case SDLK_r:
-        single_step = false;
-        break;
-
     }
 }
 
 extern "C"
 void _audio_callback(void* userdata, uint8_t* stream, int len) {
-    std::cout << "audio callback" << std::endl;
-    static_cast<GB_Core *>(userdata)->tick_audio_buffer(stream, len);
+    static_cast<GB_Core *>(userdata)->do_audio_callback((float *)stream, len / 4);
 }
 
 int main(int argc, char *argv[]) {
@@ -74,7 +56,7 @@ int main(int argc, char *argv[]) {
     }
 
     SDL_Window* window_screen = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160, 144, SDL_WINDOW_RESIZABLE);
-    SDL_Renderer* renderer_screen = SDL_CreateRenderer(window_screen, -1, SDL_RENDERER_ACCELERATED);
+    SDL_Renderer* renderer_screen = SDL_CreateRenderer(window_screen, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     SDL_Texture *screen_texture = SDL_CreateTexture(renderer_screen, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 160, 144);
 
     SDL_Window   *window_bg;
@@ -110,9 +92,10 @@ int main(int argc, char *argv[]) {
             rom_file = Silver::File::openFile(argv[1]);
         }
         else {
-            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokeblue_debug.gb");
-            bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
+            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\SFXGenerator.gb");
+            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
         }
+        bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
     #else
 
     #endif
@@ -122,22 +105,42 @@ int main(int argc, char *argv[]) {
 
     u8 *buf = (u8 *)malloc(256 * 256 * 3);
 
-    SDL_AudioSpec desired;
+    SDL_AudioSpec desired = { 0 };
+    SDL_AudioDeviceID audio_dev;
+
     desired.freq = 48000.0f;
-    desired.format = AUDIO_U8;
+    desired.format = AUDIO_F32;
     desired.channels = 1;
-    desired.samples = 1024;
+    desired.samples = 2048;
     desired.userdata = core;
     desired.callback = _audio_callback;
-    // desired.callback = NULL;
 
-    if (SDL_OpenAudio(&desired, NULL))
+    audio_dev = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, 0);
+    if(!audio_dev)
         std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
 
-    SDL_PauseAudio(0);
+    SDL_PauseAudioDevice(audio_dev, 0);
 
     SDL_Event event;
+
+//#define SHOW_FPS
+#if defined(SHOW_FPS)
+    auto start = std::chrono::steady_clock::now();
+    int frames = 0;
+
     while (isRunning) {
+        ++frames;
+        auto now = std::chrono::steady_clock::now();
+        auto diff = now - start;
+        if(diff >= std::chrono::seconds(1)) {
+            start = now;
+            std::cout << "FPS: " << frames << std::endl;
+            frames = 0;
+        }
+#else
+    while (isRunning) {
+#endif
+
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
             case SDL_KEYDOWN:
@@ -151,37 +154,15 @@ int main(int argc, char *argv[]) {
         }
 
         core->set_input_state(button_state);
-
-        // if(single_step){
-        //     try {
-        //         if(tick_frame) {
-        //             tick_frame = false;
-        //             core->tick_frame();
-        //         }
-        //         else if(tick_instr) {
-        //             tick_instr = false;
-        //             core->tick_instr();
-        //         }
-        //     }
-        //     catch (breakpoint_exception) {}
-        // } else {
-        //     try {
-        //         core->tick_frame();
-        //     }
-        //     catch (breakpoint_exception) {
-        //         single_step = true;
-        //     }
-        // }
+        core->tick_frame();
 
         void *screen_dest;
         int screen_pitch;
-        std::cout << "display screen" << std::endl;
         SDL_LockTexture(screen_texture, NULL, &screen_dest, &screen_pitch);
         memcpy(screen_dest, core->getScreenBuffer(), GB_S_P_SZ);
         SDL_UnlockTexture(screen_texture);
         SDL_RenderCopy(renderer_screen, screen_texture, NULL, NULL);
         SDL_RenderPresent(renderer_screen);
-
 
         if(enable_bg_window) {
             void *bg_dest;
@@ -206,6 +187,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    SDL_CloseAudio();
     delete core;
     SDL_Quit();
 

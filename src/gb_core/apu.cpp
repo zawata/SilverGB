@@ -2,6 +2,8 @@
 #include <cstring>
 #include <iostream>
 
+#include <chrono>
+
 #include "gb_core/defs.hpp"
 #include "gb_core/io_reg.hpp"
 #include "gb_core/apu.hpp"
@@ -9,32 +11,22 @@
 #include "util/bit.hpp"
 #include "util/util.hpp"
 
-//#define AMPLITUDE   25000.0f
-#define SAMPLE_RATE 44100.0f //TODO
+#define NUETRAL ( 0 )
 
-// inline s16 mix(s16 sample1, s16 sample2) {
-//     long result((long)sample1 + (long)sample2);
-//     if (0x7FFF < result)
-//         return (short)0x7FFF;
-//     else if ((short)0x8000 > result)
-//         return (short)0x8000;
-//     else
-//         return result;
-// }
-
-inline u8 normalize(bool state, u8 volume) {
-    if(state) return volume << 4;
-    else      return 0;
-}
+enum {
+    ALL_CHANNELS = 0,
+    CHANNEL_1    = 1,
+    CHANNEL_2    = 2,
+    CHANNEL_3    = 3,
+    CHANNEL_4    = 4,
+};
 
 inline bool _duty_check(u8 duty, u8 wv_count) {
-//to simplify the duty cycle checking, we can break this out
-
-// Bits  Cyc%   0 1 2 3 4 5 6 7
-// 00  : 12.5%  ________==______
-// 01  : 25%    ________====____
-// 10  : 50%    ____========____
-// 11  : 75%    ========____====
+    // Bits  Cyc%   0 1 2 3 4 5 6 7
+    // 00  : 12.5%  ________==______
+    // 01  : 25%    ________====____
+    // 10  : 50%    ____========____
+    // 11  : 75%    ========____====
     switch(duty) {
     case 0:
         return wv_count == 4;
@@ -47,18 +39,19 @@ inline bool _duty_check(u8 duty, u8 wv_count) {
                wv_count == 4 ||
                wv_count == 5;
     case 3:
-        return wv_count == 0 ||
-               wv_count == 1 ||
-               wv_count == 2 ||
-               wv_count == 3 ||
-               wv_count == 6 ||
-               wv_count == 7;
-    default:
-        assert(false);
+        return !_duty_check(1,wv_count);
     }
+    assert(false);
+    return false;
 }
 
 APU::APU(bool bootrom_enabled) {
+    init_core();
+    registers = { 0 };
+}
+APU::~APU() {}
+
+void APU::init_core() {
     registers.NR10 = 0x80;
     registers.NR11 = 0xBF;
     registers.NR12 = 0xF3;
@@ -81,8 +74,12 @@ APU::APU(bool bootrom_enabled) {
     registers.NR50 = 0x77;
     registers.NR51 = 0xF3;
     registers.NR52 = 0xF1; //TODO: 0xF0 on SGB
+
+    memset(&channel_1, 0 , sizeof(channel_1));
+    memset(&channel_2, 0 , sizeof(channel_2));
+    memset(&channel_3, 0 , sizeof(channel_3));
+    memset(&channel_4, 0 , sizeof(channel_4));
 }
-APU::~APU() {}
 
 // The wiki Table
 //Square 1: Sweep -> Timer -> Duty -> Length Counter -> Envelope -> Mixer
@@ -91,10 +88,10 @@ APU::~APU() {}
 //Noise:             Timer -> LFSR -> Length Counter -> Envelope -> Mixer
 
 //My Function Table
-//Square 1: fs_freq_sweep_clock -> timer_clock -> timer_clock -> length_counter_clock -> vol_env_clock -> ??
-//Square 2:                        timer_clock -> timer_clock -> length_counter_clock -> vol_env_clock -> ??
-//Wave:                            timer_clock -> ??          -> length_counter_clock -> vol_env_clock -> ??
-//Noise:                           timer_clock -> ??          -> length_counter_clock -> vol_env_clock -> ??
+//Square 1: freq_sweep_clock -> timer_clock (duty) -> length_counter_clock -> vol_env_clock -> sample
+//Square 2:                     timer_clock (duty) -> length_counter_clock -> vol_env_clock -> sample
+//Wave:                         timer_clock (wave) -> length_counter_clock -> vol_env_clock -> sample
+//Noise:                        timer_clock (LFSR) -> length_counter_clock -> vol_env_clock -> sample
 
 /**
  * Simple Event Flow:
@@ -108,127 +105,174 @@ APU::~APU() {}
  *
  *  The audio library utilizes an asynchronous execution system whereupon a callback function
  * is used to queue audio for playback.
- *  In my system, this callback function will play the roll of the DAC, sampling the
+ *  In my system, this callback function will play the role of the DAC, sampling the
  * inputs as often as it pleases to generate the proper audio.
  *  The "inputs" to the DAC will take the form of volatile variables so that they may be sampled
  * at any available rate.
  */
 
-#define getFREQ(x,y) (((u16)(x))|(((y)&0x7)<<8))
-
 void APU::tick() {
-
     tick_counter++;
 
-    if(!(tick_counter % 65536)) { //64hz
-        vol_env_clock(0);
+    //64hz
+    if(!(tick_counter % 65536)) {
+        vol_env_clock(ALL_CHANNELS);
     }
 
-    if(!(tick_counter % 32768)) { //128hz
+    //128hz
+    if(!(tick_counter % 32768)) {
         freq_sweep_clock();
     }
 
-    if(!(tick_counter % 16384)) { //256hz
-        length_counter_clock(0);
+    //256hz
+    if(!(tick_counter % 16384)) {
+        length_counter_clock(ALL_CHANNELS);
     }
 
-    if(!(tick_counter % 32)) {    //1317032 Hz
-        //adding 1 here because it takes an extra cycle to reload the timer
-        if(!channel_1.timer--) {
-            channel_1.timer = ~getFREQ(registers.NR13, registers.NR14) + 1;
-            timer_clock(1);
-        }
-
-        if(!channel_2.timer--) {
-            channel_2.timer = ~getFREQ(registers.NR23, registers.NR24) + 1;
-            timer_clock(2);
-        }
-
-        if(!channel_3.timer--) {
-            channel_3.timer = ~getFREQ(registers.NR33, registers.NR34) + 1;
-            timer_clock(2);
-        }
+    //1048576
+    if(!(tick_counter % 4)) {
+        timer_clock(1);
+        timer_clock(2);
+        timer_clock(3);
     }
 
-    if(!(tick_counter % 2)) {     //2097152 Hz
+    //2097152 Hz
+    if(!(tick_counter % 2)) {
         timer_clock(4);
     }
 
-    tick_counter %= 65536; //TODO
+    //TODO
+    tick_counter %= 65536;
 }
 
-u8 APU::sample() {
-    return normalize(channel_2.wav_out, channel_2.volume) >> 4;
-}
+void APU::sample(float *left, float *right) {
+    *left = 0.0f;
+    *right = 0.0f;
+    if( snd_en() ) {
 
-void APU::timer_clock(u8 chan) {
-    switch(chan) {
-    case 1:
-        channel_1.duty_counter++;
-        channel_1.duty_counter %= 8;
-        channel_1.wav_out = _duty_check((registers.NR11 & 0xC) >> 6, channel_1.duty_counter);
-        break;
-    case 2:
-        channel_2.duty_counter++;
-        channel_2.duty_counter %= 8;
-        channel_1.wav_out = _duty_check((registers.NR21 & 0xC) >> 6, channel_2.duty_counter);
-        break;
-    case 3:
+        #define mix(a,b) (((a)+(b))/2)
+        #define normalize(u4val) (((u4val) / 7.5f) - 1.0f)
 
-        break;
-    case 4:
-        if(!--channel_4.cfg_counter) {
-            //reset counter
-            channel_4.cfg_counter = getDivisor(registers.NR43 & 0x7) << (registers.NR43 >> 4);
-
-            //XOR bottom 2 bits
-            u8 b = Bit::test(channel_4.LFSR_REG, 0) ^ Bit::test(channel_4.LFSR_REG, 1);
-
-            //right shift the register
-            channel_4.LFSR_REG >>= 1;
-
-            //set the high bit
-            if(b) Bit::set(&channel_4.LFSR_REG, 14);
-            else  Bit::reset(&channel_4.LFSR_REG, 14);
-
-            //if 7 bit mode
-            if (Bit::test(registers.NR43, 6)) {
-                //set bit 6 too
-                if(b) Bit::set(&channel_4.LFSR_REG, 6);
-                else  Bit::reset(&channel_4.LFSR_REG, 6);
+        if(channel_1.enabled) {
+            if(ch1_L_dac_en()) {
+                *left = mix((channel_1.wav_out) ? normalize(channel_1.volume) : 0.0f, *left);
+            }
+            if(ch1_R_dac_en()) {
+                *right = mix((channel_1.wav_out) ? normalize(channel_1.volume) : 0.0f, *right);
             }
         }
-        channel_4.wav_out = Bit::test(channel_4.LFSR_REG, 0);
+
+        if(channel_2.enabled) {
+            if(ch2_L_dac_en()) {
+                *left = mix((channel_2.wav_out) ? normalize(channel_2.volume) : 0.0f, *left);
+            }
+            if(ch2_R_dac_en()) {
+                *right = mix((channel_2.wav_out) ? normalize(channel_2.volume) : 0.0f, *right);
+            }
+        }
+
+        // if(channel_3.enabled) {
+        //     if(ch3_L_dac_en()) *left = mix((channel_3.wav_out) ? channel_3.volume : 0.0f, *left);
+        //     if(ch3_R_dac_en()) *right = mix((channel_3.wav_out) ? channel_3.volume : 0.0f, *right);
+        // }
+
+        // if(channel_4.enabled) {
+        //     if(ch4_L_dac_en()) {
+        //         *left = mix((channel_4.wav_out) ? normalize(channel_4.volume) : 0.0f, *left);
+        //     }
+        //     if(ch4_R_dac_en()) {
+        //         *right = mix((channel_4.wav_out) ? normalize(channel_4.volume) : 0.0f, *right);
+        //     }
+        // }
+    }
+}
+
+u32 audio_cntr = 0;
+auto start = std::chrono::high_resolution_clock::now();
+void APU::timer_clock(u8 chan) {
+    switch(chan) {
+    case CHANNEL_1:
+        if(channel_1.timer == 0) {
+            channel_1.timer = 2048 - ch1_freq();
+
+            channel_1.duty_counter++;
+            channel_1.duty_counter %= 8;
+            channel_1.wav_out = _duty_check(ch1_wav_patt_duty(), channel_1.duty_counter);
+        }
+        else {
+            channel_1.timer--;
+        }
+        break;
+    case CHANNEL_2:
+        if(channel_2.timer == 0) {
+            channel_2.timer = 2048 - ch2_freq();
+
+            channel_2.duty_counter++;
+            channel_2.duty_counter %= 8;
+            channel_2.wav_out = _duty_check(ch2_wav_patt_duty(), channel_2.duty_counter);
+        }
+        else {
+            channel_2.timer--;
+        }
+        break;
+    case CHANNEL_4:
+        //double the counters, double the fun!
+        if(channel_4.cfg_counter == 0) {
+            channel_4.cfg_counter = ch4_div_ratio() + 1;
+            if(channel_4.shift_clock_cntr == 0) {
+                channel_4.shift_clock_cntr = 0;
+                Bit::set(&channel_4.shift_clock_cntr, ch4_shft_freq());
+
+                u8 r;
+                if(ch4_reg_width()) {
+                    r = Bit::test(channel_4.LFSR_REG, 7) ^ Bit::test(channel_4.LFSR_REG, 6);
+                    channel_4.wav_out = Bit::test(channel_4.LFSR_REG, 7);
+                } else {
+                    r = Bit::test(channel_4.LFSR_REG, 0xF) ^ Bit::test(channel_4.LFSR_REG, 0xE);
+                    channel_4.wav_out = Bit::test(channel_4.LFSR_REG, 0xF);
+                }
+
+                channel_4.LFSR_REG <<= 1;
+                if(r) Bit::set(&channel_4.LFSR_REG, 0);
+                else  Bit::reset(&channel_4.LFSR_REG, 0);
+            } else {
+                channel_4.shift_clock_cntr--;
+            }
+        } else {
+            channel_4.cfg_counter--;
+        }
     }
 }
 
 void APU::length_counter_clock(u8 chan) {
     switch(chan) {
-    case 0:
+    case ALL_CHANNELS:
         length_counter_clock(1);
         length_counter_clock(2);
         length_counter_clock(3);
         length_counter_clock(4);
         break;
-    case 1:
-        if(!channel_1.length_counter && channel_1.enabled) {
+    case CHANNEL_1:
+        if(channel_1.length_counter && channel_1.enabled) {
             channel_1.length_counter--;
-            if(!channel_1.length_counter) channel_1.enabled = false;
+            if(!channel_1.length_counter) {
+                channel_1.enabled = false;
+            }
         }
         break;
-    case 2:
+    case CHANNEL_2:
         if(!channel_2.length_counter && channel_2.enabled) {
             channel_2.length_counter--;
             if(!channel_2.length_counter) channel_2.enabled = false;
         }
         break;
-    case 3:
+    case CHANNEL_3:
         if(!channel_3.length_counter && channel_3.enabled) {
             channel_3.length_counter--;
             if(!channel_3.length_counter) channel_3.enabled = false;
         }
         break;
-    case 4:
+    case CHANNEL_4:
         if(!channel_4.length_counter && channel_4.enabled) {
             channel_4.length_counter--;
             if(!channel_4.length_counter) channel_4.enabled = false;
@@ -255,54 +299,66 @@ void APU::vol_env_clock(u8 chan) {
         vol_env_clock(4);
         break;
     case 1:
-        if(channel_1.env_enabled && !channel_1.period_counter--) {
-            if(registers.NR12 & 0x08) {
-                channel_1.volume++;
-                if(channel_1.volume != (channel_1.volume = std::min(channel_1.volume,(s8)0xF))) {
+        if(channel_1.env_enabled && channel_1.period_counter-- == 0) {
+            if(ch1_env_dir()) {
+                if(channel_1.volume == 0xF) {
                     channel_1.env_enabled = false;
+                }
+                else {
+                    channel_1.volume++;
                 }
             }
             else {
-                channel_1.volume--;
-                if(channel_1.volume != (channel_1.volume = std::max(channel_1.volume,(s8)0))) {
+                if (channel_1.volume == 0) {
                     channel_1.env_enabled = false;
                 }
+                else {
+                    channel_1.volume--;
+                }
             }
-            //channel_1.period_counter = registers.NR12 & 0x07;
+            channel_1.period_counter = ch1_env_swp_prd();
         }
         break;
     case 2:
-        if(channel_2.env_enabled && !channel_2.period_counter--) {
-            if(registers.NR22 & 0x08) {
-                channel_2.volume++;
-                if(channel_2.volume != (channel_2.volume = std::min(channel_2.volume,(s8)0xF))) {
-                    channel_2.env_enabled = false;
+        if(channel_2.env_enabled && channel_2.period_counter-- == 0) {
+            if (ch1_env_dir()) {
+                if (channel_1.volume == 0xF) {
+                    channel_1.env_enabled = false;
+                }
+                else {
+                    channel_1.volume++;
                 }
             }
             else {
-                channel_2.volume--;
-                if(channel_2.volume != (channel_2.volume = std::max(channel_2.volume,(s8)0))) {
-                    channel_2.env_enabled = false;
+                if (channel_1.volume == 0) {
+                    channel_1.env_enabled = false;
+                }
+                else {
+                    channel_1.volume--;
                 }
             }
-            //channel_2.period_counter = registers.NR22 & 0x07;
+            channel_2.period_counter = ch2_env_swp_prd();
         }
         break;
     case 4:
         if(channel_4.env_enabled && !channel_4.period_counter--) {
-            if(registers.NR42 & 0x08) {
-                channel_4.volume++;
-                if(channel_4.volume != (channel_4.volume = std::min(channel_4.volume,(s8)0xF))) {
+            if(ch1_env_dir()) {
+                if(channel_4.volume == 0xF) {
                     channel_4.env_enabled = false;
+                }
+                else {
+                    channel_4.volume++;
                 }
             }
             else {
-                channel_4.volume--;
-                if(channel_4.volume != (channel_4.volume = std::max(channel_4.volume,(s8)0))) {
+                if (channel_4.volume == 0) {
                     channel_4.env_enabled = false;
                 }
+                else {
+                    channel_4.volume--;
+                }
             }
-            //channel_4.period_counter = registers.NR42 & 0x07;
+            channel_4.period_counter = ch4_env_swp_prd();
         }
         break;
     }
@@ -316,25 +372,44 @@ void APU::trigger(u8 chan) {
     // Channel volume is reloaded from NRx2.
 
     switch(chan) {
-    case 1:
+    case CHANNEL_1:
         channel_1.enabled = true;
         if(!channel_1.length_counter) channel_1.length_counter = 64;
-        //TODO: if the period in NR12 refers to the volume envelope, the what the hell is the period for the frequency timer?
-        channel_1.timer = registers.NR12 & 0x7;
-        channel_1.period_counter = registers.NR12 & 0x07;
-        channel_1.volume = registers.NR12 >> 4;
+        channel_1.timer = 2048 - ch1_freq();
+        channel_1.period_counter = ch1_env_swp_prd();
+        channel_1.volume = ch1_init_vol_env();
+        std::cout << "trigger 1 with freq " << as_hex(ch1_freq()) << std::endl;
 
         // Square 1's sweep does several things
         freq_sweep_reset();
-    case 2:
-    case 3:
+        break;
+    case CHANNEL_2:
+        channel_2.enabled = true;
+        if(!channel_2.length_counter) channel_2.length_counter = 64;
+        channel_2.timer = 2048 - ch2_freq();
+        channel_2.period_counter = ch2_env_swp_prd();
+        channel_2.volume = ch2_init_vol_env();
+        std::cout << "trigger 2 with freq " << as_hex(ch1_freq()) << std::endl;
+
+        break;
+    case CHANNEL_3:
+        channel_3.enabled = true;
+        if(!channel_3.length_counter) channel_3.length_counter = 256;
 
         // Wave channel's position is set to 0 but sample buffer is NOT refilled.
         channel_3.wave_pos = 0;
-    case 4:
+        break;
+    case CHANNEL_4:
+        channel_4.enabled = true;
+        if(!channel_4.length_counter) channel_4.length_counter = 64;
+        channel_1.timer = 2048 - ch1_freq();
+        channel_4.period_counter = ch1_env_swp_prd();
+        channel_4.volume = ch1_init_vol_env();
+        std::cout << "trigger 4 with freq " << as_hex(ch1_freq()) << std::endl;
 
         // Noise channel's LFSR bits are all set to 1.
         channel_4.LFSR_REG = 0xFF;
+        break;
     }
 }
 
@@ -386,6 +461,9 @@ u8 APU::read_reg(u8 loc) {
         return registers.NR51 & NR51_READ_MASK;
     case NR52_REG:
         return registers.NR52 & NR52_READ_MASK;
+    default:
+        std::cerr << "bad apu reg read: " << loc << std::endl;
+        return 0xFF;
     }
 }
 
@@ -398,7 +476,7 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
     case NR11_REG:
         registers.NR11 = data & NR11_WRITE_MASK;
-        channel_1.length_counter = 64 - (data & 0x3F);
+        channel_1.length_counter = ~ch1_snd_len() + 1;
         break;
     case NR12_REG:
         registers.NR12 = data & NR12_WRITE_MASK;
@@ -410,14 +488,13 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
     case NR14_REG:
         registers.NR14 = data & NR14_WRITE_MASK;
-        //writing to this register triggers it
         if(data & 0x80) trigger(1);
         break;
 
     //channel 2 registers
     case NR21_REG:
         registers.NR21 = data & NR21_WRITE_MASK;
-        channel_2.length_counter = 64 - (data & 0x3F);
+        channel_2.length_counter = ~ch2_snd_len() + 1;
         break;
     case NR22_REG:
         registers.NR22 = data & NR22_WRITE_MASK;
@@ -458,9 +535,7 @@ void APU::write_reg(u8 loc, u8 data) {
         registers.NR42 = data & NR42_WRITE_MASK;
         break;
     case NR43_REG:
-        //registers.NR43 = data & NR43_WRITE_MASK;
-        channel_4.cfg_counter = channel_4.cfg_timer = getDivisor(registers.NR43 & 0x7) << (registers.NR43 >> 4);
-        channel_4.LFSR_7bit = (bool)Bit::test(registers.NR43, 3);
+        registers.NR43 = data & NR43_WRITE_MASK;
         break;
     case NR44_REG:
         registers.NR44 = data & NR44_WRITE_MASK;

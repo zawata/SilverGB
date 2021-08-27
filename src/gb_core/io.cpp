@@ -16,7 +16,6 @@ apu(apu),
 input(new Input_Manager()),
 cart(cart),
 gbc_mode(gbc_mode),
-bootrom_file(bios_file),
 bootrom_mode(bios_file != nullptr) {
     registers = { 0 };
     if(bios_file == nullptr) {
@@ -53,6 +52,8 @@ bootrom_mode(bios_file != nullptr) {
        registers.WY   = 0x00;
        registers.WX   = 0x00;
        registers.IE   = 0x00;
+    } else {
+        bios_file->toVector(bootrom_buffer);
     }
 
     if(gbc_mode) {
@@ -85,7 +86,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
 
     if(offset <= 0xFF) {
         if(bootrom_mode) {
-            return bootrom_file->getByte(offset);
+            return bootrom_buffer[offset];
         } else {
             return cart->read(offset);
         }
@@ -576,19 +577,13 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
  */
 
 //Called for any interrupt
+inline
 void IO_Bus::request_interrupt(IO_Bus::Interrupt i) {
     registers.IF |= i;
 }
 
 //called by ppu_Controller
 void IO_Bus::dma_tick() {
-    if(dma_start) {
-        dma_start = false;
-        dma_start_active = true;
-        dma_tick_cnt = 0;
-        dma_byte_cnt = 0;
-    }
-
     if(dma_active) {
         if(dma_tick_cnt % 4 == 0) {
             u16 src  = (u16)registers.DMA << 8 | dma_byte_cnt,
@@ -597,20 +592,23 @@ void IO_Bus::dma_tick() {
             dma_byte_cnt++;
         }
         dma_tick_cnt++;
-    }
 
-    if(dma_byte_cnt == 0xa0 && dma_active) {
-        dma_active = false;
-    }
-
-    if(dma_start_active) {
-        if(dma_tick_cnt % 4 == 0) {
-            dma_tick_cnt++;
-        } else {
-            dma_tick_cnt = 0;
-            dma_start_active = false;
-            dma_active = true;
+        if(dma_byte_cnt == 0xa0) {
+            dma_active = false;
         }
+    }
+
+    // delay start by 1 dma tick
+    if(dma_start_active) {
+        dma_start_active = false;
+        dma_active = true;
+    }
+
+    if(dma_start) {
+        dma_start = false;
+        dma_start_active = true;
+        dma_tick_cnt = 0;
+        dma_byte_cnt = 0;
     }
 }
 
@@ -620,9 +618,9 @@ void IO_Bus::dma_tick() {
 
 // increment DIV
 u16 IO_Bus::cpu_inc_DIV() {
-    registers.DIV = (div_cnt + 1) & 0xFF00;
     return ++div_cnt;
 }
+
 u16 IO_Bus::cpu_get_DIV() { return div_cnt; }
 
 void IO_Bus::cpu_inc_TIMA() {

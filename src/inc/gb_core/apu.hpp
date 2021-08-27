@@ -14,7 +14,7 @@ public:
 
     void tick();
 
-    u8 sample();
+    void sample(float *left, float *right);
 
     u8 read_reg(u8 loc);
     void write_reg(u8 loc, u8 data);
@@ -40,6 +40,26 @@ private:
         u8 period_counter;
     } channel_1;
 
+    #define reg(X) (registers.X)
+    inline u8  ch1_sweep_rt()       { return (reg(NR10) >> 4) & 7; }
+    inline u8  ch1_sweep_dir()      { return Bit::test(reg(NR10), 3); }
+    inline u8  ch1_sweep_shft_amt() { return reg(NR10) & 3; }
+
+    inline u8  ch1_wav_patt_duty()  { return reg(NR11) >> 6; }
+    inline u8  ch1_snd_len()        { return reg(NR11) & 0x3F; }
+
+    inline u8  ch1_init_vol_env()   { return reg(NR12) >> 4; }
+    inline u8  ch1_env_dir()        { return Bit::test(reg(NR12), 3); }
+    inline u8  ch1_env_swp_prd()    { return reg(NR12) & 0x7; }
+
+    inline u16 ch1_freq()           { return reg(NR13) | ((u16)(reg(NR14) & 0x7) << 8); }
+
+    inline u8  ch1_len_cntr_en()    { return reg(NR14) >> 6; }
+    #undef reg
+
+    /**
+     * Channel 2
+     **/
     struct {
         bool enabled;
         s8 volume;
@@ -55,33 +75,93 @@ private:
         u8 period_counter;
     } channel_2;
 
+    #define reg(X) (registers.X)
+    inline u8  ch2_wav_patt_duty()  { return reg(NR21) >> 6; }
+    inline u8  ch2_snd_len()        { return reg(NR21) & 0x3F; }
+
+    inline u8  ch2_init_vol_env()   { return reg(NR22) >> 4; }
+    inline u8  ch2_env_dir()        { return Bit::test(reg(NR22), 3); }
+    inline u8  ch2_env_swp_prd()    { return reg(NR22) & 0x7; }
+
+    inline u16 ch2_freq()           { return reg(NR23) | ((u16)(reg(NR24) & 0x7) << 8); }
+
+    inline u8  ch2_len_cntr_en()    { return reg(NR24) >> 6; }
+    #undef reg
+
+    /**
+     * Channel 3
+     **/
     struct {
         bool enabled;
         s8 volume;
         u16 timer;
         int length_counter;
 
+        bool wav_out;
+
         u8 wave_pos;
     } channel_3;
 
+    #define reg(X) (registers.X)
+    inline u8  ch3_mstr_en()        { return Bit::test(reg(NR30), 7); }
+
+    inline u8  ch3_snd_len()        { return reg(NR31); }
+
+    inline u8  ch3_vol()            { return (reg(NR32) >> 5) & 3; }
+
+    inline u16 ch3_freq()           { return reg(NR33) | ((u16)(reg(NR34) & 0x7) << 8); }
+
+    inline u8  ch3_len_cntr_en()    { return reg(NR34) >> 6; }
+
+    #undef reg
+
+    /**
+     * channel 4
+     **/
     struct {
         bool enabled;
-
-        //CFG timer and PRNG
+        s8  volume;
         u32  cfg_counter;
-        u32  cfg_timer;
-        u16 LFSR_REG;
-        bool LFSR_7bit; 
-
+        u32  shift_clock_cntr;
         int length_counter;
-        s8 volume;
-        u8 period_counter;
-        bool env_enabled;
-
         bool wav_out;
 
+        u8  period_counter;
+        bool env_enabled;
 
+        u16  LFSR_REG;
     } channel_4;
+
+    #define reg(X) (registers.X)
+    inline u8  ch4_wav_patt_duty()  { return reg(NR41) >> 6; }
+    inline u8  ch4_snd_len()        { return reg(NR41) & 0x3F; }
+
+    inline u8  ch4_init_vol_env()   { return reg(NR42) >> 4; }
+    inline u8  ch4_env_dir()        { return Bit::test(reg(NR42), 3); }
+    inline u8  ch4_env_swp_prd()    { return reg(NR42) & 0x7; }
+
+    inline u8  ch4_shft_freq()      { return (reg(NR43) >> 4) & 0xF; }
+    inline u8  ch4_reg_width()      { return Bit::test(reg(NR43), 3); }
+    inline u8  ch4_div_ratio()      { return reg(NR43) & 7; }
+
+    inline u8  ch4_len_cntr_en()    { return Bit::test(reg(NR44), 6); }
+    #undef reg
+
+    /**
+     *Control
+     **/
+    #define reg(X) (registers.X)
+    inline bool ch1_L_dac_en() { return Bit::test(reg(NR51), 4); }
+    inline bool ch1_R_dac_en() { return Bit::test(reg(NR51), 0); }
+    inline bool ch2_L_dac_en() { return Bit::test(reg(NR51), 5); }
+    inline bool ch2_R_dac_en() { return Bit::test(reg(NR51), 1); }
+    inline bool ch3_L_dac_en() { return Bit::test(reg(NR51), 6); }
+    inline bool ch3_R_dac_en() { return Bit::test(reg(NR51), 2); }
+    inline bool ch4_L_dac_en() { return Bit::test(reg(NR51), 7); }
+    inline bool ch4_R_dac_en() { return Bit::test(reg(NR51), 3); }
+
+    inline bool snd_en()       { return Bit::test(reg(NR52), 7); }
+    #undef reg
 
     struct __registers {
         u8 NR10;
@@ -90,6 +170,7 @@ private:
         u8 NR13;
         u8 NR14;
 
+        u8 NR20; // unused
         u8 NR21;
         u8 NR22;
         u8 NR23;
@@ -101,7 +182,7 @@ private:
         u8 NR33;
         u8 NR34;
 
-        u8 NR40;
+        u8 NR40; // unused
         u8 NR41;
         u8 NR42;
         u8 NR43;
@@ -114,7 +195,11 @@ private:
 
     u8 wav_ram[WAVRAM_LEN];
 
-    inline u8 getDivisor(u8 i) { return (u8[8]){8, 16, 32, 48, 64, 80, 96, 112}[i & 0x7]; }
+    inline u8 getDivisor(u8 i) {
+        u8 t[8] = { 8, 16, 32, 48, 64, 80, 96, 112 };
+        return t[i & 0x7]; }
+
+    void init_core();
 
     void timer_clock(u8 chan);
     void length_counter_clock(u8 chan);
