@@ -28,11 +28,11 @@ public:
     } obj_sprite_t;
 
     enum {
-        WHITE = 0,
-        LIGHTGREY,
-        DARKGREY,
-        BLACK,
-        TRANSPARENT,
+        color_id_WHITE = 0,
+        color_id_LIGHTGREY,
+        color_id_DARKGREY,
+        color_id_BLACK,
+        color_id_TRANSPARENT,
     } color_id_t;
 
     union sprite_fifo_color_t {
@@ -130,15 +130,15 @@ private:
         TD_1_0, //Tile Data byte 2 clk 1
         TD_1_1, //Tile Data byte 2 clk 2
 
-        SP_0,   //Sprite Data clk 1
-        SP_1,   //Sprite Data clk 2
+        IDLE,  //Idle Clock
     };
-    __VRAM_fetch_steps vram_fetch_step = (__VRAM_fetch_steps)0;
+    __VRAM_fetch_steps vram_fetch_step = IDLE;
 
     u8 old_LY  = 0;
     bool
         coin_bit_signal = false,
-        pause_bg_fifo = true;
+        pause_bg_fifo = true,
+        skip_sprite_clock = false;
 
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map

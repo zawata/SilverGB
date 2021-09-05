@@ -160,13 +160,29 @@ void PPU::ppu_tick_oam() {
 }
 
 void PPU::ppu_tick_vram() {
+    if(skip_sprite_clock) {
+        skip_sprite_clock = false;
+        return;
+    }
+
+    if(pause_bg_fifo) {
+        if(displayed_sprites.size() > 0) {
+            enqueue_sprite_data(displayed_sprites.front());
+            displayed_sprites.pop_front();
+        } else {
+            pause_bg_fifo = false;
+        }
+
+        skip_sprite_clock = true;
+        return;
+    }
+
     /**
      * VRAM fetches take 2 cycles to occur.
      *
      * to simplify logic, we use 2 enums per section
      */
     switch(vram_fetch_step) {
-
     // Background map clk 1
     case BM_0:
         bg_map_byte = io->read_vram(bg_map_addr, true);
@@ -248,46 +264,30 @@ void PPU::ppu_tick_vram() {
     // tile data 2 clk 2
     case TD_1_1:
         //Do nothing
-        vram_fetch_step = SP_0;
+        vram_fetch_step = IDLE;
         break;
 
-    // sprite data clk 1
-    // Doubles as IDLE
-    case SP_0:
-        //Do nothing for the sake of simplicity
-        vram_fetch_step = SP_1;
-        break;
+    // Idle Clocking
+    case IDLE:
+        // shift in bg pixels when the bg fifo is empty.
+        // this will not occur on subsequent sprite reads as the bg_fifo
+        // should be disabled until the sprite fetches are done
+        //TODO: this should be moved out of the idle clocking as it makes
+        // the first fetch 2 clock cycles too long
+        if(bg_fifo->size() == 0) {
+            for(int i = 0; i < 8; i++) {
+                u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
+                tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
+                tile_idx *= 2;
 
-    // sprite data clk 2
-    case SP_1:
-        if(displayed_sprites.size() > 0) {
-            enqueue_sprite_data(displayed_sprites.front());
-            displayed_sprites.pop_front();
+                bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
+            }
 
-            vram_fetch_step = SP_0;
-        } else {
-            pause_bg_fifo = false;
-
-            // shift in bg pixels when the bg fifo is empty.
-            // this will not occur on subsequent sprite reads as the bg_fifo
-            // should be disabled until the sprite fetches are done
-            //TODO: this should be moved out of the idle clocking as it makes
-            // the first fetch 2 clock cycles too long
-            if(bg_fifo->size() == 0) {
-                for(int i = 0; i < 8; i++) {
-                    u8 tile_idx = ((tile_byte_1 >> (7 - i)) & 1);
-                    tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
-                    tile_idx *= 2;
-
-                    bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
-                }
-
-                if(in_window) {
-                    vram_fetch_step = WM_0;
-                }
-                else {
-                    vram_fetch_step = BM_0;
-                }
+            if(in_window) {
+                vram_fetch_step = WM_0;
+            }
+            else {
+                vram_fetch_step = BM_0;
             }
         }
         break;
@@ -301,7 +301,7 @@ void PPU::ppu_tick_vram() {
     /**
      * Actual PPU logic
      */
-    if(bg_fifo->size() > 0 && !pause_bg_fifo) {
+    if(bg_fifo->size() > 0) {
         u8 color_idx = bg_fifo->dequeue();
 
         //if background is disabled, force write a 0
@@ -322,7 +322,8 @@ void PPU::ppu_tick_vram() {
             }
         }
 
-        if (x_cntr > 8 + (x_sc & 0x7_u8)) {
+        //skip first 8 pixels and first pixels of partially offscreen tiles
+        if(x_cntr > 8 + (x_sc % 8)) {
             pix_clock_count++;
 
             // if frame is disabled, don't draw pixel data
@@ -335,14 +336,14 @@ void PPU::ppu_tick_vram() {
 
         if(LCDC_OBJ_ENABLED ) {
             for(auto sprite : active_sprites) {
-                if(x_cntr == sprite.pos_x) {
+                if(x_cntr - (x_sc % 8) == sprite.pos_x) {
                     pause_bg_fifo = true;
                     displayed_sprites.push_back(sprite);
                 }
             }
         }
 
-        if (!in_window) {
+        if(!in_window) {
             if (LCDC_WINDOW_ENABLED && x_cntr >= reg(WX) && y_cntr >= reg(WY)) {
                 in_window = true;
                 vram_fetch_step = WM_0;
@@ -391,8 +392,6 @@ bool PPU::ppu_tick() {
      * - find someway to continue to tick the DMA, maybe put it in either misc ticking or cpu.
      **/
     if(wnd_enabled_bit->risen()) {
-        std::cout << "wnd_enabled rising edge" << std::endl;
-        wnd_y_cntr = 0;
         wnd_map_addr =
             0x9800 |
             ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
@@ -409,7 +408,7 @@ bool PPU::ppu_tick() {
             first_frame = false;
             frame_disable = true;
 
-            memset(screen_buffer, 0xFF, GB_S_P_SZ);
+            memset(screen_buffer, 0xFF, GB_S_P_SZ); //TODO: use the white color
         } else {
             frame_disable = false;
         }
