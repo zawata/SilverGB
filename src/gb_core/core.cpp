@@ -79,7 +79,7 @@ void GB_Core::tick_frame() {
         }
 
         if(audio_vector.size() == 2048) { //TODO: make constant
-            audio_queue->push(audio_vector);
+            audio_queue->try_push(audio_vector);
             audio_vector.clear();
         }
 

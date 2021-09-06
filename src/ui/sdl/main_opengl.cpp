@@ -1,12 +1,14 @@
+#include <chrono>
 #include <iostream>
 
+#include <GL/gl3w.h>
+#include <SDL2/SDL.h>
 #include "SDL_events.h"
 #include "SDL_keycode.h"
+
 #include "gb_core/core.hpp"
 
-#include <GL/gl3w.h>
-
-#include <SDL2/SDL.h>
+#include "audio.hpp"
 
 GLuint screen_texture,
        shader_program;
@@ -32,38 +34,39 @@ void gl_init_textures() {
 }
 
 void gl_init_shaders() {
-    std::string vert_shader_source = "                      \
-#version 150 core                                           \n\
-out vec2 v_tex;                                             \n\
-                                                            \n\
-const vec2 v_pos[4]=vec2[4](vec2(-1.0, 1.0),                \n\
-                            vec2(-1.0,-1.0),                \n\
-                            vec2( 1.0, 1.0),                \n\
-                            vec2( 1.0,-1.0));               \n\
-const vec2 t_pos[4]=vec2[4](vec2(0.0,0.0),                  \n\
-                            vec2(0.0,1.0),                  \n\
-                            vec2(1.0,0.0),                  \n\
-                            vec2(1.0,1.0));                 \n\
-                                                            \n\
-void main()                                                 \n\
-{                                                           \n\
-    v_tex=t_pos[gl_VertexID];                               \n\
-    gl_Position=vec4(v_pos[gl_VertexID], 0.0, 1.0);         \n\
-}";
+    std::string vert_shader_source = "                         \
+        #version 150 core                                    \n\
+        out vec2 v_tex;                                      \n\
+                                                             \n\
+        const vec2 v_pos[4]=vec2[4](vec2(-1.0, 1.0),         \n\
+                                    vec2(-1.0,-1.0),         \n\
+                                    vec2( 1.0, 1.0),         \n\
+                                    vec2( 1.0,-1.0));        \n\
+        const vec2 t_pos[4]=vec2[4](vec2(0.0,0.0),           \n\
+                                    vec2(0.0,1.0),           \n\
+                                    vec2(1.0,0.0),           \n\
+                                    vec2(1.0,1.0));          \n\
+                                                             \n\
+        void main()                                          \n\
+        {                                                    \n\
+            v_tex=t_pos[gl_VertexID];                        \n\
+            gl_Position=vec4(v_pos[gl_VertexID], 0.0, 1.0);  \n\
+        }";
 
-    std::string frag_shader_source = "                      \
-#version 150 core                                           \n\
-in vec2 v_tex;                                              \n\
-uniform sampler2D texSampler;                               \n\
-out vec4 color;                                             \n\
-void main()                                                 \n\
-{                                                           \n\
-    color=texture(texSampler, v_tex);                       \n\
-}";
+    std::string frag_shader_source = "                         \
+        #version 150 core                                    \n\
+        in vec2 v_tex;                                       \n\
+        uniform sampler2D texSampler;                        \n\
+        out vec4 color;                                      \n\
+        void main()                                          \n\
+        {                                                    \n\
+            color=texture(texSampler, v_tex);                \n\
+        }";
 
     GLuint vert_shader, frag_shader;
     const char *c_str;
     GLint success;
+    char infoLog[512];
 
     vert_shader = glCreateShader(GL_VERTEX_SHADER);                   check_gl_error();
     c_str = vert_shader_source.c_str();
@@ -72,7 +75,7 @@ void main()                                                 \n\
 
     glGetShaderiv(vert_shader, GL_COMPILE_STATUS, &success);          check_gl_error();
     if(!success) {
-        char infoLog[512];
+        memset(infoLog, 0, 512);
         glGetShaderInfoLog(vert_shader, 512, NULL, infoLog);          check_gl_error();
         std::cout << "vert_shader failed\n" << infoLog << std::endl;
     };
@@ -84,7 +87,7 @@ void main()                                                 \n\
 
     glGetShaderiv(frag_shader, GL_COMPILE_STATUS, &success);          check_gl_error();
     if(!success) {
-        char infoLog[512];
+        memset(infoLog, 0, 512);
         glGetShaderInfoLog(frag_shader, 512, NULL, infoLog);          check_gl_error();
         std::cout << "frag_shader failed\n" << infoLog << std::endl;
     };
@@ -96,13 +99,12 @@ void main()                                                 \n\
 
     glGetProgramiv(shader_program, GL_LINK_STATUS, &success);         check_gl_error();
     if(!success) {
-        char infoLog[512];
+        memset(infoLog, 0, 512);
         glGetProgramInfoLog(shader_program, 512, NULL, infoLog);      check_gl_error();
         std::cout << "shader program failed\n" << infoLog << std::endl;
     }
 
     glUseProgram(0);                                                  check_gl_error();
-    // glDeleteShader(vert_shader);                                      check_gl_error();
     // glDeleteShader(vert_shader);                                      check_gl_error();
 }
 
@@ -120,10 +122,10 @@ void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *even
     case SDLK_RIGHT:     // DPAD right
         buttons->right  = event->type == SDL_KEYDOWN;
         break;
-    case SDLK_a:         // A button
+    case SDLK_z:         // A button
         buttons->a      = event->type == SDL_KEYDOWN;
         break;
-    case SDLK_b:         // B button
+    case SDLK_x:         // B button
         buttons->b      = event->type == SDL_KEYDOWN;
         break;
     case SDLK_RETURN:    // Start button
@@ -174,9 +176,6 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // Application Variables
-    bool isRunning = true;
-
     struct Vertex {
         float pos[2];
         float tex[2];
@@ -224,57 +223,47 @@ int main(int argc, char *argv[])
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    u8 tsc[160 * 144 * 3] = {0};
-    u8 *ptr = tsc;
-    int x = 0, y = 0, p = 0;
-    for(int i = 0; i < (160 * 144); i++) {
-        switch(i % 3) {
-        case 0:
-            *ptr++ = 0xFF;
-            *ptr++ = 0x00;
-            *ptr++ = 0x00;
-            break;
-        case 1:
-            *ptr++ = 0x00;
-            *ptr++ = 0x00;
-            *ptr++ = 0x00;
-            break;
-        case 2:
-            *ptr++ = 0x00;
-            *ptr++ = 0x00;
-            *ptr++ = 0x00;
-            break;
-        }
-    }
-    ptr = tsc;
-    glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
-    glTexSubImage2D(
-            GL_TEXTURE_2D,            // target
-            0,                        // level
-            0,                        // xoffset
-            0,                        // yoffset
-            GB_S_W,                   // width
-            GB_S_H,                   // height
-            GL_RGB,                   // format
-            GL_UNSIGNED_BYTE,         // type
-            ptr);                                                 check_gl_error();
-    glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
-
-    //load GBCore
+    //load GB Core
     Silver::File *rom_file = nullptr;
-    #ifdef __linux__ 
-        rom_file = Silver::File::openFile("/home/zawata/Documents/silvergb/test_files/super-mario-land.gb");
+    Silver::File *bios_file = nullptr;
+    #ifdef __linux__
+        rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/pokemon-blue.gb");
+        bios_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/DMG_ROM.bin");
     #elif _WIN32
-        rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\tetris.gb");
+        if (argc > 1) {
+            rom_file = Silver::File::openFile(argv[1]);
+        }
+        else {
+            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\SFXGenerator.gb");
+            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
+            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\mealybug-tearoom-tests\\ppu\\m3_bgp_change.gb");
+            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\dmg-acid2\\dmg-acid2.gb");
+        }
+        bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
     #else
 
     #endif
 
-    GB_Core *core = new GB_Core(rom_file, nullptr);
+    GB_Core *core = new GB_Core(rom_file, bios_file);
+    GB_Audio *audio = GB_Audio::init_audio(core);
     Input_Manager::button_states_t button_state;
 
+    audio->start_audio();
+
+    bool isRunning = true;
     SDL_Event event;
+    auto start = std::chrono::steady_clock::now();
+    int frames = 0;
     while (isRunning) {
+        ++frames;
+        auto now = std::chrono::steady_clock::now();
+        auto diff = now - start;
+        if(diff >= std::chrono::seconds(1)) {
+            start = now;
+            SDL_SetWindowTitle(window, ("SilverGB - " + std::to_string(frames)).c_str());
+            frames = 0;
+        }
+
         while (SDL_PollEvent(&event)) {
             switch (event.type) {
             case SDL_KEYDOWN:
@@ -287,10 +276,8 @@ int main(int argc, char *argv[])
             }
         }
 
-
         core->set_input_state(button_state);
         core->tick_frame();
-        // core->getByteFromIO(0);
 
         glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
         glTexSubImage2D(
