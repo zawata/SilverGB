@@ -7,6 +7,81 @@
 
 #define WAVRAM_LEN 16
 
+#define protected_constructor(classname) \
+    protected: \
+        classname() {}; \
+    public: \
+
+struct _generic_channel {
+    protected_constructor(_generic_channel)
+
+    bool enabled;
+    s8 volume;
+};
+
+struct _volume_envelope : public _generic_channel {
+    protected_constructor(_volume_envelope)
+
+    void clock_volume_envelope() {
+        if(this->env_enabled) {
+            if(this->period_counter == 0) {
+                if(this->increment) {
+                    if(this->volume == 0xF) {
+                        this->env_enabled = false;
+                    } else {
+                        this->volume++;
+                    }
+                } else {
+                    if (this->volume == 0) {
+                        this->env_enabled = false;
+                    } else {
+                        this->volume--;
+                    }
+                }
+            } else {
+                this->period_counter--;
+            }
+        }
+    }
+
+    bool env_enabled;
+    u8 period_counter;
+    bool increment;
+};
+
+struct _programmable_timer {
+    protected_constructor(_programmable_timer)
+
+    u16 timer;
+};
+
+struct _configurable_timer {
+    protected_constructor(_configurable_timer)
+
+    u32  cfg_counter;
+    u32  shift_clock_cntr;
+};
+
+struct _length_counter {
+    protected_constructor(_length_counter)
+
+    int length_counter;
+};
+
+struct _duty_cycle_generator {
+    protected_constructor(_duty_cycle_generator)
+
+    u8 duty_counter;
+    bool wav_out;
+};
+
+struct _prn_generator {
+    protected_constructor(_prn_generator)
+
+    u16  LFSR_REG;
+    bool wav_out;
+};
+
 class APU {
 public:
     APU(bool bootrom_enabled);
@@ -24,21 +99,14 @@ public:
 
 private:
     u32 tick_counter;
+    u16 frame_sequence_cntr;
 
-    struct {
-        bool enabled;
-        s8 volume;
-        u16 timer;
-        int length_counter;
-
-        u8 duty_counter;
-
-        bool wav_out;
-
-        //envelope
-        bool env_enabled;
-        u8 period_counter;
-    } channel_1;
+    struct :
+        public _volume_envelope,
+        public _programmable_timer,
+        public _length_counter,
+        public _duty_cycle_generator
+    {} channel_1;
 
     #define reg(X) (registers.X)
     inline u8  ch1_sweep_rt()       { return (reg(NR10) >> 4) & 7; }
@@ -60,20 +128,12 @@ private:
     /**
      * Channel 2
      **/
-    struct {
-        bool enabled;
-        s8 volume;
-        u16 timer;
-        int length_counter;
-
-        u8 duty_counter;
-
-        bool wav_out;
-
-        //envelope
-        bool env_enabled;
-        u8 period_counter;
-    } channel_2;
+    struct :
+        public _volume_envelope,
+        public _programmable_timer,
+        public _length_counter,
+        public _duty_cycle_generator
+    {} channel_2;
 
     #define reg(X) (registers.X)
     inline u8  ch2_wav_patt_duty()  { return reg(NR21) >> 6; }
@@ -91,14 +151,11 @@ private:
     /**
      * Channel 3
      **/
-    struct {
-        bool enabled;
-        s8 volume;
-        u16 timer;
-        int length_counter;
-
-        bool wav_out;
-
+    struct :
+        public _generic_channel,
+        public _programmable_timer,
+        public _length_counter
+    {
         u8 wave_pos;
     } channel_3;
 
@@ -118,19 +175,12 @@ private:
     /**
      * channel 4
      **/
-    struct {
-        bool enabled;
-        s8  volume;
-        u32  cfg_counter;
-        u32  shift_clock_cntr;
-        int length_counter;
-        bool wav_out;
-
-        u8  period_counter;
-        bool env_enabled;
-
-        u16  LFSR_REG;
-    } channel_4;
+    struct _channel_4 :
+        public _volume_envelope,
+        public _configurable_timer,
+        public _length_counter,
+        public _prn_generator
+    {} channel_4;
 
     #define reg(X) (registers.X)
     inline u8  ch4_wav_patt_duty()  { return reg(NR41) >> 6; }

@@ -110,23 +110,37 @@ void APU::init_core() {
  *  The "inputs" to the DAC will take the form of volatile variables so that they may be sampled
  * at any available rate.
  */
-
+bool tick_print_enabled = false;
 void APU::tick() {
-    tick_counter++;
+    if(!(tick_counter % 8192)) {
+        switch(frame_sequence_cntr) {
+        case 0:
+            length_counter_clock(ALL_CHANNELS);
+            break;
+        case 1:
+            break;
+        case 2:
+            length_counter_clock(ALL_CHANNELS);
+            freq_sweep_clock();
+            break;
+        case 3:
+            break;
+        case 4:
+            length_counter_clock(ALL_CHANNELS);
+            break;
+        case 5:
+            break;
+        case 6:
+            length_counter_clock(ALL_CHANNELS);
+            freq_sweep_clock();
+            break;
+        case 7:
+            vol_env_clock(ALL_CHANNELS);
+            break;
+        }
 
-    //64hz
-    if(!(tick_counter % 65536)) {
-        vol_env_clock(ALL_CHANNELS);
-    }
-
-    //128hz
-    if(!(tick_counter % 32768)) {
-        freq_sweep_clock();
-    }
-
-    //256hz
-    if(!(tick_counter % 16384)) {
-        length_counter_clock(ALL_CHANNELS);
+        frame_sequence_cntr++;
+        frame_sequence_cntr %= 8;
     }
 
     //1048576
@@ -141,54 +155,51 @@ void APU::tick() {
         timer_clock(4);
     }
 
-    //TODO
+    tick_counter++;
     tick_counter %= 65536;
+}
+
+void mix_channel(bool wave, u8 volume, float *out) {
+    #define _mix(a,b) (((a)+(b))/2)
+    //TODO: figure out the proper range to use for the "DAC"
+    // if the range is from -1.0 to 1.0 then the silence value would need to be -1.0
+    // otherwise the volume values 0-7 would be essentially equivalent to 8-F
+    // #define _normalize(u4val) (((u4val) / 7.5f) - 1.0f)
+    #define _normalize(u4val) ((u4val) / 15.0f)
+
+    *out = _mix((wave) ? _normalize(volume & 0xF) : 0.0f, *out);
 }
 
 void APU::sample(float *left, float *right) {
     *left = 0.0f;
     *right = 0.0f;
     if( snd_en() ) {
-
-        #define mix(a,b) (((a)+(b))/2)
-        #define normalize(u4val) (((u4val) / 7.5f) - 1.0f)
-
         if(channel_1.enabled) {
-            if(ch1_L_dac_en()) {
-                *left = mix((channel_1.wav_out) ? normalize(channel_1.volume) : 0.0f, *left);
-            }
-            if(ch1_R_dac_en()) {
-                *right = mix((channel_1.wav_out) ? normalize(channel_1.volume) : 0.0f, *right);
-            }
+            if(ch1_L_dac_en()) mix_channel(channel_1.wav_out, channel_1.volume, left);
+            if(ch1_R_dac_en()) mix_channel(channel_1.wav_out, channel_1.volume, right);
         }
 
         if(channel_2.enabled) {
-            if(ch2_L_dac_en()) {
-                *left = mix((channel_2.wav_out) ? normalize(channel_2.volume) : 0.0f, *left);
-            }
-            if(ch2_R_dac_en()) {
-                *right = mix((channel_2.wav_out) ? normalize(channel_2.volume) : 0.0f, *right);
-            }
+            if(ch2_L_dac_en()) mix_channel(channel_2.wav_out, channel_2.volume, left);
+            if(ch2_R_dac_en()) mix_channel(channel_2.wav_out, channel_2.volume, right);
         }
 
         // if(channel_3.enabled) {
-        //     if(ch3_L_dac_en()) *left = mix((channel_3.wav_out) ? channel_3.volume : 0.0f, *left);
-        //     if(ch3_R_dac_en()) *right = mix((channel_3.wav_out) ? channel_3.volume : 0.0f, *right);
+            // if(ch3_L_dac_en()) mix_channel(channel_3.wav_out, channel_3.volume, left);
+            // if(ch3_R_dac_en()) mix_channel(channel_3.wav_out, channel_3.volume, right);
         // }
 
-        // if(channel_4.enabled) {
-        //     if(ch4_L_dac_en()) {
-        //         *left = mix((channel_4.wav_out) ? normalize(channel_4.volume) : 0.0f, *left);
-        //     }
-        //     if(ch4_R_dac_en()) {
-        //         *right = mix((channel_4.wav_out) ? normalize(channel_4.volume) : 0.0f, *right);
-        //     }
-        // }
+        if(channel_4.enabled) {
+            if(ch4_L_dac_en()) mix_channel(channel_4.wav_out, channel_4.volume, left);
+            if(ch4_R_dac_en()) mix_channel(channel_4.wav_out, channel_4.volume, right);
+        }
     }
+
+    //TODO: temporary, want to make this configurable and put it in core
+    *left /= 4;
+    *right /= 4;
 }
 
-u32 audio_cntr = 0;
-auto start = std::chrono::high_resolution_clock::now();
 void APU::timer_clock(u8 chan) {
     switch(chan) {
     case CHANNEL_1:
@@ -216,25 +227,28 @@ void APU::timer_clock(u8 chan) {
         }
         break;
     case CHANNEL_4:
-        //double the counters, double the fun!
         if(channel_4.cfg_counter == 0) {
-            channel_4.cfg_counter = ch4_div_ratio() + 1;
+            //this is left shifted by 1 because the output line of the counter is supposed to be inverted on TC, not reloaded
+            //easiest fix is to just double the clock timer and still reload on rising signals
+            channel_4.cfg_counter = (ch4_div_ratio() << 1) + 1;
+
             if(channel_4.shift_clock_cntr == 0) {
                 channel_4.shift_clock_cntr = 0;
                 Bit::set(&channel_4.shift_clock_cntr, ch4_shft_freq());
 
-                u8 r;
+                u8 r = Bit::test(channel_4.LFSR_REG, 0) ^ Bit::test(channel_4.LFSR_REG, 1);
+
+                channel_4.LFSR_REG >>= 1;
                 if(ch4_reg_width()) {
-                    r = Bit::test(channel_4.LFSR_REG, 7) ^ Bit::test(channel_4.LFSR_REG, 6);
-                    channel_4.wav_out = Bit::test(channel_4.LFSR_REG, 7);
-                } else {
-                    r = Bit::test(channel_4.LFSR_REG, 0xF) ^ Bit::test(channel_4.LFSR_REG, 0xE);
-                    channel_4.wav_out = Bit::test(channel_4.LFSR_REG, 0xF);
+                    if(r) Bit::set(&channel_4.LFSR_REG, 6);
+                    else  Bit::reset(&channel_4.LFSR_REG, 6);
                 }
 
-                channel_4.LFSR_REG <<= 1;
-                if(r) Bit::set(&channel_4.LFSR_REG, 0);
-                else  Bit::reset(&channel_4.LFSR_REG, 0);
+                if(r) Bit::set(&channel_4.LFSR_REG, 14);
+                else  Bit::reset(&channel_4.LFSR_REG, 14);
+
+                //output is inverted!
+                channel_4.wav_out = !Bit::test(channel_4.LFSR_REG, 0);
             } else {
                 channel_4.shift_clock_cntr--;
             }
@@ -247,10 +261,10 @@ void APU::timer_clock(u8 chan) {
 void APU::length_counter_clock(u8 chan) {
     switch(chan) {
     case ALL_CHANNELS:
-        length_counter_clock(1);
-        length_counter_clock(2);
-        length_counter_clock(3);
-        length_counter_clock(4);
+        length_counter_clock(CHANNEL_1);
+        length_counter_clock(CHANNEL_2);
+        length_counter_clock(CHANNEL_3);
+        length_counter_clock(CHANNEL_4);
         break;
     case CHANNEL_1:
         if(channel_1.length_counter && channel_1.enabled) {
@@ -290,78 +304,9 @@ void APU::freq_sweep_reset() {
 }
 
 void APU::vol_env_clock(u8 chan) {
-    //TODO: does the period counter get reset both here and on a trigger?
-    switch(chan) {
-    case 0:
-        vol_env_clock(1);
-        vol_env_clock(2);
-        vol_env_clock(3);
-        vol_env_clock(4);
-        break;
-    case 1:
-        if(channel_1.env_enabled && channel_1.period_counter-- == 0) {
-            if(ch1_env_dir()) {
-                if(channel_1.volume == 0xF) {
-                    channel_1.env_enabled = false;
-                }
-                else {
-                    channel_1.volume++;
-                }
-            }
-            else {
-                if (channel_1.volume == 0) {
-                    channel_1.env_enabled = false;
-                }
-                else {
-                    channel_1.volume--;
-                }
-            }
-            channel_1.period_counter = ch1_env_swp_prd();
-        }
-        break;
-    case 2:
-        if(channel_2.env_enabled && channel_2.period_counter-- == 0) {
-            if (ch1_env_dir()) {
-                if (channel_1.volume == 0xF) {
-                    channel_1.env_enabled = false;
-                }
-                else {
-                    channel_1.volume++;
-                }
-            }
-            else {
-                if (channel_1.volume == 0) {
-                    channel_1.env_enabled = false;
-                }
-                else {
-                    channel_1.volume--;
-                }
-            }
-            channel_2.period_counter = ch2_env_swp_prd();
-        }
-        break;
-    case 4:
-        if(channel_4.env_enabled && !channel_4.period_counter--) {
-            if(ch1_env_dir()) {
-                if(channel_4.volume == 0xF) {
-                    channel_4.env_enabled = false;
-                }
-                else {
-                    channel_4.volume++;
-                }
-            }
-            else {
-                if (channel_4.volume == 0) {
-                    channel_4.env_enabled = false;
-                }
-                else {
-                    channel_4.volume--;
-                }
-            }
-            channel_4.period_counter = ch4_env_swp_prd();
-        }
-        break;
-    }
+    channel_1.clock_volume_envelope();
+    channel_2.clock_volume_envelope();
+    channel_4.clock_volume_envelope();
 }
 
 void APU::trigger(u8 chan) {
@@ -374,41 +319,56 @@ void APU::trigger(u8 chan) {
     switch(chan) {
     case CHANNEL_1:
         channel_1.enabled = true;
-        if(!channel_1.length_counter) channel_1.length_counter = 64;
+        if(channel_1.length_counter == 0) channel_1.length_counter = 64;
         channel_1.timer = 2048 - ch1_freq();
+
         channel_1.period_counter = ch1_env_swp_prd();
+        channel_1.increment = ch1_env_dir();
+        channel_1.env_enabled = channel_1.period_counter > 0;
+
         channel_1.volume = ch1_init_vol_env();
         std::cout << "trigger 1 with freq " << as_hex(ch1_freq()) << std::endl;
-
+        std::cout << "increment" << channel_1.increment << std::endl;
         // Square 1's sweep does several things
         freq_sweep_reset();
         break;
     case CHANNEL_2:
         channel_2.enabled = true;
-        if(!channel_2.length_counter) channel_2.length_counter = 64;
+        if(channel_2.length_counter == 0) channel_2.length_counter = 64;
         channel_2.timer = 2048 - ch2_freq();
+
         channel_2.period_counter = ch2_env_swp_prd();
+        channel_2.increment = ch2_env_dir();
+        channel_2.env_enabled = channel_2.period_counter > 0;
+
         channel_2.volume = ch2_init_vol_env();
         std::cout << "trigger 2 with freq " << as_hex(ch1_freq()) << std::endl;
 
         break;
     case CHANNEL_3:
         channel_3.enabled = true;
-        if(!channel_3.length_counter) channel_3.length_counter = 256;
+        if(channel_3.length_counter == 0) channel_3.length_counter = 256;
 
         // Wave channel's position is set to 0 but sample buffer is NOT refilled.
         channel_3.wave_pos = 0;
         break;
     case CHANNEL_4:
         channel_4.enabled = true;
-        if(!channel_4.length_counter) channel_4.length_counter = 64;
-        channel_1.timer = 2048 - ch1_freq();
-        channel_4.period_counter = ch1_env_swp_prd();
+        if(channel_4.length_counter == 0) channel_4.length_counter = 64;
+
+        channel_4.period_counter = ch4_env_swp_prd();
+        channel_4.increment = ch4_env_dir();
+        channel_4.env_enabled = channel_4.period_counter > 0;
+
         channel_4.volume = ch1_init_vol_env();
         std::cout << "trigger 4 with freq " << as_hex(ch1_freq()) << std::endl;
+        // static int trigger_count = 0;
+
+        // if(trigger_count) tick_print_enabled = true;
+        // trigger_count++;
 
         // Noise channel's LFSR bits are all set to 1.
-        channel_4.LFSR_REG = 0xFF;
+        channel_4.LFSR_REG = 0xFFFF;
         break;
     }
 }
@@ -536,6 +496,8 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
     case NR43_REG:
         registers.NR43 = data & NR43_WRITE_MASK;
+        std::cout << "div_ratio: " << (int)ch4_div_ratio() << std::endl;
+        std::cout << "shft_freq: " << (int)ch4_shft_freq() << std::endl;
         break;
     case NR44_REG:
         registers.NR44 = data & NR44_WRITE_MASK;
