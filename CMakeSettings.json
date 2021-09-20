@@ -9,19 +9,8 @@
       "cmakeCommandArgs": "-DCMAKE_BUILD_TYPE=Debug",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "variables": [
-        {
-          "name": "wxWidgets_LIB_DIR",
-          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
-          "type": "PATH"
-        },
-        {
-          "name": "wxWidgets_ROOT_DIR",
-          "value": "C:/libs/wxWidgets",
-          "type": "PATH"
-        }
-      ],
-      "cmakeToolchain": "",
+      "variables": [],
+      "cmakeToolchain": "C:/Users/zawata/source/repos/SilverGB/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "generator": "Visual Studio 16 2019 Win64"
     },
     {
@@ -69,18 +58,9 @@
           "name": "VCPKG_TARGET_TRIPLET",
           "value": "x64-windows",
           "type": "STRING"
-        },
-        {
-          "name": "wxWidgets_LIB_DIR",
-          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
-          "type": "PATH"
-        },
-        {
-          "name": "wxWidgets_ROOT_DIR",
-          "value": "C:/libs/wxWidgets",
-          "type": "PATH"
         }
-      ]
+      ],
+      "cmakeToolchain": "C:/Users/zawata/source/repos/SilverGB/vcpkg/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "x64-Clang-Ninja-Release",
@@ -127,18 +107,9 @@
           "name": "VCPKG_TARGET_TRIPLET",
           "value": "x64-windows",
           "type": "STRING"
-        },
-        {
-          "name": "wxWidgets_LIB_DIR",
-          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
-          "type": "PATH"
-        },
-        {
-          "name": "wxWidgets_ROOT_DIR",
-          "value": "C:/libs/wxWidgets",
-          "type": "PATH"
         }
-      ]
+      ],
+      "cmakeToolchain": "C:/Users/zawata/source/repos/SilverGB/vcpkg/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "x64-MSVC-Release",
@@ -151,18 +122,8 @@
       "ctestCommandArgs": "",
       "addressSanitizerEnabled": true,
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "variables": [
-        {
-          "name": "wxWidgets_LIB_DIR",
-          "value": "C:/libs/wxWidgets/lib/vc14x_x64_dll",
-          "type": "PATH"
-        },
-        {
-          "name": "wxWidgets_ROOT_DIR",
-          "value": "C:/libs/wxWidgets",
-          "type": "PATH"
-        }
-      ]
+      "variables": [],
+      "cmakeToolchain": "C:/Users/zawata/source/repos/SilverGB/vcpkg/scripts/buildsystems/vcpkg.cmake"
     }
   ]
 }

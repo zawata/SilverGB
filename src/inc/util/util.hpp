@@ -6,6 +6,8 @@
 #include <iostream>
 #include <string>
 
+#define as_hex(x) std::hex << (s64)(x) << std::dec
+
 static inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { return ::memcmp(a, b, l) == 0; }
 
 /**

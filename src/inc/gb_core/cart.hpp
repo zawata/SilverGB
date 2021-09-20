@@ -1,6 +1,5 @@
 #pragma once
 
-#include "gb_core/cart.hpp"
 #include "util/file.hpp"
 
 #include "util/ints.hpp"

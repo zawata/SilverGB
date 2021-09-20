@@ -16,7 +16,7 @@ File::~File() {}
 File *File::createFile(std::string filename) {
     if(std::ifstream(filename)) return nullptr; //don't create file if it exists
 
-    //not casting to void throws an error about shaddowing filename?
+    //cast to void to avoid shadowing the function argument
     (void)std::ofstream(filename); //create file
     return openFile(filename, true);
 }
@@ -96,20 +96,6 @@ void File::setBuffer(u32 offset, u8 *buf, size_t len) {
 
 std::string File::getFilename() {
     return filename;
-}
-
-void File::toVector(std::vector<u8> &vec) {
-    u32 size = this->getSize();
-    vec.clear();
-    vec.resize(size);
-
-    //std::copy(std::istream_iterator<u8>(file), std::istream_iterator<u8>(), std::back_inserter(vec));
-    getBuffer(0, vec.data(), size);
-}
-
-void File::fromVector(std::vector<u8> const& vec) {
-    seekFile_p(0);
-    std::copy(vec.begin(), vec.end(), std::ostream_iterator<char>(file));
 }
 
 /**

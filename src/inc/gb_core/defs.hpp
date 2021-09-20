@@ -1,7 +1,5 @@
 #pragma once
 
-#define as_hex(x) std::hex << (int)(x) << std::dec
-
 #define IMAGE_FORMAT_SIZE 3 //rgb
 
 #define GB_S_W    160                          // screen width
