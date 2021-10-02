@@ -1,8 +1,10 @@
 #pragma once
 
-#include <fstream>
-#include <iostream>
+#include <cassert>
+#include <iterator>
 #include <vector>
+
+#include <nowide/fstream.hpp>
 
 #include "util/ints.hpp"
 
@@ -36,7 +38,7 @@ public:
     std::string getFilename();
 
 private:
-    std::fstream file;
+    nowide::fstream file;
     std::string filename;
 
     File(std::string filename);

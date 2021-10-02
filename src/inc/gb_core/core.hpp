@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gb_core/defs.hpp"
 #include "util/file.hpp"
 #include "gb_core/cpu.hpp"
 #include "gb_core/io.hpp"
@@ -13,6 +14,9 @@ struct breakpoint_exception {
 
 class GB_Core {
 public:
+    static constexpr u32 native_width = GB_S_W;
+    static constexpr u32 native_height = GB_S_H;
+
     GB_Core(Silver::File *rom, Silver::File *bootrom);
     ~GB_Core();
 

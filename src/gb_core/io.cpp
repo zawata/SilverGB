@@ -1,5 +1,7 @@
 #include <stdexcept>
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/defs.hpp"
 #include "gb_core/io.hpp"
 #include "gb_core/io_reg.hpp"
@@ -142,7 +144,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         return read_reg(offset-0xFF00);
     }
 
-    std::cerr << "IO Overread" << std::endl;
+    nowide::cerr << "IO Overread" << std::endl;
     return 0;
 }
 
@@ -216,7 +218,7 @@ void IO_Bus::write(u16 offset, u8 data) {
         return;
     }
 
-    std::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
+    nowide::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
 }
 
 u8  IO_Bus::read_reg(u8 loc) {
@@ -350,7 +352,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         return apu->write_wavram(loc, data);
     case LCDC_REG :
         if(!Bit::test(data, 7) && !check_mode(MODE_VBLANK))
-            std::cerr << "LCD Disable outside VBLANK" << std::endl;
+            nowide::cerr << "LCD Disable outside VBLANK" << std::endl;
         registers.LCDC = data & LCDC_WRITE_MASK;
         break;
     case STAT_REG:
@@ -394,7 +396,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         break;
     // case KEY1_REG :
     case ROMEN_REG:
-        std::cout << "Boot rom disabled" << std::endl;
+        nowide::cout << "Boot rom disabled" << std::endl;
         bootrom_mode = false;
         return;
     // case HDMA1_REG:
@@ -461,7 +463,7 @@ u8 IO_Bus::read_vram(u16 offset, bool bypass) {
         }
     }
     else {
-        std::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
         return 0;
     }
 }
@@ -483,7 +485,7 @@ void IO_Bus::write_vram(u16 offset, u8 data) {
         }
     }
     else {
-        std::cerr << "vram write OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "vram write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
@@ -496,7 +498,7 @@ u8 IO_Bus::read_oam(u16 offset, bool bypass) {
         return oam_ram[offset];
     }
     else {
-        std::cerr << "oam read OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "oam read OOB: " << as_hex(offset) << std::endl;
         return 0;
     }
 }
@@ -508,7 +510,7 @@ void IO_Bus::write_oam(u16 offset, u8 data) {
         oam_ram[offset] = data;
     }
     else {
-        std::cerr << "oam write OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "oam write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
@@ -527,7 +529,7 @@ u8 IO_Bus::read_ram(u16 offset) {
         }
     }
     else {
-        std::cerr << "ram read OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "ram read OOB: " << as_hex(offset) << std::endl;
         return 0;
     }
 }
@@ -547,7 +549,7 @@ void IO_Bus::write_ram(u16 offset, u8 data) {
         }
     }
     else {
-        std::cerr << "ram write OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "ram write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
@@ -558,7 +560,7 @@ u8 IO_Bus::read_hram(u16 offset) {
         return high_ram[offset];
     }
     else {
-        std::cerr << "hram read OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "hram read OOB: " << as_hex(offset) << std::endl;
         return 0;
     }
 }
@@ -570,7 +572,7 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
         high_ram[offset] = data;
     }
     else {
-        std::cerr << "hram write OOB: " << as_hex(offset) << std::endl;
+        nowide::cerr << "hram write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
@@ -579,7 +581,6 @@ void IO_Bus::write_hram(u16 offset, u8 data) {
  */
 
 //Called for any interrupt
-inline
 void IO_Bus::request_interrupt(IO_Bus::Interrupt i) {
     registers.IF |= i;
 }

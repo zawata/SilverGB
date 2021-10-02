@@ -3,9 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "util/ints.hpp"
+#include <nowide/iostream.hpp>
 
-#include <iostream>
+#include "util/ints.hpp"
 
 template<typename T>
 class CircularQueue {

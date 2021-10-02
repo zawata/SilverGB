@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/cart.hpp"
 
 #include "util/bit.hpp"
@@ -22,7 +24,7 @@ struct MBC1_Controller : public MBC1_Base {
             return MBC1_Base::read(offset);
         }
         else {
-            std::cerr << "MBC1: read out of bounds: " << offset << std::endl;
+            nowide::cerr << "MBC1: read out of bounds: " << offset << std::endl;
             return 0;
         }
     }
@@ -54,7 +56,7 @@ struct MBC1_Controller : public MBC1_Base {
             MBC1_Base::write(offset, data);
         }
         else {
-            std::cerr << "MBC1: write out of bounds: " << offset << std::endl;
+            nowide::cerr << "MBC1: write out of bounds: " << offset << std::endl;
         }
     }
 

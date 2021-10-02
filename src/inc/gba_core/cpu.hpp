@@ -1,7 +1,7 @@
 #pragma once
-#include <iostream>
 #include <queue>
-#include <vcruntime_string.h>
+
+#include <nowide/iostream.hpp>
 
 #include "gba_core/io.hpp"
 

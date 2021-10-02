@@ -1,3 +1,5 @@
+#include <nowide/iostream.hpp>
+
 #include "gba_core/cart.hpp"
 #include "gba_core/io.hpp"
 
@@ -20,7 +22,7 @@ u32 IO_Bus::read(u32 offset, bool bypass) {
 }
 
 void IO_Bus::write(u16 offset, u8 data) {
-    std::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
+    nowide::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
 }
 
 u8  IO_Bus::read_reg(u8 loc) {

@@ -1,3 +1,5 @@
+#include <nowide/iostream.hpp>
+
 #include "gb_core/cpu.hpp"
 #include "gb_core/defs.hpp"
 
@@ -105,7 +107,7 @@ cpu_counter(0) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
-        std::cout << "Starting CPU without bootrom not supported!" << std::endl;
+        nowide::cout << "Starting CPU without bootrom not supported!" << std::endl;
         AF_REG = 0x01b0;
         BC_REG = 0x0013;
         DE_REG = 0x00D8;
@@ -230,7 +232,7 @@ inline void CPU::on_div1024() {
 }
 
 u8 CPU::decode(u8 op) {
-    //  std::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
+    //  nowide::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -1711,7 +1713,7 @@ u8 CPU::ret_cond(bool cond) {
 // Invalid Op
 //====================
 u8 CPU::invalid_op(u8 op) {
-    std::cerr << "Invalid OP" << std::endl;
+    nowide::cerr << "Invalid OP" << std::endl;
     PC_REG--; //to make the game freeze
     return 0;
 }

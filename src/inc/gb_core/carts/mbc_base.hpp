@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/cart.hpp"
 
 #include "util/util.hpp"
@@ -67,7 +69,7 @@ struct MBC1_Base : public MemoryBankController {
             }
         }
         else {
-            std::cerr << "read out of bounds: " << offset << std::endl;
+            nowide::cerr << "read out of bounds: " << offset << std::endl;
             return 0;
         }
     }
@@ -83,7 +85,7 @@ struct MBC1_Base : public MemoryBankController {
             }
         }
         else {
-            std::cerr << "write out of bounds: " << offset << std::endl;
+            nowide::cerr << "write out of bounds: " << offset << std::endl;
         }
     }
 

@@ -17,7 +17,7 @@ GLuint screen_texture,
 void _check_gl_error(u32 line) {
     GLenum err;
     if((err = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "GL" << line << ": " << as_hex(err) << std::endl;
+        nowide::cerr << "GL" << line << ": " << as_hex(err) << std::endl;
     }
 }
 
@@ -77,7 +77,7 @@ void gl_init_shaders() {
     if(!success) {
         memset(infoLog, 0, 512);
         glGetShaderInfoLog(vert_shader, 512, NULL, infoLog);          check_gl_error();
-        std::cout << "vert_shader failed\n" << infoLog << std::endl;
+        nowide::cout << "vert_shader failed\n" << infoLog << std::endl;
     };
 
     frag_shader = glCreateShader(GL_FRAGMENT_SHADER);                 check_gl_error();
@@ -89,7 +89,7 @@ void gl_init_shaders() {
     if(!success) {
         memset(infoLog, 0, 512);
         glGetShaderInfoLog(frag_shader, 512, NULL, infoLog);          check_gl_error();
-        std::cout << "frag_shader failed\n" << infoLog << std::endl;
+        nowide::cout << "frag_shader failed\n" << infoLog << std::endl;
     };
 
     shader_program = glCreateProgram();                               check_gl_error();
@@ -101,7 +101,7 @@ void gl_init_shaders() {
     if(!success) {
         memset(infoLog, 0, 512);
         glGetProgramInfoLog(shader_program, 512, NULL, infoLog);      check_gl_error();
-        std::cout << "shader program failed\n" << infoLog << std::endl;
+        nowide::cout << "shader program failed\n" << infoLog << std::endl;
     }
 
     glUseProgram(0);                                                  check_gl_error();
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 
     // Initialize SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-        std::cout << SDL_GetError() << std::endl;
+        nowide::cout << SDL_GetError() << std::endl;
         return -1;
     }
 
@@ -160,19 +160,19 @@ int main(int argc, char *argv[])
         200, 200, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
     if (window == NULL) {
-        std::cout << SDL_GetError() << std::endl;
+        nowide::cout << SDL_GetError() << std::endl;
         return -1;
     }
 
     // Create the OpenGL context for the window using SDL
     context = SDL_GL_CreateContext(window);
     if (context == NULL) {
-        std::cout << SDL_GetError() << std::endl;
+        nowide::cout << SDL_GetError() << std::endl;
         return -1;
     }
 
     if (gl3wInit() < 0) {
-        std::cout << "gl3w failed" << std::endl;
+        nowide::cout << "gl3w failed" << std::endl;
         return -1;
     }
 
@@ -227,8 +227,15 @@ int main(int argc, char *argv[])
     Silver::File *rom_file = nullptr;
     Silver::File *bios_file = nullptr;
     #ifdef __linux__
-        rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/pokemon-blue.gb");
+        nowide::cout << "in linux" << std::endl;
+        if (argc > 1) {
+            rom_file = Silver::File::openFile(argv[1]);
+        }
+        else {
+            rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/pokemon-blue.gb");
+        }
         bios_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/DMG_ROM.bin");
+        nowide::cout << "after file" << std::endl;
     #elif _WIN32
         if (argc > 1) {
             rom_file = Silver::File::openFile(argv[1]);

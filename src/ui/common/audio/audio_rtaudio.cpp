@@ -26,12 +26,12 @@ GB_Audio *GB_Audio::init_audio(GB_Core *core) {
 	    gb_audio->audio_dev = audio_dev = new RtAudio();
     }
     catch(RtAudioError e){
-	    std::cerr << "fail to create RtAudio: " << e.what() << std::endl;
+	    nowide::cerr << "fail to create RtAudio: " << e.what() << std::endl;
 	    return nullptr;
     }
 
     if (!audio_dev){
-	    std::cerr << "fail to allocate RtAudio" << std::endl;
+	    nowide::cerr << "fail to allocate RtAudio" << std::endl;
 	return nullptr;
     }
     /* probe audio devices */
@@ -54,7 +54,7 @@ GB_Audio *GB_Audio::init_audio(GB_Core *core) {
             _audio_callback, // callback
             core);          // userData
 
-    std::cout << "frame_count: " << frame_count << std::endl;
+    nowide::cout << "frame_count: " << frame_count << std::endl;
 
     return gb_audio;
 }

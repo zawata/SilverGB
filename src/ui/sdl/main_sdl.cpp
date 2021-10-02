@@ -48,7 +48,7 @@ void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *even
 int main(int argc, char *argv[]) {
     // Initialize SDL
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-        std::cout << SDL_GetError() << std::endl;
+        nowide::cout << SDL_GetError() << std::endl;
         return -1;
     }
 

@@ -1,6 +1,8 @@
 #include <cassert>
 #include <vector>
 
+#include <nowide/iostream.hpp>
+
 #include "gba_core/cart.hpp"
 
 #include "util/file.hpp"
@@ -23,24 +25,24 @@ std::string get_ram_file_name(std::string rom_file_name) {
 
 bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u32> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
-        std::cout<< "SAV File: does not exist" << std::endl;
+        nowide::cout << "SAV File: does not exist" << std::endl;
         return false;
     }
 
     Silver::File *ram_file = Silver::File::openFile(ram_file_name);
     if(ram_file == nullptr) {
-        std::cout<< "SAV File: could not be opened" << std::endl;
+        nowide::cout << "SAV File: could not be opened" << std::endl;
         return false;
     }
 
     // if(ram_file->getSize() != getRAMSize()) {
-    //     std::cout<< "SAV File: incorrect size" << std::endl;
+    //     nowide::cout << "SAV File: incorrect size" << std::endl;
     //     return false;
     // }
 
     ram_file->toVector<u32>(ram_buffer);
 
-    std::cout<< "SAV File: loaded" << std::endl;
+    nowide::cout << "SAV File: loaded" << std::endl;
     return true;
 }
 
@@ -54,11 +56,11 @@ bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u32> const& r
     }
 
     if(ram_file == nullptr) {
-        std::cout<< "SAV File: could not be opened/created" << std::endl;
+        nowide::cout << "SAV File: could not be opened/created" << std::endl;
         return false;
     }
 
-    std::cout<< "SAV File: saved" << std::endl;
+    nowide::cout << "SAV File: saved" << std::endl;
     ram_file->fromVector(ram_buffer);
 
     return true;
@@ -75,5 +77,5 @@ Cartridge::~Cartridge() {};
 
 u32   Cartridge::read(u32 offset)  { return rom.at(offset); }
 void Cartridge::write(u32 offset, u32 data) {
-    std::cout << "tried to write " << as_hex(data) << " to " << as_hex(offset) << std::endl;
+    nowide::cout << "tried to write " << as_hex(data) << " to " << as_hex(offset) << std::endl;
 }

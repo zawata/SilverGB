@@ -11,67 +11,19 @@ The emulator attempts to remain compilable on all Major Operating Systems(as I'm
 ## Major TODOs
 
 Slight TODOs are littered throughout the code, the bigger ones are placed here:  
- - Implement Friendlier UI (See Below)
- - Audio Processing Unit
  - M-Cycle accurate CPU rewrite(see `src/gb/new_cpu.c`)
    - Basic structure is done and designed, just need to actually implement all 499 instructions
  - Accurate PPU timing
    - Most of this isn't centrally documented but spread across 3-4 documents and dozens of test-roms. So yay.
- - core-clocking rewrite
-   - Currently timed by window updates in SDL which runs slightly too fast.
-   - Saw a recommendation to time the emulator by audio buffer updates, will probably implement with APU support.
-
-
-### UI
-After Having compared like a dozen UI Libraries I've come to the conclusion that I want a a native UI Framework. which leaves my options at:
- - WxWidgets:
-   - Currently Implmented
-   - Pros:
-     - C++
-     - Open Source
-     - Easy to start with
-   - Cons:
-     - Archaic
-     - Minimal graphics support
-     - poorly documented
-     - Lots of OS-specific behavior
- - libUI
-   - Pros:
-     - Slim
-     - Fast
-   - Cons:
-     - constantly evolving, the cpp wrapper gave up like 2 years ago
-     - "mid-alpha"
-     - no native graphics support
- - QT
-   - Pros:
-     - library for everything
-     - actively devlopement but not unstable
-     - industry standard
-   - Cons:
-     - Massive
-     - threaded model
-     - difficult to manage
-     - restrictive licensing
 
 
 ## Progress:  
 ✔ = Done  
 ➕ = In Progress  
 🚫 = Not Working  
-\- = Not Tested
+\- = Not Tested  
 
 ✔ CPU  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ OpCodes  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ OpCode Disassembly  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ Timers  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ Interrupt Handling  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ IO Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Core Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Input Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Sound Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ Video Registers  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ Memory Layout  
 ➕ Cartridge  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Header Parsing  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ Memory Bank Controllers  
@@ -115,13 +67,6 @@ After Having compared like a dozen UI Libraries I've come to the conclusion that
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Input  
 &nbsp;&nbsp;&nbsp;&nbsp;🚫 Interrupts  
 
-## Current Issues
-PPU  
-&nbsp;&nbsp;&nbsp;&nbsp; - Sprites do not scroll with the SCX register and instead jump ~8pixels at a time.  
-&nbsp;&nbsp;&nbsp;&nbsp; - Window Seems to be 1 pixel to the left and possibly 1 pixel down too.  
-&nbsp;&nbsp;&nbsp;&nbsp; - The first VRAM Fetch of a new line may take 2 more clocks than it should.  
-UI  
-&nbsp;&nbsp;&nbsp;&nbsp; - Screen is always stretched to the window bounds.
 
 ## Features
 
@@ -211,6 +156,49 @@ Gekkio's Acceptance Tests:
 &nbsp;&nbsp;&nbsp;&nbsp;- ret_timing.gb  
 &nbsp;&nbsp;&nbsp;&nbsp;- rst_timing.gb  
 
+
+## Compilation
+
+Cmake is used for the build system.  
+Vcpkg is used as a package manager where possible(make sure to `git submodule update --init --recursive`).  
+`clang` is the preferred compiler(as it's my favorite) but `msvc` and `gcc` should work as well  
+ninja is recommended as a generator but any generator will do.
+### Windows
+
+Install the following packages in vcpkg
+
+```bash
+./vcpkg install @../.vcpkg_deps.txt
+./vcpkg install magnum[wglContext] --recurse
+
+```
+Note that this will default to x86-32. for 64bit pass `--triplet=x64-windows`  
+
+Visual Studio  2019+ is probably the easiest solution as iut contains built in support for cmake.  
+
+
+### Linux
+
+Install the following packages in vcpkg
+
+```bash
+./vcpkg install @../.vcpkg_deps.txt
+./vcpkg install magnum[GlxContext] --recurse
+
+```
+
+```bash
+mkdir -p out/linux
+cd out/linux
+
+#Ninja
+cmake ../.. -GNinja
+cmake --build .
+
+#Make
+cmake ../..
+make
+```
 
 ## Questions
 ### Who?

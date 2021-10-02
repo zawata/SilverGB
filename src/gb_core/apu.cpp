@@ -1,8 +1,9 @@
 #include <cassert>
 #include <cstring>
-#include <iostream>
 
 #include <chrono>
+
+#include <nowide/iostream.hpp>
 
 #include "gb_core/defs.hpp"
 #include "gb_core/io_reg.hpp"
@@ -327,8 +328,8 @@ void APU::trigger(u8 chan) {
         channel_1.env_enabled = channel_1.period_counter > 0;
 
         channel_1.volume = ch1_init_vol_env();
-        std::cout << "trigger 1 with freq " << as_hex(ch1_freq()) << std::endl;
-        std::cout << "increment" << channel_1.increment << std::endl;
+        nowide::cout << "trigger 1 with freq " << as_hex(ch1_freq()) << std::endl;
+        nowide::cout << "increment" << channel_1.increment << std::endl;
         // Square 1's sweep does several things
         freq_sweep_reset();
         break;
@@ -342,7 +343,7 @@ void APU::trigger(u8 chan) {
         channel_2.env_enabled = channel_2.period_counter > 0;
 
         channel_2.volume = ch2_init_vol_env();
-        std::cout << "trigger 2 with freq " << as_hex(ch1_freq()) << std::endl;
+        nowide::cout << "trigger 2 with freq " << as_hex(ch1_freq()) << std::endl;
 
         break;
     case CHANNEL_3:
@@ -361,7 +362,7 @@ void APU::trigger(u8 chan) {
         channel_4.env_enabled = channel_4.period_counter > 0;
 
         channel_4.volume = ch1_init_vol_env();
-        std::cout << "trigger 4 with freq " << as_hex(ch1_freq()) << std::endl;
+        nowide::cout << "trigger 4 with freq " << as_hex(ch1_freq()) << std::endl;
         // static int trigger_count = 0;
 
         // if(trigger_count) tick_print_enabled = true;
@@ -422,7 +423,7 @@ u8 APU::read_reg(u8 loc) {
     case NR52_REG:
         return registers.NR52 & NR52_READ_MASK;
     default:
-        std::cerr << "bad apu reg read: " << loc << std::endl;
+        nowide::cerr << "bad apu reg read: " << loc << std::endl;
         return 0xFF;
     }
 }
@@ -496,8 +497,8 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
     case NR43_REG:
         registers.NR43 = data & NR43_WRITE_MASK;
-        std::cout << "div_ratio: " << (int)ch4_div_ratio() << std::endl;
-        std::cout << "shft_freq: " << (int)ch4_shft_freq() << std::endl;
+        nowide::cout << "div_ratio: " << (int)ch4_div_ratio() << std::endl;
+        nowide::cout << "shft_freq: " << (int)ch4_shft_freq() << std::endl;
         break;
     case NR44_REG:
         registers.NR44 = data & NR44_WRITE_MASK;

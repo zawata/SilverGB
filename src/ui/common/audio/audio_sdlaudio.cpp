@@ -24,7 +24,7 @@ GB_Audio *GB_Audio::init_audio(GB_Core *core) {
 
     *audio_dev = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, 0);
     if(!*audio_dev)
-        std::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
+        nowide::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
 
     gb_audio->audio_dev = audio_dev;
 

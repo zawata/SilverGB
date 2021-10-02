@@ -1,5 +1,7 @@
 #include <chrono>
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/input.hpp"
@@ -95,7 +97,7 @@ void GB_Core::set_input_state(Input_Manager::button_states_t const& state) {
 
 void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
     if(!audio_queue->front()) {
-        std::cerr << "audio buffer underflow" << std::endl;
+        nowide::cerr << "audio buffer underflow" << std::endl;
         memset(buff, 0, copy_cnt * 4);
     } else {
         auto audio_buffer = *audio_queue->front();

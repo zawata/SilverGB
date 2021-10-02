@@ -1,5 +1,7 @@
 #pragma once
 
+#include <chrono>
+
 #include <Corrade/Containers/Reference.h>
 
 #include <Magnum/DimensionTraits.h>
@@ -32,7 +34,7 @@
 #endif
 
 #if !wxUSE_GLCANVAS
-#   error "OpenGL required"
+#   error "GLCanvas required"
 #endif
 #include "wx/glcanvas.h"
 
@@ -84,6 +86,12 @@ public:
         execMode_TICK_FRAME
     };
 
+    enum DisplayMode {
+        displayMode_STRETCH,
+        displayMode_FIT,
+        displayMode_CENTER
+    };
+
 private:
     wxGLCanvas *glcanvas = nullptr;
     GB_Core *core = nullptr;
@@ -97,7 +105,8 @@ private:
 
     std::chrono::high_resolution_clock::time_point prev_tp;
 
-    ExecMode mode = execMode_NORMAL;
+    ExecMode exec_mode = execMode_NORMAL;
+    DisplayMode display_mode = displayMode_FIT;
 
 public:
     Silver_ExecutionManager(wxGLCanvas *glcanvas);
@@ -107,6 +116,7 @@ public:
     void setBIOS(std::string filename);
 
     void setExecMode(ExecMode mode);
+    void setDisplayMode(DisplayMode mode);
 
     void startCore();
     void endCore();
@@ -120,17 +130,19 @@ class SilverGBApp : public wxApp {
 public:
     SilverGBApp() {}
     ~SilverGBApp() {}
-    bool OnInit() wxOVERRIDE;
+    bool OnInit() override;
 };
 
 class Silver_mainFrame : public wxFrame {
 public:
     Silver_mainFrame(const wxString& title);
 
-    void openROM(wxCommandEvent &event);
-    void openBIOS(wxCommandEvent &event);
+    void loadROM(wxCommandEvent &event);
+    void loadBIOS(wxCommandEvent &event);
 
     void setExecMode(wxCommandEvent &event);
+    void setDisplayMode(wxCommandEvent &event);
+    void setScaledSize(wxCommandEvent& event);
 
     void startROM(wxCommandEvent& event);
     void stepExecution(wxCommandEvent& event);

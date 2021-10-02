@@ -1,9 +1,9 @@
 #pragma once
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/io.hpp"
 #include "util/util.hpp"
-
-#include <iostream>
 
 #define DIV_MAX 1024
 

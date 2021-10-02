@@ -1,5 +1,7 @@
 #include <cassert>
 
+#include <nowide/iostream.hpp>
+
 #include "gba_core/cpu.hpp"
 
 #include "gba_core/io.hpp"
@@ -105,7 +107,7 @@ bool (*conditions[])(void) = {
 };
 
 void CPU::prefetch() {
-    std::cout << "prefetch " << as_hex(REG_PC) << std::endl;
+    nowide::cout << "prefetch " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(REG_PC);
 }
@@ -169,14 +171,14 @@ void CPU::execute() {
 
     #define MUL_CONSTANT 0b1001
 
-    std::cout << (std::string)op_fields << std::endl;
+    nowide::cout << (std::string)op_fields << std::endl;
 
 
     bool (*condition)(void) = conditions[op_fields.get(word, "condition")];
 
     switch(op_fields.get(word, "op_code")) {
         case op_code_DATA_PROCESSING: {
-            std::cout << "dp" << std::endl;
+            nowide::cout << "dp" << std::endl;
             bool immediate =  op_fields.get<bool>(word, "is_imm");
             bool set_flags =  op_fields.get<bool>(word, "dp_set_flags");
             u8 command =      op_fields.get(word, "dp_command");
@@ -184,7 +186,7 @@ void CPU::execute() {
             u8 reg_D =        op_fields.get(word, "dp_reg_D");
 
             if(immediate) {
-                std::cout << "immediate" << std::endl;
+                nowide::cout << "immediate" << std::endl;
                 data_proc_immediate(
                     condition(),
                     (op_data_proc_cmd_t)command,
@@ -195,7 +197,7 @@ void CPU::execute() {
                     op_fields.get(word, "dpi_immediate"));
             //special case: if the bits 4-7 are set to 0b1001, then it's not a dp instruction, it's a multiply
             } else if(op_fields.get(word, "mul_const") == MUL_CONSTANT) {
-                std::cout << "MULTIPLY" << std::endl;
+                nowide::cout << "MULTIPLY" << std::endl;
             } else {
                 u8 shift_type = op_fields.get(word, "dpr_shift_type");
                 u8 reg_M      = op_fields.get(word, "dpr_reg_M");
@@ -226,7 +228,7 @@ void CPU::execute() {
             break;
         }
         case op_code_LOAD_STORE: {
-            std::cout << "ls" << std::endl;
+            nowide::cout << "ls" << std::endl;
             bool immediate =  op_fields.get<bool>(word, "is_imm");
             bool is_pre_idx = op_fields.get<bool>(word, "ls_is_pre_idx");
             bool is_up =      op_fields.get<bool>(word, "ls_is_up");
@@ -237,7 +239,7 @@ void CPU::execute() {
             u8   reg_D =      op_fields.get<u8>(word, "dp_reg_D");
 
             if(immediate) {
-                std::cout << "immediate" << std::endl;
+                nowide::cout << "immediate" << std::endl;
                 load_store_immediate(
                         condition(),
                         is_pre_idx,
@@ -269,12 +271,12 @@ void CPU::execute() {
             bool link = Bit::test(word, 24);
             s32 immediate = Bit::sign_extend(word & 0x00FFFFFF, 23);
 
-            std::cout << "branch" << std::endl;
+            nowide::cout << "branch" << std::endl;
 
             branch(condition, Bit::test(word, 24), Bit::sign_extend(word & 0x00FFFFFF, 23));
         }
         case op_code_COPROCESSOR:
-            std::cout << "coprocessor!" << std::endl;
+            nowide::cout << "coprocessor!" << std::endl;
         break;
     }
 }
@@ -282,7 +284,7 @@ void CPU::execute() {
 u32 CPU::calc_shift_operand(op_data_proc_shift_t shift_type, u8 amount, u8 reg_M, bool *carry_out) {
     switch(shift_type) {
     case op_data_proc_shift_LSL:
-        return Bit::shift_with_carry<u32>::shift_left(REG(reg_M), amount, carry_out);
+        return Bit::shift_with_carry<u32>::shift_left(REG(reg_M), amount, get_CPSR_C(), carry_out);
     case op_data_proc_shift_LSR:
         return Bit::shift_with_carry<u32>::shift_right(REG(reg_M), amount, carry_out);
     case op_data_proc_shift_ASR:

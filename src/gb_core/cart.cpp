@@ -1,6 +1,8 @@
 #include <cassert>
 #include <vector>
 
+#include <nowide/iostream.hpp>
+
 #include "gb_core/cart.hpp"
 
 #include "util/file.hpp"
@@ -31,24 +33,24 @@ std::string get_ram_file_name(std::string rom_file_name) {
 
 bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
-        std::cout<< "SAV File: does not exist" << std::endl;
+        nowide::cerr << "SAV File: does not exist" << std::endl;
         return false;
     }
 
     Silver::File *ram_file = Silver::File::openFile(ram_file_name);
     if(ram_file == nullptr) {
-        std::cout<< "SAV File: could not be opened" << std::endl;
+        nowide::cerr << "SAV File: could not be opened" << std::endl;
         return false;
     }
 
     if(ram_file->getSize() != getRAMSize()) {
-        std::cout<< "SAV File: incorrect size" << std::endl;
+        nowide::cerr << "SAV File: incorrect size" << std::endl;
         return false;
     }
 
     ram_file->toVector(ram_buffer);
 
-    std::cout<< "SAV File: loaded" << std::endl;
+    nowide::cout << "SAV File: loaded" << std::endl;
     return true;
 }
 
@@ -62,11 +64,11 @@ bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ra
     }
 
     if(ram_file == nullptr) {
-        std::cout<< "SAV File: could not be opened/created" << std::endl;
+        nowide::cerr << "SAV File: could not be opened/created" << std::endl;
         return false;
     }
 
-    std::cout<< "SAV File: saved" << std::endl;
+    nowide::cout << "SAV File: saved" << std::endl;
     ram_file->fromVector(ram_buffer);
 
     return true;
@@ -95,34 +97,34 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
     } else if (cart_type.MBC1) {
         controller = new MBC1_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC2) {
-        std::cerr << "MBC2 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "MBC2 not supported, emulator will now segfault" << std::endl;
         //controller = new MBC2_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC3) {
         controller = new MBC3_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC5) {
         //controller = new MBC5_Controller(cart_type, rom, ram);
-        std::cerr << "MBC5 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "MBC5 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.MBC6) {
-        std::cerr << "MBC6 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "MBC6 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.MBC7) {
-        std::cerr << "MBC7 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "MBC7 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.HuC1) {
-        std::cerr << "HuC1 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "HuC1 not supported, emulator will now segfault" << std::endl;
     } else if (cart_type.HuC3) {
-        std::cerr << "HuC3 not supported, emulator will now segfault" << std::endl;
+        nowide::cerr << "HuC3 not supported, emulator will now segfault" << std::endl;
     }
 
     //debug info
-    std::cout << "cart:      " << getCartTitle() << std::endl;
-    std::cout << "cart type: " << (std::string)getCartType() << std::endl;
-    std::cout << "cart rom:  " << getROMSize() << std::endl;
+    nowide::cout << "cart:      " << getCartTitle() << std::endl;
+    nowide::cout << "cart type: " << (std::string)getCartType() << std::endl;
+    nowide::cout << "cart rom:  " << getROMSize() << std::endl;
     if(cart_type.RAM) {
-        std::cout << "cart ram:  " << getRAMSize();
+        nowide::cout << "cart ram:  " << getRAMSize();
         if(cart_type.BATTERY) {
-            std::cout << ", Battery-Backed" << std::endl;
+            nowide::cout << ", Battery-Backed" << std::endl;
         }
         else {
-            std::cout << std::endl;
+            nowide::cout << std::endl;
         }
     }
 }

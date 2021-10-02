@@ -7,3 +7,6 @@ add_library(gb_core
 		"input.cpp"
 		"io.cpp"
 		"ppu.cpp")
+
+target_link_libraries(gb_core
+	PRIVATE nowide::nowide)

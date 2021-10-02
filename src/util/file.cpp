@@ -1,5 +1,4 @@
-#include <iterator>
-#include <vector>
+#include <nowide/iostream.hpp>
 
 #include "util/file.hpp"
 
@@ -14,30 +13,30 @@ filename(filename) {}
 File::~File() {}
 
 File *File::createFile(std::string filename) {
-    if(std::ifstream(filename)) return nullptr; //don't create file if it exists
+    if(nowide::ifstream(filename)) return nullptr; //don't create file if it exists
 
     //cast to void to avoid shadowing the function argument
-    (void)std::ofstream(filename); //create file
+    (void)nowide::ofstream(filename); //create file
     return openFile(filename, true);
 }
 
 File *File::openFile(std::string filename, bool write, bool trunc) {
     auto ret = new File(filename);
 
-    std::ios::openmode mode = std::ifstream::binary;
+    std::ios::openmode mode = nowide::ifstream::binary;
 
     if(write) {
-        mode |= std::ifstream::out;
+        mode |= nowide::ifstream::out;
 
         if(trunc) {
-            mode |= std::ifstream::trunc;
+            mode |= nowide::ifstream::trunc;
         }
     } else {
-        mode |= std::ifstream::in;
+        mode |= nowide::ifstream::in;
     }
 
-    if((ret->file = std::fstream(filename, mode))) {
-        ret->file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    if((ret->file = nowide::fstream(filename, mode))) {
+        ret->file.exceptions(nowide::ifstream::failbit | nowide::ifstream::badbit);
         return ret;
     } else {
         delete ret;
@@ -46,7 +45,7 @@ File *File::openFile(std::string filename, bool write, bool trunc) {
 }
 
 bool File::fileExists(std::string filename) {
-    return (bool)std::ifstream(filename);
+    return (bool)nowide::ifstream(filename);
 }
 
 u32 File::getCRC() {

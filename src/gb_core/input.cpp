@@ -1,8 +1,8 @@
+#include <nowide/iostream.hpp>
+
 #include "gb_core/input.hpp"
 
 #include "util/bit.hpp"
-
-#include <iostream>
 
 Input_Manager::Input_Manager() {
     read_dir_keys = false;

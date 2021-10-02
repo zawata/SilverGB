@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <sstream>
 #include <type_traits>
 #include <unordered_map>
@@ -87,10 +88,10 @@ namespace Bit {
         static constexpr u8 bit_count = CHAR_BIT * sizeof(T);
 
         static __force_inline
-        T shift_left(T in, u8 shift_amount, bool *carry_out) {
+        T shift_left(T in, u8 shift_amount, bool carry_in, bool *carry_out) {
             if(carry_out != nullptr) {
                 if(shift_amount) *carry_out = Bit::test(in, bit_count - shift_amount);
-                else             *carry_out = get_CPSR_C();
+                else             *carry_out = carry_in;
             }
             return in << shift_amount;
         }

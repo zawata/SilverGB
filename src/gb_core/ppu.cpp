@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cstring>
-#include <iostream>
+
+#include <nowide/iostream.hpp>
 
 #include "gb_core/defs.hpp"
 #include "gb_core/io_reg.hpp"
@@ -50,7 +51,7 @@ PPU::PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
 io(io),
 screen_buffer(scrn_buf) {
     if(!bootrom_enabled) {
-        std::cout << "Starting PPU without bootrom not supported!" << std::endl;
+        nowide::cout << "Starting PPU without bootrom not supported!" << std::endl;
        new_frame = true;
        first_frame = true;
 
@@ -294,7 +295,7 @@ void PPU::ppu_tick_vram() {
 
     default:
         //invalid VRAM fetch step
-        std::cerr << "vram step error" << vram_fetch_step << std::endl;
+        nowide::cerr << "vram step error" << vram_fetch_step << std::endl;
         assert(false);
     }
 
@@ -474,7 +475,7 @@ bool PPU::ppu_tick() {
         } else if(y_cntr < 154) {
             process_step = VBLANK;
         } else {
-            std::cerr << "y_cntr OOB: " << y_cntr << std::endl;
+            nowide::cerr << "y_cntr OOB: " << y_cntr << std::endl;
         }
     }
 
@@ -550,7 +551,7 @@ bool PPU::ppu_tick() {
             new_line = true;
         }
     } else {
-        std::cerr << "process_step error: " << as_hex((int)process_step) << std::endl;
+        nowide::cerr << "process_step error: " << as_hex((int)process_step) << std::endl;
     }
 
     line_clock_count++; //used in HBLANK and VBLANK

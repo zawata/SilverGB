@@ -4,4 +4,5 @@ add_library(util
 find_package(ZLIB REQUIRED)
 
 target_link_libraries(util
-	PRIVATE ZLIB::ZLIB)
+	PRIVATE ZLIB::ZLIB
+	PRIVATE nowide::nowide)

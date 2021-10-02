@@ -1,13 +1,24 @@
-cmake_minimum_required (VERSION 3.13)
+cmake_minimum_required (VERSION 3.21)
 
-set(CMAKE_FIND_DEBUG_MODE ON)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# set(CMAKE_FIND_DEBUG_MODE TRUE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 set(CMAKE_CXX_STANDARD 17)
-set(VERBOSE ON)
+set(VERBOSE TRUE)
 
-#TODO:
-# switches for which executable to compile
+if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+    if(DEFINED ENV{VCPKG_ROOT})
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "")
+    else()
+        set(CMAKE_TOOLCHAIN_FILE "${CMAKE_SOURCE_DIR}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+                CACHE STRING "")
+    endif()
+endif()
+message("Using Toolchain file at: ${CMAKE_TOOLCHAIN_FILE}")
 
 project ("SilverGB")
+
+#global packages
+find_package(nowide CONFIG REQUIRED)
 
 add_subdirectory("src")
