@@ -1,6 +1,9 @@
 add_executable(gb_main_wx
 		"main_wnd.cpp")
 
+set_target_properties(gb_main_wx
+		PROPERTIES WIN32_EXECUTABLE $<NOT:$<CONFIG:Debug>>)
+
 # find_package(gl3w CONFIG REQUIRED)
 find_package(Magnum REQUIRED GL Shaders)
 if(MAGNUM_TARGET_GLES AND NOT MAGNUM_TARGET_DESKTOP_GLES)
@@ -38,9 +41,6 @@ target_link_libraries(gb_main_wx
 		${wxWidgets_LIBRARIES})
 
 if(WIN32)
-	# To force WinMain Entrypoint for wxWidgets
-	target_link_options(gb_main_wx
-			PRIVATE "LINKER:/SUBSYSTEM:WINDOWS,/ENTRY:WinMainCRTStartup")
 
 	# Dpi Awareness
 	target_sources(gb_main_wx

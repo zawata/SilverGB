@@ -46,8 +46,7 @@
           "value": "C:/libs/wxWidgets/",
           "type": "PATH"
         }
-      ],
-      "cmakeExecutable": "C:/Program Files/CMake/bin/cmake.exe"
+      ]
     },
     {
       "name": "x64-Clang-Ninja-Release",
@@ -95,8 +94,7 @@
           "value": "C:/libs/wxWidgets/",
           "type": "PATH"
         }
-      ],
-      "cmakeExecutable": "C:/Program Files/CMake/bin/cmake.exe"
+      ]
     },
     {
       "name": "x64-MSVC-Debug",
@@ -108,7 +106,6 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "generator": "Visual Studio 16 2019 Win64",
-      "cmakeExecutable": "C:/Program Files/CMake/bin/cmake.exe",
       "variables": [
         {
           "name": "wxWidgets_ROOT_DIR",
@@ -127,7 +124,6 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "msvc_x64_x64" ],
-      "cmakeExecutable": "C:/Program Files/CMake/bin/cmake.exe",
       "variables": [
         {
           "name": "wxWidgets_ROOT_DIR",

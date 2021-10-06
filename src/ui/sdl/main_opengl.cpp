@@ -1,12 +1,12 @@
 #include <chrono>
 #include <iostream>
 
+#include "gb_core/core.hpp"
+
 #include <GL/gl3w.h>
 #include <SDL2/SDL.h>
 #include "SDL_events.h"
 #include "SDL_keycode.h"
-
-#include "gb_core/core.hpp"
 
 #include "audio.hpp"
 
@@ -22,7 +22,7 @@ void _check_gl_error(u32 line) {
 }
 
 void gl_init_textures() {
-    //Build Screen Texture, leave unpopulated right now  so we can do partial updates later
+    //Build Screen Texture, leave unpopulated right now so we can do partial updates later
     glGenTextures(1, &screen_texture);                                check_gl_error();
     glBindTexture(GL_TEXTURE_2D, screen_texture);                     check_gl_error();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); check_gl_error();

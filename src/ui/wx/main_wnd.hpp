@@ -27,6 +27,7 @@
 
 // https://wiki.wxwidgets.org/Troubleshooting_building_wxWidgets_using_Microsoft_VC#MSVC_8.0_.282005.29_Windows_XP_Manifest_Build_Problems
 #define wxUSE_NO_MANIFEST 1
+#define _CRT_SECURE_NO_WARNINGS // TODO: find the specific place wxcrt.h is being included and wrap it with this definition
 
 #include "wx/wxprec.h"
 #ifndef WX_PRECOMP
@@ -138,7 +139,8 @@ public:
     Silver_mainFrame(const wxString& title);
 
     void loadROM(wxCommandEvent &event);
-    void loadBIOS(wxCommandEvent &event);
+    void loadRecent(wxCommandEvent& event);
+    void setBIOS(wxCommandEvent &event);
 
     void setExecMode(wxCommandEvent &event);
     void setDisplayMode(wxCommandEvent &event);

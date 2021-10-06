@@ -1,3 +1,10 @@
+#include <chrono>
+#include <codecvt>
+#include <iterator>
+#include <locale>
+
+#include <nowide/iostream.hpp>
+
 #include "main_wnd.hpp"
 
 #include "Magnum/GL/GL.h"
@@ -6,42 +13,38 @@
 #include "Magnum/Shaders/Flat.h"
 #include "gb_core/defs.hpp"
 
+#include <wx/filename.h>
+#include "wx/app.h"
+#include "wx/event.h"
+#include "wx/msw/menu.h"
 #include "wx/string.h"
 #include "wx/version.h"
 
-#include <chrono>
-#include <codecvt>
-#include <locale>
+#include "cfg.hpp"
+#include "helpers.hpp"
 
-#include <nowide/iostream.hpp>
-
-#define check_gl_error() _check_gl_error(__LINE__)
-void _check_gl_error(u32 line) {
-    GLenum err;
-    if((err = glGetError()) != GL_NO_ERROR) {
-        nowide::cerr << "GL" << line << ": " << as_hex(err) << std::endl;
-    }
-}
-
-std::string wx_to_utf8(wxString wx) {
-#if wxCHECK_VERSION(3,1,5)
-    return wx.utf8_string();
-#else
-    return wx.ToStdString(wxConvUTF8);
-#endif
-}
-
-/*********************************************************************
- * SilverGB Application
- */
-
-#define wxID_next() (wxID_HIGHEST + __LINE__)
+Config *config;
 
 enum {
+    #define wxID_next() (wxID_HIGHEST + __LINE__)
+
     id_File_LoadROM = wxID_next(),
-    id_File_LoadBIOS = wxID_next(),
+    id_File_Recents_NoRecentFiles = wxID_next(),
+
+    id_File_Recents_FileIdx0 = wxID_next(),
+    id_File_Recents_FileIdx1 = wxID_next(),
+    id_File_Recents_FileIdx2 = wxID_next(),
+    id_File_Recents_FileIdx3 = wxID_next(),
+    id_File_Recents_FileIdx4 = wxID_next(),
+    id_File_Recents_FileIdx5 = wxID_next(),
+    id_File_Recents_FileIdx6 = wxID_next(),
+    id_File_Recents_FileIdx7 = wxID_next(),
+    id_File_Recents_FileIdx8 = wxID_next(),
+    id_File_Recents_FileIdx9 = wxID_next(),
+
     id_File_Quit = wxID_EXIT,
 
+    id_Emulation_SetBIOS = wxID_next(),
     id_Emulation_ExecMode_Normal = wxID_next(),
     id_Emulation_ExecMode_StepClk = wxID_next(),
     id_Emulation_ExecMode_StepInstr = wxID_next(),
@@ -65,9 +68,11 @@ enum {
 
 wxBEGIN_EVENT_TABLE(Silver_mainFrame, wxFrame)
     EVT_MENU(id_File_LoadROM, Silver_mainFrame::loadROM)
-    EVT_MENU(id_File_LoadBIOS, Silver_mainFrame::loadBIOS)
+    EVT_MENU_RANGE(id_File_Recents_FileIdx0, id_File_Recents_FileIdx9, Silver_mainFrame::loadRecent)
 
     EVT_MENU(id_File_Quit,    Silver_mainFrame::OnQuit)
+
+    EVT_MENU(id_Emulation_SetBIOS, Silver_mainFrame::setBIOS)
 
     EVT_MENU(id_Emulation_ExecMode_Normal, Silver_mainFrame::setExecMode)
     EVT_MENU(id_Emulation_ExecMode_StepClk, Silver_mainFrame::setExecMode)
@@ -80,30 +85,190 @@ wxBEGIN_EVENT_TABLE(Silver_mainFrame, wxFrame)
     EVT_MENU(id_View_DisplayMode_Fit, Silver_mainFrame::setDisplayMode)
     EVT_MENU(id_View_DisplayMode_Center, Silver_mainFrame::setDisplayMode)
 
-    EVT_MENU(id_View_Size_1x1, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_2x2, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_3x3, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_4x4, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_5x5, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_6x6, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_7x7, Silver_mainFrame::setScaledSize)
-    EVT_MENU(id_View_Size_8x8, Silver_mainFrame::setScaledSize)
+    EVT_MENU_RANGE(id_View_Size_1x1, id_View_Size_8x8, Silver_mainFrame::setScaledSize)
 
     EVT_MENU(id_Help_About,   Silver_mainFrame::OnAbout)
 
     EVT_IDLE(Silver_mainFrame::onIdle)
 wxEND_EVENT_TABLE()
 
-//DO NOT TOUCH
-//msvc/clang/wxwidgets seems confused about which particular entry function it/they should be using
-//these settings coupled with those in cmakelists work for now.
+
+class MenuManager {
+    Config *config;
+
+    static constexpr const char * file_label = "File";
+    wxMenu *generateFileMenu() {
+        wxMenu *fileMenu = new wxMenu(); {
+            fileMenu->Append(id_File_LoadROM,  "Load Rom\tCtrl-F");
+            wxMenu *fileRecentsMenu = new wxMenu(); {
+                if(config->fileSettings.recent_files.empty()) {
+                    fileRecentsMenu->Append(id_File_Recents_NoRecentFiles, "No Recent Files");
+                    fileRecentsMenu->Enable(id_File_Recents_NoRecentFiles, false);
+                } else {
+                    int cntr = 0;
+                    for(auto const& file : config->fileSettings.recent_files) {
+                        fileRecentsMenu->Append(id_File_Recents_FileIdx0 + cntr++, wxFileName(file).GetFullName(), file);
+                    }
+                }
+            }
+            fileMenu->AppendSubMenu(fileRecentsMenu, "Recent Files");
+
+            fileMenu->Append(id_File_Quit, "Exit\tCtrl-W");
+        }
+
+        return fileMenu;
+    }
+
+    static constexpr const char * emulation_label = "Emulation";
+    wxMenu *generateEmulationMenu() {
+        wxMenu *emuMenu = new wxMenu(); {
+            emuMenu->AppendCheckItem(id_Emulation_SetBIOS, "Set BIOS");
+            wxMenu *execModeMenu = new wxMenu(); {
+                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_Normal,    "Normal");
+                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepClk,   "Step Clock Cycle");
+                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepInstr, "Step Instruction");
+                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepFrame, "Step Frame");
+
+                execModeMenu->Check(id_Emulation_ExecMode_Normal, true );
+            }
+            emuMenu->AppendSubMenu(execModeMenu, "Execution Mode", "Set Execution Mode");
+
+            emuMenu->Append(id_Emulation_step, "Step\tCtrl-T", "Step According to Execution Mode");
+
+            if(!config->emulationSettings.bios_file.empty()) {
+                emuMenu->Check(id_Emulation_SetBIOS, true);
+                emuMenu->Enable(id_Emulation_SetBIOS, false);
+            }
+        }
+
+        return emuMenu;
+    }
+
+    static constexpr const char * view_label = "View";
+    wxMenu *generateViewMenu() {
+        wxMenu *viewMenu = new wxMenu(); {
+            wxMenu *dispModeMenu = new wxMenu(); {
+                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Fit,     "Fit");
+                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Stretch, "Stretch");
+                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Center,  "Fixed");
+
+                dispModeMenu->Check(id_View_DisplayMode_Fit, true );
+            }
+            viewMenu->AppendSubMenu(dispModeMenu, "Display Mode");
+
+            wxMenu *sizeMenu = new wxMenu(); {
+                sizeMenu->AppendRadioItem(id_View_Size_1x1, "x1");
+                sizeMenu->AppendRadioItem(id_View_Size_2x2, "x2");
+                sizeMenu->AppendRadioItem(id_View_Size_3x3, "x3");
+                sizeMenu->AppendRadioItem(id_View_Size_4x4, "x4");
+                sizeMenu->AppendRadioItem(id_View_Size_5x5, "x5");
+                sizeMenu->AppendRadioItem(id_View_Size_6x6, "x6");
+                sizeMenu->AppendRadioItem(id_View_Size_7x7, "x7");
+                sizeMenu->AppendRadioItem(id_View_Size_8x8, "x8");
+
+                auto size = config->viewSettings.size;
+                sizeMenu->Check(id_View_Size_1x1 + size - 1, true );
+            }
+            viewMenu->AppendSubMenu(sizeMenu, "Size");
+        }
+
+        return viewMenu;
+    }
+
+    static constexpr const char * help_label = "Help";
+    wxMenu *generateHelpMenu() {
+        wxMenu *helpMenu = new wxMenu(); {
+            helpMenu->Append(id_Help_About, "About\tF1", "Show about dialog");
+        }
+
+        return helpMenu;
+    }
+
+public:
+    MenuManager(Config *config): config(config) {}
+
+    void regenerateFileMenu(wxMenuBar *menuBar) {
+        int idx = menuBar->FindMenu(file_label);
+
+        if(idx != wxNOT_FOUND) {
+            wxMenu *menu = menuBar->Replace(idx, generateFileMenu(), file_label);
+            delete menu;
+            return;
+        }
+
+        assert(false);
+    }
+
+    void regenerateEmulationMenu(wxMenuBar *menuBar) {
+        int idx = menuBar->FindMenu(emulation_label);
+
+        if(idx != wxNOT_FOUND) {
+            wxMenu *menu = menuBar->Replace(idx, generateEmulationMenu(), emulation_label);
+            delete menu;
+            return;
+        }
+
+        assert(false);
+    }
+
+    void regenerateViewMenu(wxMenuBar *menuBar) {
+        int idx = menuBar->FindMenu(view_label);
+
+        if(idx != wxNOT_FOUND) {
+            wxMenu *menu = menuBar->Replace(idx, generateViewMenu(), view_label);
+            delete menu;
+            return;
+        }
+
+        assert(false);
+    }
+
+    void regenerateHelpMenu(wxMenuBar *menuBar) {
+        int idx = menuBar->FindMenu(help_label);
+
+        if(idx != wxNOT_FOUND) {
+            wxMenu *menu = menuBar->Replace(idx, generateHelpMenu(), help_label);
+            delete menu;
+            return;
+        }
+
+        assert(false);
+    }
+
+    wxMenuBar *generateMenuBar() {
+        wxMenuBar *menuBar = new wxMenuBar();
+
+        menuBar->Append(generateFileMenu(), "File");
+        menuBar->Append(generateEmulationMenu(), "Emulation");
+        menuBar->Append(generateViewMenu(), "View");
+        menuBar->Append(generateHelpMenu(), "Help");
+
+        return menuBar;
+    }
+};
+
+/*********************************************************************
+ * SilverGB Application
+ */
+
+// If in debug mode, start app with console
+
+#if defined(NDEBUG)
 wxIMPLEMENT_APP(SilverGBApp);
+#else
+wxIMPLEMENT_APP_CONSOLE(SilverGBApp);
+#endif
+
+
 
 bool SilverGBApp::OnInit() {
     if ( !wxApp::OnInit() )
         return false;
 
     nowide::cout << "🎉" << std::endl;
+
+    //TODO: this needs to be moved to the frame
+    config = new Config();
 
     Silver_mainFrame* frame = new Silver_mainFrame("SilverGB");
 
@@ -143,62 +308,7 @@ Silver_mainFrame::Silver_mainFrame(const wxString& title) : wxFrame{nullptr, wxI
 
     exec_mngr = new Silver_ExecutionManager(glcanvas);
 
-    wxMenuBar *menuBar = new wxMenuBar(); {
-        wxMenu *fileMenu = new wxMenu(); {
-            fileMenu->Append(id_File_LoadROM,  "Load Rom\tCtrl-F");
-            fileMenu->Append(id_File_LoadBIOS, "Load BIOS");
-            fileMenu->Append(id_File_Quit, "Exit\tCtrl-W");
-        }
-        menuBar->Append(fileMenu, "File");
-
-        wxMenu *emuMenu = new wxMenu(); {
-            wxMenu *execModeMenu = new wxMenu(); {
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_Normal,    "Normal");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepClk,   "Step Clock Cycle");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepInstr, "Step Instruction");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepFrame, "Step Frame");
-
-                execModeMenu->Check(id_Emulation_ExecMode_Normal, true );
-            }
-            emuMenu->AppendSubMenu(execModeMenu, "Execution Mode", "Set Execution Mode");
-
-            emuMenu->Append(id_Emulation_step, "Step\tCtrl-T", "Step According to Execution Mode");
-        }
-        menuBar->Append(emuMenu, "Emulation");
-
-        wxMenu *viewMenu = new wxMenu(); {
-            wxMenu *dispModeMenu = new wxMenu(); {
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Fit,     "Fit");
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Stretch, "Stretch");
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Center,  "Fixed");
-
-                dispModeMenu->Check(id_View_DisplayMode_Fit, true );
-            }
-            viewMenu->AppendSubMenu(dispModeMenu, "Display Mode");
-
-            wxMenu *sizeMenu = new wxMenu(); {
-                sizeMenu->AppendRadioItem(id_View_Size_1x1, "x1");
-                sizeMenu->AppendRadioItem(id_View_Size_2x2, "x2");
-                sizeMenu->AppendRadioItem(id_View_Size_3x3, "x3");
-                sizeMenu->AppendRadioItem(id_View_Size_4x4, "x4");
-                sizeMenu->AppendRadioItem(id_View_Size_5x5, "x5");
-                sizeMenu->AppendRadioItem(id_View_Size_6x6, "x6");
-                sizeMenu->AppendRadioItem(id_View_Size_7x7, "x7");
-                sizeMenu->AppendRadioItem(id_View_Size_8x8, "x8");
-
-                sizeMenu->Check(id_View_Size_2x2, true );
-            }
-            viewMenu->AppendSubMenu(sizeMenu, "Size");
-        }
-        menuBar->Append(viewMenu, "View");
-
-        wxMenu *helpMenu = new wxMenu(); {
-            helpMenu->Append(id_Help_About, "About\tF1", "Show about dialog");
-        }
-        menuBar->Append(helpMenu, "Help");
-    }
-
-    SetMenuBar(menuBar);
+    SetMenuBar(MenuManager(config).generateMenuBar());
 
     // 2 is the default scaling factor
     SetClientSize(wxSize(GB_Core::native_width, GB_Core::native_height) * 2);
@@ -217,11 +327,30 @@ void Silver_mainFrame::loadROM(wxCommandEvent& event) {
     if (openFileDialog.ShowModal() != wxID_OK)
         return;
 
-    exec_mngr->setROM(wx_to_utf8(openFileDialog.GetPath()));
+    auto const& file = wx_to_utf8(openFileDialog.GetPath());
+
+    add_to_MRU(config, file);
+    MenuManager(config).regenerateFileMenu(GetMenuBar());
+
+    exec_mngr->setROM(file);
     exec_mngr->startCore();
 }
 
-void Silver_mainFrame::loadBIOS(wxCommandEvent& event) {
+void Silver_mainFrame::loadRecent(wxCommandEvent& event) {
+    int file_idx = event.GetId() - id_File_Recents_FileIdx0;
+
+    assert(0 <= file_idx && file_idx < 10);
+
+    auto const& file = config->fileSettings.recent_files.at(file_idx);
+
+    add_to_MRU(config, file);
+    MenuManager(config).regenerateFileMenu(GetMenuBar());
+
+    exec_mngr->setROM(file);
+    exec_mngr->startCore();
+}
+
+void Silver_mainFrame::setBIOS(wxCommandEvent& event) {
     wxFileDialog openFileDialog(
             this,
             "Open Gameboy BIOS",
@@ -448,6 +577,7 @@ void Silver_ExecutionManager::execStep() {
 }
 
 void Silver_ExecutionManager::onGLDraw() {
+    //initialize on firs draw
     static bool initialized = false;
     if(!initialized) {
         initialized = true;
@@ -456,19 +586,14 @@ void Silver_ExecutionManager::onGLDraw() {
         tex = GL::Texture2D();
 
         tex.setWrapping(GL::SamplerWrapping::ClampToEdge)
-        .setMagnificationFilter(GL::SamplerFilter::Linear)
-        .setMinificationFilter(GL::SamplerFilter::Linear)
-        .setStorage(1, GL::TextureFormat::RGB8, Vector2i(GB_S_W, GB_S_H));
+                .setMagnificationFilter(GL::SamplerFilter::Linear)
+                .setMinificationFilter(GL::SamplerFilter::Linear)
+                .setStorage(1, GL::TextureFormat::RGB8, Vector2i(GB_S_W, GB_S_H));
     }
 
     GL::defaultFramebuffer
-        .clear(GL::FramebufferClear::Color)
-        .setViewport({{0,0},{glcanvas->GetSize().x, glcanvas->GetSize().y}});
-
-    struct Vertex {
-        Vector2 position;
-        Vector2 textureCoordinates;
-    };
+            .clear(GL::FramebufferClear::Color)
+            .setViewport({{0,0},{glcanvas->GetSize().x, glcanvas->GetSize().y}});
 
     /*******************************
      * Drawing this out because I keep forgeting it
@@ -497,11 +622,14 @@ void Silver_ExecutionManager::onGLDraw() {
 
     *******************************/
 
-    Vertex vertices[4]{
-        {{-1.0, -1.0},{0.0,0.0}},
-        {{-1.0 , 1.0},{1.0,0.0}},
-        {{ 1.0, -1.0},{0.0,1.0}},
-        {{ 1.0,  1.0},{1.0,1.0}},
+    struct Vertex {
+        Vector2 position;
+        Vector2 textureCoordinates;
+    } vertices[4] {
+        {{-1.0,   1.0},{0.0,0.0}},
+        {{-1.0 , -1.0},{0.0,1.0}},
+        {{ 1.0,   1.0},{1.0,0.0}},
+        {{ 1.0,  -1.0},{1.0,1.0}},
     };
 
     using namespace Magnum;
@@ -510,13 +638,11 @@ void Silver_ExecutionManager::onGLDraw() {
 
     GL::Mesh mesh;
     mesh.setPrimitive(GL::MeshPrimitive::TriangleStrip).setCount(4)
-        .addVertexBuffer(v_buffer, 0,
-        Shaders::Flat2D::Position{},
-        Shaders::Flat2D::TextureCoordinates{});
+            .addVertexBuffer(v_buffer, 0,
+                    Shaders::Flat2D::Position{},
+                    Shaders::Flat2D::TextureCoordinates{});
 
-    shader
-        .bindTexture(tex)
-        .draw(std::move(mesh));
+    shader.bindTexture(tex).draw(std::move(mesh));
 
     glcanvas->SwapBuffers();
 }

@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cassert>
+#include <ios>
 #include <iterator>
 #include <vector>
 
 #include <nowide/fstream.hpp>
+#include <nowide/iostream.hpp>
 
 #include "util/ints.hpp"
 
@@ -58,8 +60,7 @@ void File::toVector(std::vector<T> &vec) {
     vec.clear();
     vec.resize(size);
 
-    std::copy(std::istream_iterator<T>(file), std::istream_iterator<T>(), std::back_inserter(vec));
-    // getBuffer(0, vec.data(), size);
+    getBuffer(0, vec.data(), size);
 }
 
 template<typename T>

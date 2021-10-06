@@ -1,6 +1,5 @@
 #pragma once
 
-#include "nop/base/serializer.h"
 #include "util/file.hpp"
 #include "util/ints.hpp"
 
@@ -9,6 +8,8 @@
 #include <vcruntime.h>
 #include <vector>
 
+#include "nop/base/serializer.h"
+#include "nop/base/vector.h"
 #include <nop/serializer.h>
 #include <nop/status.h>
 #include <nop/structure.h>
@@ -87,42 +88,78 @@ public:
     nop::Status<HandleType> GetHandle(nop::HandleReference handle_reference) {}
 };
 
-struct Config_FileSettings {
-    //abs path + filename
-    std::string bios_file;
+struct _Config_Section_Base {
+    virtual void setDefaults() = 0;
+};
+
+
+struct Config_FileSettings: _Config_Section_Base {
     //abs path
     std::string recent_dir;
     //abs path + filename
-    std::array<std::string, 10> recent_files;
+    std::vector<std::string> recent_files;
+
+    void setDefaults() {
+        recent_dir = "";
+        recent_files.clear();
+    }
 
     NOP_STRUCTURE(Config_FileSettings,
-            bios_file,
             recent_dir,
             recent_files);
 };
 
-struct Config_ViewSettings {
+struct Config_ViewSettings: _Config_Section_Base {
+    // greater than zero
+    unsigned int size;
 
+    void setDefaults() {
+        size = 2;
+    }
+
+    NOP_STRUCTURE(Config_ViewSettings,
+            size);
 };
 
-struct Config_EmulationSettings {
+struct Config_EmulationSettings: _Config_Section_Base {
+    //abs path + filename
+    std::string bios_file;
 
+    void setDefaults() {
+        bios_file = "";
+    }
+
+    NOP_STRUCTURE(Config_EmulationSettings,
+            bios_file);
 };
 
 class Config {
-
+    static constexpr const char *filename = "Silver.cfg";
 public:
     Config_FileSettings fileSettings;
     Config_ViewSettings viewSettings;
     Config_EmulationSettings emulationSettings;
 
+    Config() {
+        Load();
+    }
+
+    ~Config() {
+        Save();
+    }
+
     void Load() {
-        if(Silver::File::fileExists("SilverGB.cfg")) {
-            nop::Deserializer<FileReader> deserializer(Silver::File::openFile("SilverGB.cfg"));
+        if(Silver::File::fileExists(filename)) {
+            nop::Deserializer<FileReader> deserializer(Silver::File::openFile(filename));
 
             deserializer.Read(&fileSettings);
-            // deserializer.Read(viewSettings);
-            // deserializer.Read(emulationSettings);
+            deserializer.Read(&viewSettings);
+            deserializer.Read(&emulationSettings);
+        } else {
+            std::cout << "Loading Defaults" << std::endl;
+            fileSettings.setDefaults();
+            viewSettings.setDefaults();
+            emulationSettings.setDefaults();
         }
 
 
@@ -130,17 +167,17 @@ public:
 
     void Save() {
         Silver::File *file;
-        if(Silver::File::fileExists("SilverGB.cfg")) {
-            file = Silver::File::openFile("SilverGB.cfg");
+        if(Silver::File::fileExists(filename)) {
+            file = Silver::File::openFile(filename);
         }
         else {
-            file = Silver::File::createFile("SilverGB.cfg");
+            file = Silver::File::createFile(filename);
         }
 
         nop::Serializer<FileWriter> serializer(file);
 
         serializer.Write(fileSettings);
-        // serializer.Write(viewSettings);
-        // serializer.Write(emulationSettings);
+        serializer.Write(viewSettings);
+        serializer.Write(emulationSettings);
     }
 };
