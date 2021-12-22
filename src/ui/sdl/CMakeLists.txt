@@ -10,6 +10,7 @@ target_include_directories(gb_main_sdl
 target_link_libraries(gb_main_sdl
 		gb_core
 		util
+		nowide::nowide
 		SDL2::SDL2
 		SDL2::SDL2main)
 
@@ -22,6 +23,7 @@ target_link_libraries(gb_main_opengl
 		gb_core
 		util
 		RtAudio::rtaudio
+		nowide::nowide
 		SDL2::SDL2
 		SDL2::SDL2main
 		unofficial::gl3w::gl3w)

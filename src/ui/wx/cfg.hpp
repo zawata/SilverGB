@@ -1,15 +1,24 @@
 #pragma once
 
+#include <list>
+#include <string>
+#include <vector>
+
 #include "util/file.hpp"
 #include "util/ints.hpp"
 
-#include <list>
-#include <string>
-#include <vcruntime.h>
-#include <vector>
+// Turns out win32 isn't the only OS to give me a headache 🙃
+#if defined(_X11_XLIB_H_)
+    #undef Bool
+    #undef Status
+    #undef False
+    #undef True
+#endif
 
-#include "nop/base/serializer.h"
-#include "nop/base/vector.h"
+#if defined(X_H)
+    #undef None
+#endif
+
 #include <nop/serializer.h>
 #include <nop/status.h>
 #include <nop/structure.h>
@@ -84,8 +93,8 @@ public:
         return nop::ErrorStatus::None;
     }
 
-    template <typename HandleType>
-    nop::Status<HandleType> GetHandle(nop::HandleReference handle_reference) {}
+    // template <typename HandleType>
+    // nop::Status<HandleType> GetHandle(nop::HandleReference handle_reference) {}
 };
 
 struct _Config_Section_Base {

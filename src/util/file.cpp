@@ -7,7 +7,7 @@
 
 namespace Silver {
 
-File::File(std::string filename) :
+File::File(std::string const& filename) :
 filename(filename) {}
 
 File::~File() {}

@@ -140,22 +140,22 @@ namespace Bit {
     public:
         BitFieldAccessor() {}
 
-        BitFieldAccessor & add_field(key_type name, T mask) {
+        BitFieldAccessor & add_field(key_type const& name, T mask) {
             return add_field(name, mask);
         }
 
-        BitFieldAccessor const& add_field(key_type name, T mask) const {
+        BitFieldAccessor const& add_field(key_type const& name, T mask) const {
             bool added = fields.insert(name, {__builtin_ctz(mask) + 1, mask}).first;
             assert(added); //TODO
 
             return *this;
         }
 
-        BitFieldAccessor & add_field(key_type name, u8 count, u8 offset) {
+        BitFieldAccessor & add_field(key_type const& name, u8 count, u8 offset) {
             return add_field(name, count, offset);
         }
 
-        BitFieldAccessor const& add_field(key_type name, u8 count, u8 offset) const {
+        BitFieldAccessor const& add_field(key_type const& name, u8 count, u8 offset) const {
             bool added = fields.insert(name, {((1 << count) - 1) << offset, offset});
             assert(added); //TODO
 

@@ -9,6 +9,9 @@
 out/
 build/
 
+#vcpkg manifest installation directory
+vcpkg_installed
+
 #Clang Command Database
 compile_commands.json
 

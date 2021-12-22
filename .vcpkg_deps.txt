@@ -1,7 +1,0 @@
-zlib
-libnop
-RTAudio
-corrade
-magnum
-gl3w
-nowide

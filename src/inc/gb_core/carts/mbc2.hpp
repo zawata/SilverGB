@@ -12,7 +12,7 @@
  * TODO: this
  */
 struct MBC2_Controller : public MemoryBankController {
-    MBC2_Controller(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
+    MBC2_Controller(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
     MemoryBankController(cart_type, rom, ram) {
         nowide::cerr << "MBC2 not yet implemented. Will probably crash now" << std::endl;
         if(cart_type.RAM)
@@ -22,6 +22,7 @@ struct MBC2_Controller : public MemoryBankController {
     }
 
     u8 read(u16 offset) override {
+        return 0;
     }
 
     void write(u16 offset, u8 data) override {

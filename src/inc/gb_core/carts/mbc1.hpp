@@ -10,8 +10,9 @@
 #include "mbc_base.hpp"
 
 struct MBC1_Controller : public MBC1_Base {
-    MBC1_Controller(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
-    MBC1_Base(cart_type, rom, ram) {
+    MBC1_Controller(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
+    MBC1_Base(cart_type, rom, ram),
+    addl_bank_num(0) {
         MBC1_Base::set_rom_0_bank(0);
         MBC1_Base::set_rom_bank(1);
     }

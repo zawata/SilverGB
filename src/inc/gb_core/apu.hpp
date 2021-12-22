@@ -84,7 +84,7 @@ struct _prn_generator {
 
 class APU {
 public:
-    APU(bool bootrom_enabled);
+    explicit APU(bool bootrom_enabled);
     ~APU();
 
     void tick();
@@ -246,7 +246,7 @@ private:
     u8 wav_ram[WAVRAM_LEN];
 
     inline u8 getDivisor(u8 i) {
-        u8 t[8] = { 8, 16, 32, 48, 64, 80, 96, 112 };
+        const u8 t[8] = { 8, 16, 32, 48, 64, 80, 96, 112 };
         return t[i & 0x7]; }
 
     void init_core();

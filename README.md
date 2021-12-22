@@ -160,45 +160,57 @@ Gekkio's Acceptance Tests:
 ## Compilation
 
 Cmake is used for the build system.  
-Vcpkg is used as a package manager where possible(make sure to `git submodule update --init --recursive`).  
 `clang` is the preferred compiler(as it's my favorite) but `msvc` and `gcc` should work as well  
 ninja is recommended as a generator but any generator will do.
+
+Vcpkg is used as a package manager where possible. You should be able to either use the submodule(make sure to `git submodule update --init` if so) or integrate an existing install if you prefer. Cmake will attempt to find a vcpkg installation at start or fallback the one in the submodule.  
+
+We are also using vcpkg's new "manifest mode" meaning you don't even need to install packages, it will pull dependencies on build(from `./vcpkg.json`); meaning in most cases you just need to configure and build everything will be downloaded. OS specific config is below.  
+
 ### Windows
 
-Install the following packages in vcpkg
+Note that vcpkg will default to x86-32. for 64bit set the env var `VCPKG_TARGET_ARCHITECTURE=x64` when building  
 
-```bash
-./vcpkg install @../.vcpkg_deps.txt
-./vcpkg install magnum[wglContext] --recurse
+You'll also need to install wxwidgets for the wx UI. this should be done from the website as the vcpkg is broken(as of writing this).  
+
+Visual Studio 2019+ is probably the easiest solution as it contains built in support for cmake but otherwise set the wx root directory when configuring from the command line:  
 
 ```
-Note that this will default to x86-32. for 64bit pass `--triplet=x64-windows`  
-
-Visual Studio  2019+ is probably the easiest solution as iut contains built in support for cmake.  
-
+mkdir build
+cd build
+cmake -DwxWidgets_ROOT_DIR=<dir with include/ and lib/> ..
+```
+Executables are located at `./build/src/ui/*/` or `./out/<arch>/configuration/src/ui/*/` for Visual Studio.  
 
 ### Linux
 
-Install the following packages in vcpkg
+For the wx UI, install wxwidgets through your package manager. Less than v3 is not supported(and probably broken).  
+
+Compile the normal CMake way:
 
 ```bash
-./vcpkg install @../.vcpkg_deps.txt
-./vcpkg install magnum[GlxContext] --recurse
-
-```
-
-```bash
-mkdir -p out/linux
-cd out/linux
-
-#Ninja
-cmake ../.. -GNinja
-cmake --build .
+mkdir -p build
+cd build
 
 #Make
-cmake ../..
+cmake ..
 make
+
+#Ninja
+cmake .. -GNinja
+cmake --build .
 ```
+
+note that you may need to specify your preferred wx-config:  
+```
+WX_CONFIG=$(which wx-config-gtk3) cmake ..
+```
+
+Executables are located at `./build/src/ui/*/`
+
+### macOS
+
+Not tested, should work? Follow linux directions.  
 
 ## Questions
 ### Who?
@@ -207,11 +219,11 @@ Me
 ### What?
 I'm writing a gameboy emulator.
 
-### When?
-In my very limited freetime.
-
 ### Where?
 Here.
+
+### When?
+In my very limited freetime.
 
 ### Why?
 Because I've always wanted too.

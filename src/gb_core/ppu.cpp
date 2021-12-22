@@ -19,12 +19,12 @@
 #define LCDC_BG_TILE_MAP_BIT      3
 #define LCDC_BIG_SPRITES_BIT      2
 #define LCDC_OBJ_ENABLED_BIT      1
-#define LCDC_BG_ENABLED_BIT   0
+#define LCDC_BG_ENABLED_BIT       0
 
-#define OBG_BG_PRIORITY_BIT   7
-#define OBG_Y_FLIP_BIT        6
-#define OBG_X_FLIP_BIT        5
-#define OBG_GB_PALLETTE_BIT   4
+#define OBG_BG_PRIORITY_BIT 7
+#define OBG_Y_FLIP_BIT      6
+#define OBG_X_FLIP_BIT      5
+#define OBG_GB_PALLETTE_BIT 4
 
 #define STAT_COIN_INT_BIT   6
 #define STAT_MODE_2_INT_BIT 5

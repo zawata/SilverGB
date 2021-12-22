@@ -21,9 +21,6 @@ typedef u64      size_t;
 
 #ifdef __cplusplus
 }
-#endif
-
-#ifdef __cplusplus
 
 inline std::uint8_t  operator "" _u8 (unsigned long long value) { return static_cast<std::uint8_t>(value); }
 inline std::uint16_t operator "" _u16(unsigned long long value) { return static_cast<std::uint16_t>(value); }

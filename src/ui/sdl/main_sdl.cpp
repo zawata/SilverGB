@@ -1,6 +1,7 @@
-#include <iostream>
 #include <chrono>
 
+// remove win32 mix/max defines
+#define NOMINMAX
 #include <GL/gl3w.h>
 #include <SDL2/SDL.h>
 #include <SDL_events.h>

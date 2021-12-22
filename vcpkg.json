@@ -1,0 +1,42 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "silver-gb",
+  "version": "0.2.1",
+  "dependencies": [
+    "zlib",
+    "libnop",
+    "rtaudio",
+    "gl3w",
+    "nowide",
+    "sdl2",
+    {
+      "name":"magnum",
+      "default-features": false,
+      "features": ["shaders"]
+    },
+    {
+      "name": "magnum",
+      "default-features": false,
+      "features": ["glxcontext"],
+      "platform": "linux"
+    },
+    {
+      "name": "magnum",
+      "default-features": false,
+      "features": ["cglcontext"],
+      "platform": "osx"
+    },
+    {
+      "name": "magnum",
+      "default-features": false,
+      "features": ["wglcontext"],
+      "platform": "windows"
+    },
+    {
+      "name": "sdl2",
+      "default-features": false,
+      "features": ["x11"],
+      "platform": "linux"
+    }
+  ]
+}

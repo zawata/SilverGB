@@ -6,7 +6,7 @@
 #include "gb_core/io.hpp"
 #include "gb_core/ppu.hpp"
 
-#include "util/SPSCQueue.h"
+#include "util/ringbuffer.hpp"
 
 struct breakpoint_exception {
     breakpoint_exception() {}
@@ -58,7 +58,7 @@ private:
     PPU *vpu;
 
     u8 *screen_buffer = nullptr;
-    rigtorp::SPSCQueue<std::vector<float>> *audio_queue = nullptr;
+    jnk0le::Ringbuffer<std::vector<float>,4> *audio_queue = nullptr;
     std::vector<float> audio_vector;
 
     u16 breakpoint = 0;

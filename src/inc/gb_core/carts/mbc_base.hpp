@@ -7,7 +7,7 @@
 #include "util/util.hpp"
 
 struct MBC1_Base : public MemoryBankController {
-    MBC1_Base(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
+    MBC1_Base(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
     MemoryBankController(cart_type, rom, ram) {
 
         ram_enable = false;
@@ -32,7 +32,7 @@ struct MBC1_Base : public MemoryBankController {
         this->ram_enable = ram_enable;
     }
 
-    virtual u8 read(u16 offset) {
+    virtual u8 read(u16 offset) override {
         if(bounded(offset, 0_u16, 0x3FFF_u16)) {
             u32 addr = (u32)offset + (rom_0_bank * ROM_BANK_SIZE);
 
@@ -74,7 +74,7 @@ struct MBC1_Base : public MemoryBankController {
         }
     }
 
-    virtual void write(u16 offset, u8 data) {
+    virtual void write(u16 offset, u8 data) override {
         if(bounded(offset, 0xA000_u16, 0xBFFF_u16)) {
             offset -= 0xA000;
 

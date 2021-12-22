@@ -11,7 +11,7 @@
  * ROM with optional RAM
  */
 struct ROM_Controller : public MemoryBankController {
-    ROM_Controller(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
+    ROM_Controller(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
     MemoryBankController(cart_type, rom, ram) {}
 
     u8 read(u16 offset) override {

@@ -21,6 +21,7 @@ namespace Cartridge_Constants {
     typedef struct __cart_type_t {
         static struct __cart_type_t getCartType(u8 cart_type) {
             switch(cart_type) {
+            //TODO: this could be a bunch of binary definitions instead of ...this
             case 0x00: return_cart_type(1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type) //00h  ROM ONLY
             case 0x01: return_cart_type(0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,cart_type) //01h  MBC1
             case 0x02: return_cart_type(0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,cart_type) //02h  MBC1+RAM
@@ -192,7 +193,7 @@ struct MemoryBankController {
     virtual void write(u16 offset, u8 data) = 0;
     virtual void tick() {};
 protected:
-    MemoryBankController(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom_data, std::vector<u8> ram_data) :
+    MemoryBankController(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom_data, std::vector<u8> const& ram_data) :
     cart_type(cart_type),
     rom_data(rom_data),
     ram_data(ram_data) {}
@@ -205,28 +206,28 @@ protected:
 
 class Cartridge {
 public:
-    Cartridge(Silver::File *f);
+    explicit Cartridge(Silver::File *f);
     ~Cartridge();
 
     bool loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer);
     bool saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer);
 
-    bool checkMagicNumber();
+    bool checkMagicNumber() const;
 
-    std::string getCartTitle();
-    u8 getCartVersion();
-    Cartridge_Constants::cart_type_t getCartType();
+    std::string getCartTitle() const;
+    u8 getCartVersion() const;
+    Cartridge_Constants::cart_type_t getCartType() const;
 
-    Cartridge_Constants::rom_size_t getROMSize();
-    Cartridge_Constants::ram_size_t getRAMSize();
+    Cartridge_Constants::rom_size_t getROMSize() const;
+    Cartridge_Constants::ram_size_t getRAMSize() const;
 
-    bool isCGBCart();
-    bool isCGBOnlyCart();
+    bool isCGBCart() const;
+    bool isCGBOnlyCart() const;
 
-    bool cartSupportsSGB();
+    bool cartSupportsSGB() const;
 
-    bool checkHeaderChecksum();
-    bool checkGlobalChecksum();
+    bool checkHeaderChecksum() const;
+    bool checkGlobalChecksum() const;
 
     u8 read(u16 loc);
     void write(u16 loc, u8 data);

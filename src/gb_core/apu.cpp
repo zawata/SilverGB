@@ -518,7 +518,7 @@ void APU::write_reg(u8 loc, u8 data) {
 }
 
 u8 APU::read_wavram(u8 loc) {
-    if(loc >= WAVRAM_LEN) return wav_ram[loc];
+    if(loc < WAVRAM_LEN) return wav_ram[loc];
     return 0;
 }
 

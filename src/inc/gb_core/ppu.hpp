@@ -3,7 +3,6 @@
 #include <deque>
 
 #include "io.hpp"
-
 #include "defs.hpp"
 
 #include "util/bit.hpp"

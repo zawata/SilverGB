@@ -29,10 +29,7 @@
 #define wxUSE_NO_MANIFEST 1
 #define _CRT_SECURE_NO_WARNINGS // TODO: find the specific place wxcrt.h is being included and wrap it with this definition
 
-#include "wx/wxprec.h"
-#ifndef WX_PRECOMP
-#   include "wx/wx.h"
-#endif
+#include "wx/wx.h"
 
 #if !wxUSE_GLCANVAS
 #   error "GLCanvas required"
@@ -44,7 +41,6 @@
 #endif
 
 #include "gb_core/core.hpp"
-#include "util/file.hpp"
 #include "util/CircularQueue.hpp"
 
 /**

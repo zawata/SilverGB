@@ -77,14 +77,11 @@ bool CircularQueue<T>::enqueue(T const& elem) {
 
 template<typename T>
 T CircularQueue<T>::dequeue(void) {
-    T retval;
     if(head != tail) {
         head++;
         if(head == end) head = start;
 
-        retval = *head;
-
-        return retval;
+        return *head;
     }
 }
 

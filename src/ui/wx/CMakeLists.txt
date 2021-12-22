@@ -20,7 +20,7 @@ endif()
 
 set(wxWidgets_EXCLUDE_COMMON_LIBRARIES TRUE)
 find_package(wxWidgets REQUIRED core base gl)
-find_path(LIBNOP_INCLUDE_DIRS "nop/base/array.h")
+find_path(LIBNOP_INCLUDE_DIRS "nop/protocol.h")
 
 target_include_directories(gb_main_wx
 		PRIVATE ${LIBNOP_INCLUDE_DIRS}

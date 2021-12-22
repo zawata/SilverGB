@@ -16,7 +16,7 @@
 #include <wx/filename.h>
 #include "wx/app.h"
 #include "wx/event.h"
-#include "wx/msw/menu.h"
+#include "wx/menu.h"
 #include "wx/string.h"
 #include "wx/version.h"
 
@@ -284,16 +284,7 @@ Silver_mainFrame::Silver_mainFrame(const wxString& title) : wxFrame{nullptr, wxI
     wxBoxSizer* bSizer;
     bSizer = new wxBoxSizer{wxVERTICAL};
 
-    wxGLAttributes attributes;
-    attributes.PlatformDefaults()
-              .BufferSize(24)
-              .MinRGBA(8, 8, 8, 0)
-              .Depth(24)
-              .Stencil(0)
-              .DoubleBuffer()
-              .EndList();
-    glcanvas = new wxGLCanvas{this, attributes, wxID_ANY, wxDefaultPosition};
-
+    glcanvas = init_wxGLCanvas(this);
     wx_gl_ctxt = new wxGLContext{glcanvas};
     glcanvas->SetCurrent(*wx_gl_ctxt);
     mgnm_ctxt.create();

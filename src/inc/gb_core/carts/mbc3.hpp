@@ -12,7 +12,7 @@
  * MBC3
  */
 struct MBC3_Controller : public MBC1_Base {
-    MBC3_Controller(Cartridge_Constants::cart_type_t cart_type, std::vector<u8> rom, std::vector<u8> ram) :
+    MBC3_Controller(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
     MBC1_Base(cart_type, rom, ram) {}
 
     u8 read(u16 offset) override {
@@ -33,7 +33,7 @@ struct MBC3_Controller : public MBC1_Base {
     }
 
     void write(u16 offset, u8 data) override {
-        if(bounded(offset, 0x0_u16, 0x1FFF_u16)) {
+        if(bounded(offset, 0_u16, 0x1FFF_u16)) {
             MBC1_Base::set_ram_enable((data & 0xf) == 0xA);
         }
         else if(bounded(offset, 0x2000_u16, 0x3FFF_u16)) {

@@ -7,15 +7,55 @@
 #include <nowide/iostream.hpp>
 
 #include <wx/version.h>
+#include <wx/glcanvas.h>
 #include <wx/string.h>
 
 #include "cfg.hpp"
 
-std::string wx_to_utf8(wxString wx) {
+inline std::string wx_to_utf8(wxString wx) {
 #if wxCHECK_VERSION(3,1,5)
     return wx.utf8_string();
-#else
+#elif wxCHECK_VERSION(3,1,1)
     return wx.ToStdString(wxConvUTF8);
+#else
+    wxScopedCharBuffer buf(wx.utf8_str());
+    return std::string(buf.data(), buf.length());
+#endif
+}
+
+inline wxGLCanvas *init_wxGLCanvas(wxWindow *parent) {
+    //TODO: I'm not sure about how required most of these options are.
+#if wxCHECK_VERSION(3,1,0)
+    wxGLAttributes attributes;
+    attributes.PlatformDefaults()
+              .BufferSize(24)
+              .MinRGBA(8, 8, 8, 0)
+              .Depth(24)
+              .Stencil(0)
+              .DoubleBuffer()
+              .EndList();
+    return new wxGLCanvas{
+        parent,
+        attributes
+    };
+#else
+    int attrib_list[] = {
+        WX_GL_BUFFER_SIZE, 24,
+        WX_GL_MIN_RED, 8,
+        WX_GL_MIN_GREEN, 8,
+        WX_GL_MIN_BLUE, 8,
+        WX_GL_MIN_ALPHA, 0,
+        WX_GL_DEPTH_SIZE, 24,
+        WX_GL_STENCIL_SIZE, 0,
+        WX_GL_DOUBLEBUFFER,
+        0 // terminate the list
+    };
+
+    return new wxGLCanvas{
+        parent,
+        wxID_ANY,
+        attrib_list
+    };
 #endif
 }
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <cassert>
-#include <ios>
 #include <iterator>
 #include <vector>
 
@@ -14,7 +13,6 @@ namespace Silver {
 
 class File {
 public:
-
     ~File();
 
     static File *openFile(std::string filename, bool write=false, bool trunc=false);
@@ -43,7 +41,7 @@ private:
     nowide::fstream file;
     std::string filename;
 
-    File(std::string filename);
+    explicit File(std::string const& filename);
 
     void seekFile_g(u32 offset);
     void seekFile_p(u32 offset);

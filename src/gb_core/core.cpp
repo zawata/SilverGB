@@ -1,4 +1,5 @@
 #include <chrono>
+#include <vector>
 
 #include <nowide/iostream.hpp>
 
@@ -10,13 +11,15 @@
 #include "util/bit.hpp"
 #include "util/util.hpp"
 
+using namespace jnk0le;
+
 GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
     screen_buffer = new u8[GB_S_P_SZ];
 
     // the Aduio buffering system is threaded because it's simpler
     // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
     // so we use an SPSC queue to buffer entire audio buffers at a time
-    audio_queue = new rigtorp::SPSCQueue<std::vector<float>>(4);
+    audio_queue = new Ringbuffer<std::vector<float>,4>();
     audio_vector = std::vector<float>();
     audio_vector.reserve(2048);
 
@@ -81,7 +84,7 @@ void GB_Core::tick_frame() {
         }
 
         if(audio_vector.size() == 2048) { //TODO: make constant
-            audio_queue->try_push(audio_vector);
+            audio_queue->insert(audio_vector);
             audio_vector.clear();
         }
 
@@ -96,12 +99,12 @@ void GB_Core::set_input_state(Input_Manager::button_states_t const& state) {
 }
 
 void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
-    if(!audio_queue->front()) {
+    if(audio_queue->isEmpty()) {
         nowide::cerr << "audio buffer underflow" << std::endl;
         memset(buff, 0, copy_cnt * 4);
     } else {
-        auto audio_buffer = *audio_queue->front();
-        audio_queue->pop();
+        std::vector<float> audio_buffer;
+        audio_queue->remove(audio_buffer);
 
         assert(copy_cnt == audio_buffer.size());
 
@@ -141,9 +144,9 @@ std::vector<u8> GB_Core::getOAMEntry(int index) {
         u8 b1 = io->read_oam(base_addr | i),
            b2 = io->read_oam(base_addr | i + 1);
 
-        for(int i = 0; i < 8; i++) {
-            u8 out_color = ((b1 >> (7 - i)) & 1);
-            out_color   |= ((b2 >> (7 - i)) & 1) << 1;
+        for(int j = 0; j < 8; j++) {
+            u8 out_color = ((b1 >> (7 - j)) & 1);
+            out_color   |= ((b2 >> (7 - j)) & 1) << 1;
 
             const u8 *pixel_colors = PPU::pixel_colors[(pallette >> (out_color * 2)) & 0x3];
             ret_vec.push_back(pixel_colors[0]);

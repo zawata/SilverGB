@@ -135,13 +135,13 @@ Cartridge::~Cartridge() {
     }
 };
 
-bool Cartridge::checkMagicNumber() {
+bool Cartridge::checkMagicNumber() const {
     u8 buf[Cartridge_Constants::MAGIC_NUM_LENGTH];
     rom_file->getBuffer(Cartridge_Constants::MAGIC_NUM_OFFSET, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
     return byteCompare(Cartridge_Constants::MAGIC_NUM, buf, Cartridge_Constants::MAGIC_NUM_LENGTH);
 }
 
-std::string Cartridge::getCartTitle() {
+std::string Cartridge::getCartTitle() const {
     if(isCGBCart()) {
         u8 buf[Cartridge_Constants::CGB_TITLE_LENGTH];
         rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::CGB_TITLE_LENGTH);
@@ -153,16 +153,16 @@ std::string Cartridge::getCartTitle() {
     }
 }
 
-u8 Cartridge::getCartVersion() {
+u8 Cartridge::getCartVersion() const {
     return rom_file->getByte(Cartridge_Constants::VERSION_NUMBER);
 }
 
-Cartridge_Constants::cart_type_t Cartridge::getCartType() {
+Cartridge_Constants::cart_type_t Cartridge::getCartType() const {
     return cart_type;
 }
 
 
-Cartridge_Constants::rom_size_t Cartridge::getROMSize() {
+Cartridge_Constants::rom_size_t Cartridge::getROMSize() const {
     using namespace Cartridge_Constants;
 
     u8 rom_size_byte = rom_file->getByte(Cartridge_Constants::ROM_SIZE_OFFSET);
@@ -196,7 +196,7 @@ Cartridge_Constants::rom_size_t Cartridge::getROMSize() {
     }
 }
 
-Cartridge_Constants::ram_size_t Cartridge::getRAMSize() {
+Cartridge_Constants::ram_size_t Cartridge::getRAMSize() const {
     using namespace Cartridge_Constants;
 
     u8 rom_size_byte = rom_file->getByte(Cartridge_Constants::RAM_SIZE_OFFSET);
@@ -218,29 +218,29 @@ Cartridge_Constants::ram_size_t Cartridge::getRAMSize() {
     }
 }
 
-bool Cartridge::isCGBCart() {
+bool Cartridge::isCGBCart() const {
     return (bool)(rom_file->getByte(Cartridge_Constants::CGB_FLAG) & 0x80);
 }
 
-bool Cartridge::isCGBOnlyCart() {
+bool Cartridge::isCGBOnlyCart() const {
     return rom_file->getByte(Cartridge_Constants::CGB_FLAG) == 0xC0;
 }
 
-bool Cartridge::cartSupportsSGB() {
+bool Cartridge::cartSupportsSGB() const {
     return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03;
 }
 
 
-bool Cartridge::checkHeaderChecksum() {
+bool Cartridge::checkHeaderChecksum() const {
     u16 x = 0;
-    for(u16 i = 0x134; i <= 0x14C; i++){
+    for(u16 i = 0x134; i <= 0x14C; i++) {
         x = x - rom_file->getByte(i) - 1;
     }
 
     return (x & 0x00FF_u16) == rom_file->getByte(Cartridge_Constants::HEADER_CHECKSUM_OFFSET);
 }
 
-bool Cartridge::checkGlobalChecksum() {
+bool Cartridge::checkGlobalChecksum() const {
     //return false until I care enough to figure out how this is calculated.
     // real gameboy hardware doesn't even use this.
     return false;
