@@ -1,5 +1,6 @@
 ﻿#includes
 include_directories("./inc")
+include_directories("../res")
 
 add_subdirectory("./util")
 

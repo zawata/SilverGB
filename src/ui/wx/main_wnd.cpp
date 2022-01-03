@@ -5,21 +5,26 @@
 
 #include <nowide/iostream.hpp>
 
-#include "main_wnd.hpp"
-
-#include "Magnum/GL/GL.h"
-#include "Magnum/GL/Mesh.h"
-#include "Magnum/Math/Tags.h"
-#include "Magnum/Shaders/Flat.h"
-#include "gb_core/defs.hpp"
+#include <Magnum/GL/GL.h>
+#include <Magnum/GL/Mesh.h>
+#include <Magnum/Math/Tags.h>
+#include <Magnum/Shaders/Flat.h>
 
 #include <wx/filename.h>
-#include "wx/app.h"
-#include "wx/event.h"
-#include "wx/menu.h"
-#include "wx/string.h"
-#include "wx/version.h"
+#include <wx/app.h>
+#include <wx/event.h>
+#include <wx/icon.h>
+#include <wx/menu.h>
+#include <wx/string.h>
+#include <wx/version.h>
 
+#if !defined(_WIN32)
+#include "icon/silver_icon.xpm"
+#endif
+
+#include "gb_core/defs.hpp"
+
+#include "main_wnd.hpp"
 #include "cfg.hpp"
 #include "helpers.hpp"
 
@@ -272,23 +277,23 @@ bool SilverGBApp::OnInit() {
 
     Silver_mainFrame* frame = new Silver_mainFrame("SilverGB");
 
-    frame->Show(true);
-
     return true;
 }
 
 /*********************************************************************
  * SilverGB Frame
  */
-Silver_mainFrame::Silver_mainFrame(const wxString& title) : wxFrame{nullptr, wxID_ANY, title}, mgnm_ctxt{Magnum::NoCreate} {
-    wxBoxSizer* bSizer;
-    bSizer = new wxBoxSizer{wxVERTICAL};
-
-    glcanvas = init_wxGLCanvas(this);
-    wx_gl_ctxt = new wxGLContext{glcanvas};
+Silver_mainFrame::Silver_mainFrame(const wxString& title) :
+    wxFrame{nullptr, wxID_ANY, title},
+    mgnm_ctxt{Magnum::NoCreate},
+    glcanvas(init_wxGLCanvas((wxWindow *)this)),
+    wx_gl_ctxt(new wxGLContext{glcanvas})
+{
+    Show(true);
     glcanvas->SetCurrent(*wx_gl_ctxt);
     mgnm_ctxt.create();
 
+    wxBoxSizer* bSizer = new wxBoxSizer{wxVERTICAL};
     bSizer->Add(glcanvas, 1, wxALL|wxEXPAND);
     SetSizer(bSizer);
     Layout();
@@ -300,6 +305,7 @@ Silver_mainFrame::Silver_mainFrame(const wxString& title) : wxFrame{nullptr, wxI
     exec_mngr = new Silver_ExecutionManager(glcanvas);
 
     SetMenuBar(MenuManager(config).generateMenuBar());
+    SetIcon(wxIcon(wxICON(silver_icon)));
 
     // 2 is the default scaling factor
     SetClientSize(wxSize(GB_Core::native_width, GB_Core::native_height) * 2);
@@ -347,12 +353,13 @@ void Silver_mainFrame::setBIOS(wxCommandEvent& event) {
             "Open Gameboy BIOS",
             "",
             "",
-            "Gameboy BIOS|DMG_ROM.bin",
+            "Gameboy BIOS (*.bin)|*.bin",
             wxFD_OPEN|wxFD_FILE_MUST_EXIST);
-    if (openFileDialog.ShowModal() != wxID_OK)
-        return;
+    if (openFileDialog.ShowModal() == wxID_OK) {
+        exec_mngr->setBIOS(wx_to_utf8(openFileDialog.GetPath()));
+    }
 
-    exec_mngr->setBIOS(wx_to_utf8(openFileDialog.GetPath()));
+    return;
 }
 
 void Silver_mainFrame::startROM(wxCommandEvent& event) {  }
