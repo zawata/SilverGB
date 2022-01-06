@@ -2,8 +2,8 @@
 
 #include <deque>
 
-#include "io.hpp"
-#include "defs.hpp"
+#include "gb_core/defs.hpp"
+#include "gb_core/mem.hpp"
 
 #include "util/bit.hpp"
 #include "util/ints.hpp"
@@ -61,7 +61,7 @@ public:
     //     {0x09, 0x20, 0x21}, // black
     // };
 
-    PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled);
+    PPU(Memory *mem, u8 *scrn_buf, bool bootrom_enabled);
     ~PPU();
 
     bool tick();
@@ -74,7 +74,7 @@ public:
     void ppu_tick_vram();
 
 private:
-    IO_Bus *io;
+    Memory *mem;
 
     bool gbc_mode;
     u8 *screen_buffer = NULL; //buffer for the screen, passed from core

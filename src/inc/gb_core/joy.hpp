@@ -2,9 +2,11 @@
 
 #include <string>
 
+#include "gb_core/mem.hpp"
+
 #include "util/ints.hpp"
 
-class Input_Manager {
+class Joypad {
 public:
     struct button_states_t{
         bool a,b,start,select,up,down,left,right;
@@ -24,15 +26,16 @@ public:
         }
     };
 
-    Input_Manager();
-    ~Input_Manager();
+    Joypad(Memory *mem);
+    ~Joypad();
 
     void set_input_state(button_states_t state);
-    Input_Manager::button_states_t get_input_state();
+    Joypad::button_states_t get_input_state();
 
     u8 read();
     void write(u8 data);
 private:
     bool read_dir_keys, read_button_keys;
     button_states_t current_state;
+    Memory *mem;
 };

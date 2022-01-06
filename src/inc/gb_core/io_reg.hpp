@@ -281,18 +281,73 @@
 #define ROMEN_READ_MASK  ROMEN_WRITE_MASK
 #define ROMEN_DAT        __ARR(ROMEN)
 
-//TODO: these
-// #define HDMA1_REG        0x51
-// #define HDMA2_REG        0x52
-// #define HDMA3_REG        0x53
-// #define HDMA4_REG        0x54
-// #define HDMA5_REG        0x55
-// #define RP_REG           0x56
-// #define BCPS_REG         0x68
-// #define BCPD_REG         0x69
-// #define OCPS_REG         0x6A
-// #define OCPD_REG         0x6B
+// GBC: HDMA Source High
+#define HDMA1_REG        0x51
+#define HDMA1_WRITE_MASK 0xFF
+#define HDMA1_READ_MASK  HDMA1_WRITE_MASK
+#define HDMA1_DAT        __ARR(HDMA1)
 
+// GBC: HDMA Source Low
+#define HDMA2_REG        0x52
+#define HDMA2_WRITE_MASK 0xF0
+#define HDMA2_READ_MASK  HDMA2_WRITE_MASK
+#define HDMA2_DAT        __ARR(HDMA2)
+
+// GBC: HDMA Destination High
+#define HDMA3_REG        0x53
+#define HDMA3_WRITE_MASK 0xFF
+#define HDMA3_READ_MASK  HDMA3_WRITE_MASK
+#define HDMA3_DAT        __ARR(HDMA3)
+
+// GBC: HDMA Destination Low
+#define HDMA4_REG        0x54
+#define HDMA4_WRITE_MASK 0xF0
+#define HDMA4_READ_MASK  HDMA4_WRITE_MASKHDMA4_WRITE_MASK
+#define HDMA4_DAT        __ARR(HDMA4)
+
+// GBC: HDMA Control
+#define HDMA5_REG        0x55
+#define HDMA5_WRITE_MASK 0xFF
+#define HDMA5_READ_MASK  0xFF
+#define HDMA5_DAT        __ARR(HDMA5)
+
+// GBC: Infrared Communications Port
+#define RP_REG           0x56
+#define RP_WRITE_MASK    0xC1
+#define RP_READ_MASK     0xFF
+#define RP_DAT           __ARR(RP)
+
+// GBC: Background Color Palette Specification
+#define BCPS_REG         0x68
+#define BCPS_WRITE_MASK  0xBF
+#define BCPS_READ_MASK   BCPS_WRITE_MASK
+#define BCPS_DAT         __ARR(BCPS)
+
+// GBC: Background Color Palette Data
+#define BCPD_REG         0x69
+#define BCPD_WRITE_MASK  0x3FFF
+#define BCPD_READ_MASK   BCPD_WRITE_MASK
+#define BCPD_DAT         _ARR(BCPD)
+
+// GBC: Object Color Palette Specification
+#define OCPS_REG         0x6A
+#define OCPS_WRITE_MASK  0xBF
+#define OCPS_READ_MASK   OCPS_WRITE_MASK
+#define OCPS_DAT         __ARR(OCPS)
+
+// GBC: Object Color Palette Data
+#define OCPD_REG         0x6B
+#define OCPD_WRITE_MASK  0xFF
+#define OCPD_READ_MASK   OCPD_WRITE_MASK
+#define OCPD_DAT         _ARR(OCPD)
+
+// GBC: Object Priority Mode
+#define OPRI_REG         0x6C
+#define OPRI_WRITE_MASK  0x01
+#define OPRI_READ_MASK   OPRI_WRITE_MASK
+#define OPRI_DAT         __ARR(OPRI)
+
+// WRAM Bank Select
 #define SVBK_REG        0x70
 #define SVBK_WRITE_MASK 0x07
 #define SVBK_READ_MASK  SVBK_WRITE_MASK

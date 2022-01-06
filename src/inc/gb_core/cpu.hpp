@@ -19,7 +19,7 @@ public:
         u16 PC;
     };
 
-    CPU(IO_Bus *io, bool bootrom_enabled);
+    CPU(Memory *mem, IO_Bus *io, bool bootrom_enabled);
     ~CPU();
 
     bool tick();
@@ -31,16 +31,19 @@ public:
     registers_t getRegisters();
 
 private:
-    void on_div16();
-    void on_div64();
-    void on_div256();
-    void on_div1024();
+    void on_div(u16 val);
+
+    void      inc_TIMA();
+    u16       get_TAC_cs();
+    Interrupt check_interrupts();
+    void      unset_interrupt(Interrupt i);
 
     //used for disassembly
     std::string i8(u16 PC);
     std::string i16(u16 PC);
     std::string format(std::string fmt, u16 PC);
 
+    Memory *mem;
     IO_Bus *io;
 
     u8 inst_clocks;

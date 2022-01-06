@@ -2,6 +2,7 @@
 
 #include "gb_core/cpu.hpp"
 #include "gb_core/defs.hpp"
+#include "gb_core/mem.hpp"
 
 #include "util/bit.hpp"
 #include "util/flags.hpp"
@@ -93,7 +94,8 @@ __force_inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^
 __force_inline bool      check_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x10000; }
 __force_inline bool      check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
-CPU::CPU(IO_Bus *io, bool bootrom_enabled = false) :
+CPU::CPU(Memory *mem, IO_Bus *io, bool bootrom_enabled = false) :
+mem(mem),
 io(io),
 inst_clocks(0),
 cpu_counter(0) {
@@ -146,33 +148,35 @@ CPU::registers_t CPU::getRegisters() {
 
 //TODO: stop
 bool CPU::tick() {
-    new_div = io->cpu_inc_DIV();
-    if(Bit::fallen(old_div, new_div, 3)) on_div16();
-    if(Bit::fallen(old_div, new_div, 5)) on_div64();
-    if(Bit::fallen(old_div, new_div, 7)) on_div256();
-    if(Bit::fallen(old_div, new_div, 9)) on_div1024();
+    using Interrupt = Memory::Interrupt;
+
+    new_div++;
+    if(Bit::fallen(old_div, new_div, 3)) on_div(16);
+    if(Bit::fallen(old_div, new_div, 5)) on_div(64);
+    if(Bit::fallen(old_div, new_div, 7)) on_div(256);
+    if(Bit::fallen(old_div, new_div, 9)) on_div(1024);
     old_div = new_div;
 
     if(!inst_clocks) { //used to properly time the instruction execution
         u8 int_pc = 0, int_val = 0;
         bool int_set = false;
 
-        IO_Bus::Interrupt curr_interupts = io->cpu_check_interrupts();
-        if(curr_interupts & IO_Bus::Interrupt::VBLANK_INT) {
+        Interrupt curr_interupts = check_interrupts();
+        if(curr_interupts & Interrupt::VBLANK_INT) {
             int_pc = VBLANK_INT_OFFSET;
-            int_val = IO_Bus::Interrupt::VBLANK_INT;
-        } else if(curr_interupts & IO_Bus::Interrupt::LCD_STAT_INT) {
+            int_val = Interrupt::VBLANK_INT;
+        } else if(curr_interupts & Interrupt::LCD_STAT_INT) {
             int_pc = LCD_STAT_INT_OFFSET;
-            int_val = IO_Bus::Interrupt::LCD_STAT_INT;
-        } else if(curr_interupts & IO_Bus::Interrupt::TIMER_INT) {
+            int_val = Interrupt::LCD_STAT_INT;
+        } else if(curr_interupts & Interrupt::TIMER_INT) {
             int_pc = TIMER_INT_OFFSET;
-            int_val = IO_Bus::Interrupt::TIMER_INT;
-        } else if(curr_interupts & IO_Bus::Interrupt::SERIAL_INT) {
+            int_val = Interrupt::TIMER_INT;
+        } else if(curr_interupts & Interrupt::SERIAL_INT) {
             int_pc = SERIAL_INT_OFFSET;
-            int_val = IO_Bus::Interrupt::SERIAL_INT;
-        } else if(curr_interupts & IO_Bus::Interrupt::JOYPAD_INT) {
+            int_val = Interrupt::SERIAL_INT;
+        } else if(curr_interupts & Interrupt::JOYPAD_INT) {
             int_pc = JOYPAD_INT_OFFSET;
-            int_val = IO_Bus::Interrupt::JOYPAD_INT;
+            int_val = Interrupt::JOYPAD_INT;
         }
 
         if(int_val) {
@@ -188,7 +192,7 @@ bool CPU::tick() {
                 IME = 0;
                 stack_push(PC_REG);
                 PC_REG = int_pc;
-                io->cpu_unset_interrupt((IO_Bus::Interrupt)int_val);
+                unset_interrupt((Interrupt)int_val);
                 inst_clocks = 20;
                 int_set = true;
             }
@@ -215,20 +219,39 @@ bool CPU::tick() {
     return inst_clocks == 0;
 }
 
-inline void CPU::on_div16() {
-    if(io->cpu_get_TAC_cs() == 16) io->cpu_inc_TIMA();
+u16 CPU::get_TAC_cs() {
+    //return the Timer Control Speed if enabled
+    if(mem->registers.TAC & 4) {
+        switch(mem->registers.TAC & 3) {
+        case 0: return 1024;
+        case 1: return 16;
+        case 2: return 64;
+        case 3: return 256;
+        }
+    }
+
+    return 0; // the TIMA register won't be incremented
 }
 
-inline void CPU::on_div64() {
-    if(io->cpu_get_TAC_cs() == 64) io->cpu_inc_TIMA();
+inline void CPU::on_div(u16 val) {
+    if(get_TAC_cs() == val) {
+        mem->registers.TIMA++;
+        if(mem->registers.TIMA == 0) {
+            mem->request_interrupt(Memory::Interrupt::TIMER_INT);
+            mem->registers.TIMA = mem->registers.TMA;
+        }
+    };
 }
 
-inline void CPU::on_div256() {
-    if(io->cpu_get_TAC_cs() == 256) io->cpu_inc_TIMA();
+Memory::Interrupt CPU::check_interrupts() {
+    //return Interrupts that are both set and requested.
+    //The CPU will check the IME flag
+    return (Interrupt)(mem->registers.IF & mem->registers.IE);
 }
 
-inline void CPU::on_div1024() {
-    if(io->cpu_get_TAC_cs() == 1024) io->cpu_inc_TIMA();
+void CPU::unset_interrupt(Memory::Interrupt i) {
+    //turn off the specific interrupt
+    mem->registers.IF &= ~(i);
 }
 
 u8 CPU::decode(u8 op) {
@@ -1587,7 +1610,7 @@ u8 CPU::ccf() {
 // Halt/Stop
 //====================
 u8 CPU::halt() {
-    if(!IME && io->cpu_check_interrupts())
+    if(!IME && check_interrupts())
         halt_bug = true;
     else
         is_halted = true;

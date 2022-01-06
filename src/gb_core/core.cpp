@@ -5,7 +5,7 @@
 
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
-#include "gb_core/input.hpp"
+#include "gb_core/joy.hpp"
 #include "gb_core/io_reg.hpp"
 #include "gb_core/ppu.hpp"
 #include "util/bit.hpp"
@@ -13,29 +13,57 @@
 
 using namespace jnk0le;
 
-GB_Core::GB_Core(Silver::File*rom, Silver::File *bootrom = nullptr) {
+GB_Core::GB_Core(Silver::File *rom, Silver::File *bootrom) {
     screen_buffer = new u8[GB_S_P_SZ];
 
-    // the Aduio buffering system is threaded because it's simpler
+    // the Audio buffering system is threaded because it's simpler
     // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
     // so we use an SPSC queue to buffer entire audio buffers at a time
     audio_queue = new Ringbuffer<std::vector<float>,4>();
     audio_vector = std::vector<float>();
     audio_vector.reserve(2048);
 
-    cart = new Cartridge(rom);
-    apu = new APU(bootrom != nullptr);
+    // Class Usage Heirarchy in diagram form
+    // +-----+    +-----+      +-----+
+    // | CPU | -> | IO_ | -+-> | PPU | --+
+    // +-----+    +-----+  |   +-----+   |
+    //    |          |     |             |
+    //    |          |     |   +-----+   |
+    //    |          |     +-> | APU | --+
+    //    |          |     |   +-----+   |
+    //    |          |     |             |
+    //    |          |     |   +-----+   |
+    //    |          |     +-> | JOY | --+
+    //    |          |     |   +-----+   |
+    //    |          |     |             |
+    //    |          |     |   +------+  |
+    //    |          |     +-> | CART |  |
+    //    |          |         +------+  |
+    //    |          |                   |
+    //    |          |                   |   +-----+
+    //    +----------+-------------------+-> | MEM |
+    //                                       +-----+
 
-    io = new IO_Bus(apu, cart, false, bootrom);
-    cpu = new CPU(io, bootrom != nullptr);
-    vpu = new PPU(io, screen_buffer, bootrom != nullptr);
+    cart = new Cartridge(rom);
+    mem = new Memory(false);
+
+    apu = new APU(bootrom != nullptr);
+    ppu = new PPU(mem, screen_buffer, bootrom != nullptr);
+    joy = new Joypad(mem);
+
+    io = new IO_Bus(mem, apu, ppu, joy, cart, false, bootrom);
+    cpu = new CPU(mem, io, bootrom != nullptr);
 }
 
 GB_Core::~GB_Core() {
-    delete vpu;
     delete cpu;
     delete io;
+    delete joy;
+    delete ppu;
+    delete apu;
+    delete mem;
     delete cart;
+    delete audio_queue;
 
     delete[] screen_buffer;
 }
@@ -44,17 +72,16 @@ GB_Core::~GB_Core() {
  * Tick Functions
  */
 void GB_Core::tick_once() {
-    //can't check breakpoints on single tick functions
+    // can't check breakpoints on single tick functions
     cpu->tick();
-    vpu->tick();
+    io->dma_tick();
     apu->tick();
+    ppu->tick();
 }
 
 void GB_Core::tick_instr() {
     for(int i = 0; i < 4; i++) {
-        cpu->tick();
-        vpu->tick();
-        apu->tick();
+        tick_once();
     }
 
     if(cpu->getRegisters().PC == breakpoint && bp_active){
@@ -65,14 +92,18 @@ void GB_Core::tick_instr() {
 
 void GB_Core::tick_frame() {
     u8 tick_cntr = 0;
+    bool instr_completed, frame_completed;
 
     do {
-        if(cpu->tick() && cpu->getRegisters().PC == breakpoint && bp_active) {
+        instr_completed = cpu->tick();
+        io->dma_tick();
+        apu->tick();
+        frame_completed = ppu->tick();
+
+        if(instr_completed && cpu->getRegisters().PC == breakpoint && bp_active) {
             bp_active = false;
             throw breakpoint_exception();
         }
-
-        apu->tick();
         //TODO: this should be dynamic. probably adjusting the live sampling rate ot keep the buffer from over or underflowing.
         // 90 tends to underflow every couple frames, while 85 keeps buffer sizes at 2-3x higher than the callback copy size.
         // the ideal rate right now seems to be 87, it will underflow every couple seconds
@@ -88,14 +119,14 @@ void GB_Core::tick_frame() {
             audio_vector.clear();
         }
 
-    } while(!vpu->tick());
+    } while(!frame_completed);
 }
 
 /**
  * Interface Functions
  */
-void GB_Core::set_input_state(Input_Manager::button_states_t const& state) {
-    io->input->set_input_state(state);
+void GB_Core::set_input_state(Joypad::button_states_t const& state) {
+    joy->set_input_state(state);
 }
 
 void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
@@ -121,8 +152,8 @@ CPU::registers_t GB_Core::getRegistersFromCPU() {
     return cpu->getRegisters();
 }
 
-IO_Bus::io_registers_t GB_Core::getregistersfromIO() {
-    return io->registers;
+Memory::io_registers_t GB_Core::getregistersfromIO() {
+    return mem->registers;
 }
 
 u8 GB_Core::getByteFromIO(u16 addr) { return 0;  }
@@ -134,15 +165,15 @@ u8 const* GB_Core::getScreenBuffer() {
 std::vector<u8> GB_Core::getOAMEntry(int index) {
     if(index >= 40 ) { return {}; }
 
-    PPU::obj_sprite_t sprite = vpu->oam_fetch_sprite(index);
+    PPU::obj_sprite_t sprite = ppu->oam_fetch_sprite(index);
 
     u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
 
     std::vector<u8> ret_vec;
-    u8 pallette = io->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
+    u8 pallette = mem->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
     for( int i = 0; i < 16; i += 2 ) {
-        u8 b1 = io->read_oam(base_addr | i),
-           b2 = io->read_oam(base_addr | i + 1);
+        u8 b1 = mem->read_oam(base_addr | i),
+           b2 = mem->read_oam(base_addr | i + 1);
 
         for(int j = 0; j < 8; j++) {
             u8 out_color = ((b1 >> (7 - j)) & 1);
@@ -173,7 +204,7 @@ bool GB_Core::get_bp_active()        { return bp_active; }
 
 
 void GB_Core::getBGBuffer(u8 *buf) {
-    #define reg(X) (io->registers.X)
+    #define reg(X) (mem->registers.X)
 
     for(int y = 0; y < 256; y++) {
         for(int x = 0; x < 32; x++) {
@@ -181,7 +212,7 @@ void GB_Core::getBGBuffer(u8 *buf) {
             u8 y_tile = y / 8;
 
             u16 base = Bit::test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
-            u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
+            u8 bg_idx = mem->read_vram(base + x + (y_tile * 32));
 
             u16 tile_addr = 0;
             if(Bit::test(bg_idx, 7)) {
@@ -195,8 +226,8 @@ void GB_Core::getBGBuffer(u8 *buf) {
                     ((bg_idx & 0x7F) << 4) |
                     ((y & 0x7) << 1);
 
-            u8 byte_1 = io->read_vram(0x8000 + tile_addr, true),
-               byte_2 = io->read_vram(0x8000 + tile_addr + 1, true);
+            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true),
+               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true);
 
             for(int tile_x = 0; tile_x < 8; tile_x++) {
                 u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);
@@ -210,7 +241,7 @@ void GB_Core::getBGBuffer(u8 *buf) {
 }
 
 void GB_Core::getWNDBuffer(u8 *buf) {
-    #define reg(X) (io->registers.X)
+    #define reg(X) (mem->registers.X)
 
     for(int y = 0; y < 256; y++) {
         for(int x = 0; x < 32; x++) {
@@ -218,7 +249,7 @@ void GB_Core::getWNDBuffer(u8 *buf) {
             u8 y_tile = y / 8;
 
             u16 base = Bit::test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
-            u8 bg_idx = io->read_vram(base + x + (y_tile * 32));
+            u8 bg_idx = mem->read_vram(base + x + (y_tile * 32));
 
             u16 tile_addr = 0;
             if(Bit::test(bg_idx, 7)) {
@@ -232,8 +263,8 @@ void GB_Core::getWNDBuffer(u8 *buf) {
                     ((bg_idx & 0x7F) << 4) |
                     ((y & 0x7) << 1);
 
-            u8 byte_1 = io->read_vram(0x8000 + tile_addr, true),
-               byte_2 = io->read_vram(0x8000 + tile_addr + 1, true);
+            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true),
+               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true);
 
             for(int tile_x = 0; tile_x < 8; tile_x++) {
                 u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);

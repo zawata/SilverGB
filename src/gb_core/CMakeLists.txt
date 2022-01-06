@@ -4,8 +4,9 @@ add_library(gb_core
 		"core.cpp"
 		"cpu.cpp"
 		"cpu_disassem.cpp"
-		"input.cpp"
+		"joy.cpp"
 		"io.cpp"
+		"mem.cpp"
 		"ppu.cpp")
 
 target_link_libraries(gb_core

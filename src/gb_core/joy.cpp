@@ -1,24 +1,37 @@
 #include <nowide/iostream.hpp>
 
-#include "gb_core/input.hpp"
+#include "gb_core/joy.hpp"
 
 #include "util/bit.hpp"
 
-Input_Manager::Input_Manager() {
+Joypad::Joypad(Memory *mem):
+mem(mem) {
     read_dir_keys = false;
     read_button_keys = false;
 }
-Input_Manager::~Input_Manager() {}
+Joypad::~Joypad() {}
 
-void Input_Manager::set_input_state(button_states_t state) {
+void Joypad::set_input_state(button_states_t state) {
     current_state = state;
+
+    if(read_dir_keys) {
+        if(current_state.down || current_state.up || current_state.left || current_state.right) {
+            mem->request_interrupt(Memory::Interrupt::JOYPAD_INT);
+        }
+    }
+
+    if(read_dir_keys) {
+        if(current_state.start || current_state.select || current_state.b || current_state.a) {
+            mem->request_interrupt(Memory::Interrupt::JOYPAD_INT);
+        }
+    }
 }
 
-Input_Manager::button_states_t Input_Manager::get_input_state() {
+Joypad::button_states_t Joypad::get_input_state() {
     return current_state;
 }
 
-u8 Input_Manager::read() {
+u8 Joypad::read() {
     u8 bits = 0;
 
     if(read_dir_keys)    Bit::set(&bits, 4);
@@ -43,7 +56,7 @@ u8 Input_Manager::read() {
     return ~bits & 0xF;
 }
 
-void Input_Manager::write(u8 data) {
+void Joypad::write(u8 data) {
     read_dir_keys = Bit::test(data, 5);
     read_button_keys = Bit::test(data, 4);
 }

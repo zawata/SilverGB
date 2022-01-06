@@ -5,12 +5,13 @@
 
 #include "gb_core/defs.hpp"
 #include "gb_core/io_reg.hpp"
+#include "gb_core/mem.hpp"
 #include "gb_core/ppu.hpp"
 
 #include "util/bit.hpp"
 #include "util/util.hpp"
 
-#define reg(X) (io->registers.X)
+#define reg(X) (mem->registers.X)
 
 #define LCDC_LCD_ENABLED_BIT      7
 #define LCDC_WINDOW_TILE_MAP_BIT  6
@@ -47,8 +48,8 @@
 #define OBJ_X_FLIP(obj)      (Bit::test((obj).attrs, OBG_X_FLIP_BIT))
 #define OBJ_PALLETTE_1(obj)  (Bit::test((obj).attrs, OBG_GB_PALLETTE_BIT)) //false if obj pallette 0
 
-PPU::PPU(IO_Bus *io, u8 *scrn_buf, bool bootrom_enabled = false) :
-io(io),
+PPU::PPU(Memory *mem, u8 *scrn_buf, bool bootrom_enabled = false) :
+mem(mem),
 screen_buffer(scrn_buf) {
     if(!bootrom_enabled) {
         nowide::cout << "Starting PPU without bootrom not supported!" << std::endl;
@@ -64,7 +65,6 @@ screen_buffer(scrn_buf) {
 PPU::~PPU() {}
 
 bool PPU::tick() {
-    io->dma_tick();
     return ppu_tick();
 }
 
@@ -77,10 +77,10 @@ PPU::obj_sprite_t PPU::oam_fetch_sprite(int index) {
 
     PPU::obj_sprite_t o;
     return o = {
-            io->read_oam(loc + 0, true),
-            io->read_oam(loc + 1, true),
-            io->read_oam(loc + 2, true),
-            io->read_oam(loc + 3, true)};
+            mem->read_oam(loc + 0, true),
+            mem->read_oam(loc + 1, true),
+            mem->read_oam(loc + 2, true),
+            mem->read_oam(loc + 3, true)};
 }
 
 void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
@@ -95,8 +95,8 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
                 (tile_num << 4) |
                 (pixel_line << 1);
 
-    u8 sprite_tile_1 = io->read_vram(addr, true),
-        sprite_tile_2 = io->read_vram(addr + 1, true);
+    u8 sprite_tile_1 = mem->read_vram(addr, true),
+        sprite_tile_2 = mem->read_vram(addr + 1, true);
 
     u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
@@ -186,7 +186,7 @@ void PPU::ppu_tick_vram() {
     switch(vram_fetch_step) {
     // Background map clk 1
     case BM_0:
-        bg_map_byte = io->read_vram(bg_map_addr, true);
+        bg_map_byte = mem->read_vram(bg_map_addr, true);
 
         //increment bg_map_addr, but only the bottom 5 bits.
         // this will wrap around the edge of the tile map
@@ -217,7 +217,7 @@ void PPU::ppu_tick_vram() {
 
     // window map clk 1
     case WM_0:
-        wnd_map_byte = io->read_vram(wnd_map_addr, true);
+        wnd_map_byte = mem->read_vram(wnd_map_addr, true);
         wnd_map_addr++;
 
         vram_fetch_step = WM_1;
@@ -242,7 +242,7 @@ void PPU::ppu_tick_vram() {
 
     // tile data 1 clk 1
     case TD_0_0:
-        tile_byte_1 = io->read_vram(tile_addr, true);
+        tile_byte_1 = mem->read_vram(tile_addr, true);
         tile_addr++;
 
         vram_fetch_step = TD_0_1;
@@ -256,7 +256,7 @@ void PPU::ppu_tick_vram() {
 
     // tile data 2 clk 1
     case TD_1_0:
-        tile_byte_2 = io->read_vram(tile_addr, true);
+        tile_byte_2 = mem->read_vram(tile_addr, true);
         tile_addr++;
 
         vram_fetch_step = TD_1_1;
@@ -385,13 +385,6 @@ bool PPU::ppu_tick() {
         return false;
     }
 
-    //check if video registers were written too:
-    /**TODO: we only do this in this way because we're trying to avoid cyclic dependencies and ppu has to access IO members.
-     *  this relationship can be reversed with the following changes:
-     * - moving interrupt handling to either the CPU or it's own class
-     * - move VRAM storage to PPU
-     * - find someway to continue to tick the DMA, maybe put it in either misc ticking or cpu.
-     **/
     if(wnd_enabled_bit->risen()) {
         wnd_map_addr =
             0x9800 |
@@ -528,7 +521,7 @@ bool PPU::ppu_tick() {
     old_mode1_int = mode1_int;
     old_mode0_int = mode0_int;
     if(throw_stat) {
-        io->request_interrupt(IO_Bus::Interrupt::LCD_STAT_INT);
+        mem->request_interrupt(Memory::Interrupt::LCD_STAT_INT);
     }
 
     if(process_step == SCANLINE_OAM) {
@@ -542,7 +535,7 @@ bool PPU::ppu_tick() {
     } else if(process_step == VBLANK) {
         if(!vblank_int_requested) {
             vblank_int_requested = true;
-            io->request_interrupt(IO_Bus::Interrupt::VBLANK_INT);
+            mem->request_interrupt(Memory::Interrupt::VBLANK_INT);
         }
         //clock_count checker below will reset the frame
 

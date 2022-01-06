@@ -33,11 +33,11 @@ public:
     void tick_frame();
     void tick_audio_buffer(u8* buf, int buf_len);
 
-    void set_input_state(Input_Manager::button_states_t const& state);
+    void set_input_state(Joypad::button_states_t const& state);
     void do_audio_callback(float *buff, int copy_cnt);
 
     CPU::registers_t getRegistersFromCPU();
-    IO_Bus::io_registers_t getregistersfromIO();
+    Memory::io_registers_t getregistersfromIO();
     u8 getByteFromIO(u16 addr);
     u8 const* getScreenBuffer();
 
@@ -51,11 +51,13 @@ public:
     bool get_bp_active();
 
 private:
+    Memory *mem;
     Cartridge *cart;
-    IO_Bus *io;
     APU *apu;
+    PPU *ppu;
+    Joypad *joy;
+    IO_Bus *io;
     CPU *cpu;
-    PPU *vpu;
 
     u8 *screen_buffer = nullptr;
     jnk0le::Ringbuffer<std::vector<float>,4> *audio_queue = nullptr;
