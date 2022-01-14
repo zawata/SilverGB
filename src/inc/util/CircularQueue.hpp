@@ -14,7 +14,8 @@ public:
     ~CircularQueue<T>();
 
     bool enqueue(T const& elem);
-    T dequeue(void);
+    bool dequeue(T &elem);
+    bool dequeue();
 
     size_t size(void);
     void clear(void);
@@ -76,13 +77,28 @@ bool CircularQueue<T>::enqueue(T const& elem) {
 }
 
 template<typename T>
-T CircularQueue<T>::dequeue(void) {
+bool CircularQueue<T>::dequeue(T &elem) {
     if(head != tail) {
         head++;
         if(head == end) head = start;
 
-        return *head;
+        elem = *head;
+        return true;
     }
+
+    return false;
+}
+
+template<typename T>
+bool CircularQueue<T>::dequeue() {
+    if(head != tail) {
+        head++;
+        if(head == end) head = start;
+
+        return true;
+    }
+
+    return false;
 }
 
 template<typename T>

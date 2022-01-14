@@ -22,10 +22,12 @@
 #define LCDC_OBJ_ENABLED_BIT      1
 #define LCDC_BG_ENABLED_BIT       0
 
-#define OBG_BG_PRIORITY_BIT 7
-#define OBG_Y_FLIP_BIT      6
-#define OBG_X_FLIP_BIT      5
-#define OBG_GB_PALLETTE_BIT 4
+#define PRIORITY_BIT      7
+#define Y_FLIP_BIT        6
+#define X_FLIP_BIT        5
+#define GB_PALLETTE_BIT   4
+#define GBC_VRAM_BANK_BIT 3
+#define GBC_PALLETTE_MASK 0x7
 
 #define STAT_COIN_INT_BIT   6
 #define STAT_MODE_2_INT_BIT 5
@@ -34,19 +36,33 @@
 #define STAT_COIN_BIT       2
 #define STAT_MODE_FLAG      (0x3)
 
-#define LCDC_LCD_ENABLED          (Bit::test(reg(LCDC), LCDC_LCD_ENABLED_BIT))
-#define LCDC_WINDOW_TILE_MAP      (Bit::test(reg(LCDC), LCDC_WINDOW_TILE_MAP_BIT))
-#define LCDC_WINDOW_ENABLED       (Bit::test(reg(LCDC), LCDC_WINDOW_ENABLED_BIT))
-#define LCDC_BG_WND_TILE_DATA     (Bit::test(reg(LCDC), LCDC_BG_WND_TILE_DATA_BIT))
-#define LCDC_BG_TILE_MAP          (Bit::test(reg(LCDC), LCDC_BG_TILE_MAP_BIT))
-#define LCDC_BIG_SPRITES          (Bit::test(reg(LCDC), LCDC_BIG_SPRITES_BIT))
-#define LCDC_OBJ_ENABLED          (Bit::test(reg(LCDC), LCDC_OBJ_ENABLED_BIT))
-#define LCDC_BG_ENABLED           (Bit::test(reg(LCDC), LCDC_BG_ENABLED_BIT)) //TODO: DMG only
+#define LCDC_LCD_ENABLED       (Bit::test(reg(LCDC), LCDC_LCD_ENABLED_BIT))
+#define LCDC_WINDOW_TILE_MAP   (Bit::test(reg(LCDC), LCDC_WINDOW_TILE_MAP_BIT))
+#define LCDC_WINDOW_ENABLED    (Bit::test(reg(LCDC), LCDC_WINDOW_ENABLED_BIT))
+#define LCDC_BG_WND_TILE_DATA  (Bit::test(reg(LCDC), LCDC_BG_WND_TILE_DATA_BIT))
+#define LCDC_BG_TILE_MAP       (Bit::test(reg(LCDC), LCDC_BG_TILE_MAP_BIT))
+#define LCDC_BIG_SPRITES       (Bit::test(reg(LCDC), LCDC_BIG_SPRITES_BIT))
+#define LCDC_OBJ_ENABLED       (Bit::test(reg(LCDC), LCDC_OBJ_ENABLED_BIT))
+#define LCDC_BG_ENABLED        (Bit::test(reg(LCDC), LCDC_BG_ENABLED_BIT)) //TODO: DMG only
 
-#define OBJ_BG_PRIORITY(obj) (Bit::test((obj).attrs, OBG_BG_PRIORITY_BIT))
-#define OBJ_Y_FLIP(obj)      (Bit::test((obj).attrs, OBG_Y_FLIP_BIT))
-#define OBJ_X_FLIP(obj)      (Bit::test((obj).attrs, OBG_X_FLIP_BIT))
-#define OBJ_PALLETTE_1(obj)  (Bit::test((obj).attrs, OBG_GB_PALLETTE_BIT)) //false if obj pallette 0
+#define OBJ_PRIORITY(obj)      (Bit::test((obj).attrs, PRIORITY_BIT))
+#define OBJ_Y_FLIP(obj)        (Bit::test((obj).attrs, Y_FLIP_BIT))
+#define OBJ_X_FLIP(obj)        (Bit::test((obj).attrs, X_FLIP_BIT))
+#define OBJ_GB_PALLETTE(obj)   (Bit::test((obj).attrs, GB_PALLETTE_BIT)) //false if obj pallette 0
+#define OBJ_GBC_VRAM_BANK(obj) (Bit::test((obj).attrs, GBC_VRAM_BANK_BIT)) //false if bank 0
+#define OBJ_GBC_PALLETTE(obj)  ((obj).attrs & GBC_PALLETTE_MASK)
+
+#define BG_PRIORITY(obj)       (Bit::test((obj).attrs, PRIORITY_BIT))
+#define BG_Y_FLIP(obj)         (Bit::test((obj).attrs, Y_FLIP_BIT))
+#define BG_X_FLIP(obj)         (Bit::test((obj).attrs, X_FLIP_BIT))
+#define BG_VRAM_BANK(obj)      (Bit::test((obj).attrs, GBC_VRAM_BANK_BIT)) //false if bank 0
+#define BG_PALLETTE(obj)       ((obj).attrs & GBC_PALLETTE_MASK)
+
+void write_5bit_color(u8 *loc, u16 color) {
+    *loc++ = (((color >> 0)  & 0x001F) * 527 + 23 ) >> 6;
+    *loc++ = (((color >> 5)  & 0x001F) * 527 + 23 ) >> 6;
+    *loc++ = (((color >> 10) & 0x001F) * 527 + 23 ) >> 6;
+}
 
 PPU::PPU(Memory *mem, u8 *scrn_buf, bool bootrom_enabled = false) :
 mem(mem),
@@ -59,6 +75,10 @@ screen_buffer(scrn_buf) {
        frame_clock_count = 0;
     }
 
+    //TODO: demagic
+    bg_pallettes.resize(8);
+    obj_pallettes.resize(8);
+
     wnd_enabled_bit = new Bit::BitWatcher<u8>(&reg(LCDC), LCDC_WINDOW_ENABLED_BIT);
 }
 
@@ -66,6 +86,50 @@ PPU::~PPU() {}
 
 bool PPU::tick() {
     return ppu_tick();
+}
+
+void PPU::set_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem, u8 data) {
+    u8 byte_idx = *reg & 0x1;
+    u8 color_idx = (*reg & 0x6) >> 1;
+    u8 pallette_idx = (*reg & 0x38) >> 3;
+
+    if(Bit::test(*reg, 7)) {
+        *reg = *reg | ((*reg + 1) & 0x3F);
+    }
+
+    // Deny color write if in mode 3
+    if(process_step != SCANLINE_VRAM) {
+        pallette_t pallette = pallette_mem.at(pallette_idx);
+
+        pallette.colors[color_idx] &= (0xFF << (8 * byte_idx));
+        pallette.colors[color_idx] |= (data << (8 * byte_idx));
+    }
+}
+
+u8 PPU::get_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem) {
+    u8 byte_idx = *reg & 0x1;
+    u8 color_idx = (*reg & 0x6) >> 1;
+    u8 pallette_idx = (*reg & 0x38) >> 3;
+
+    pallette_t pallette = pallette_mem.at(pallette_idx);
+
+    return pallette.colors[color_idx] & (0xFF << (8 * byte_idx));
+}
+
+void PPU::write_bg_color_data(u8 data) {
+    set_color_data(&reg(BCPS), bg_pallettes, data);
+}
+
+u8 PPU::read_bg_color_data() {
+    return get_color_data(&reg(BCPS), bg_pallettes);
+}
+
+void PPU::write_obj_color_data(u8 data) {
+    set_color_data(&reg(OCPS), obj_pallettes, data);
+}
+
+u8 PPU::read_obj_color_data() {
+    return get_color_data(&reg(BCPS), bg_pallettes);
 }
 
 /**
@@ -98,7 +162,7 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
     u8 sprite_tile_1 = mem->read_vram(addr, true),
         sprite_tile_2 = mem->read_vram(addr + 1, true);
 
-    u8 pallette = !OBJ_PALLETTE_1(curr_sprite) ? reg(OBP0) : reg(OBP1);
+    u8 pallette = !OBJ_GB_PALLETTE(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
     for(int i = 0; i < 8; i++) {
         u8 pix_idx = i;
@@ -110,10 +174,18 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
         tile_idx   |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
         tile_idx *= 2;
 
-        sprite_fifo_color_t color{};
+        fifo_color_t color{};
+
+        if(dev_is_GBC(device)) {
+            color.pallette = &obj_pallettes.data()[OBJ_GBC_PALLETTE(curr_sprite)];
+        } else {
+            color.pallette = const_cast<pallette_t *>(&gb_pallette);
+        }
+
+        //TODO: we're special casing the object pallettes for GB. should we fix this?
         color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
         color.is_transparent = tile_idx == 0;
-        color.bg_priority = OBJ_BG_PRIORITY(curr_sprite);
+        color.priority = OBJ_PRIORITY(curr_sprite);
 
         if(sp_fifo->size() > i) {
             //lower idx sprites have priority, only replace pixels
@@ -281,7 +353,18 @@ void PPU::ppu_tick_vram() {
                 tile_idx   |= ((tile_byte_2 >> (7 - i)) & 1) << 1;
                 tile_idx *= 2;
 
-                bg_fifo->enqueue((reg(BGP) >> tile_idx) & 0x3);
+                fifo_color_t color{};
+
+                if(dev_is_GBC(device)) {
+                    //TODO: find the location of this
+                } else {
+                    color.pallette = const_cast<pallette_t *>(&gb_pallette);
+                }
+
+                color.color_idx = (reg(BGP) >> tile_idx) & 0x3;
+                color.pallette = const_cast<pallette_t *>(&gb_pallette);
+
+                bg_fifo->enqueue(color);
             }
 
             if(in_window) {
@@ -303,22 +386,28 @@ void PPU::ppu_tick_vram() {
      * Actual PPU logic
      */
     if(bg_fifo->size() > 0) {
-        u8 color_idx = bg_fifo->dequeue();
+        fifo_color_t color;
+        bg_fifo->dequeue(color);
 
         //if background is disabled, force write a 0
         if(!LCDC_BG_ENABLED) {
-            color_idx = 0;
+            color.color_idx = 0;
         }
 
         //if drawing a sprite, dequeue a sprite pixel
         if(sp_fifo->size() > 0) {
-            sprite_fifo_color_t s_color = sp_fifo->dequeue();
+            fifo_color_t s_color;
+            sp_fifo->dequeue(s_color);
 
-            //if the color in the sprite pixel isn't transparent
-            // or has priority, replace the background color
-            if(!s_color.is_transparent) {
-                if(!s_color.bg_priority || color_idx == 0) {
-                    color_idx = s_color.color_idx;
+            if(dev_is_GBC(device)) {
+                //TODO: do this
+            } else {
+                //if the color in the sprite pixel isn't transparent
+                // or has priority, replace the background color
+                if(!s_color.is_transparent) {
+                    if(!s_color.priority || color.color_idx == 0) {
+                        color.color_idx = s_color.color_idx;
+                    }
                 }
             }
         }
@@ -329,7 +418,7 @@ void PPU::ppu_tick_vram() {
 
             // if frame is disabled, don't draw pixel data
             if (!frame_disable) {
-                memcpy(screen_buffer + current_byte, pixel_colors[color_idx], 3);
+                write_5bit_color(screen_buffer + current_byte, color.pallette->colors[color.color_idx]);
                 current_byte += 3;
             }
         }

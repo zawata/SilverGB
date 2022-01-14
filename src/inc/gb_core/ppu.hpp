@@ -1,5 +1,8 @@
 #pragma once
 
+#include <ratio>
+#include <type_traits>
+#include <vector>
 #include <deque>
 
 #include "gb_core/defs.hpp"
@@ -26,40 +29,40 @@ public:
         // u8 obj_idx;
     } obj_sprite_t;
 
-    enum {
-        color_id_WHITE = 0,
-        color_id_LIGHTGREY,
-        color_id_DARKGREY,
-        color_id_BLACK,
-        color_id_TRANSPARENT,
-    } color_id_t;
-
-    union sprite_fifo_color_t {
-        struct {
-            u8   color_idx      : 6;
-            bool is_transparent : 1;
-            bool bg_priority    : 1;
+    typedef struct {
+        union {
+            struct {
+                u16 color0;
+                u16 color1;
+                u16 color2;
+                u16 color3;
+            };
+            u16 colors[4];
         };
-        u8 byte;
-    };
-    static_assert(sizeof(sprite_fifo_color_t) == 1, "");
+    } pallette_t;
 
-    //using html codes for now
+    struct fifo_color_t {
+        u8 color_idx;
+        pallette_t *pallette;
+        bool is_transparent;
+        bool priority;
+    };
+
     // TODO: make this user-configurable
-    static constexpr u8 pixel_colors[6][3] = {
-        {0xFF, 0xFF, 0xFF}, // white
-        {0xD3, 0xD3, 0xD3}, // lightgrey
-        {0x69, 0x69, 0x69}, // dimgrey
-        {0x00, 0x00, 0x00}, // black
-    };
-
-    //green version
-    // static constexpr u8 pixel_color[4][3] = {
-    //     {0xE1, 0xF7, 0xD1}, // white
-    //     {0x87, 0xC3, 0x72}, // lightgrey
-    //     {0x33, 0x70, 0x53}, // dimgrey
-    //     {0x09, 0x20, 0x21}, // black
+    // http://www.budmelvin.com/dev/15bitconverter.html
+    // static constexpr pallette_t gb_pallette = {
+    //     0x7FFF, // white
+    //     0x6B5A, // lightgrey
+    //     0x35AD, // dimgrey
+    //     0x0000, // black
     // };
+
+    static constexpr pallette_t gb_pallette = {
+        0x6BDC, // white
+        0x3B10, // lightgrey
+        0x29C6, // dimgrey
+        0x1081, // black
+    };
 
     PPU(Memory *mem, u8 *scrn_buf, bool bootrom_enabled);
     ~PPU();
@@ -73,10 +76,18 @@ public:
     void ppu_tick_oam();
     void ppu_tick_vram();
 
+    void write_bg_color_data(u8 data);
+    u8 read_bg_color_data();
+    void write_obj_color_data(u8 data);
+    u8 read_obj_color_data();
+
 private:
+    void set_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem, u8 data);
+    u8 get_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem);
+
     Memory *mem;
 
-    bool gbc_mode;
+    gb_device_t device = device_GB;
     u8 *screen_buffer = NULL; //buffer for the screen, passed from core
 
     int curr_mode;
@@ -101,8 +112,8 @@ private:
     /**
      * PPU Variables
      */
-    CircularQueue<u8> *bg_fifo                  = new CircularQueue<u8>(160);
-    CircularQueue<sprite_fifo_color_t> *sp_fifo = new CircularQueue<sprite_fifo_color_t>(160);
+    CircularQueue<fifo_color_t> *bg_fifo = new CircularQueue<fifo_color_t>(160);
+    CircularQueue<fifo_color_t> *sp_fifo = new CircularQueue<fifo_color_t>(160);
     u8 process_step;
 
     Bit::BitWatcher<u8> *wnd_enabled_bit;
@@ -170,6 +181,9 @@ private:
     obj_sprite_t current_sprite;
     std::deque<obj_sprite_t> active_sprites;
     std::deque<obj_sprite_t> displayed_sprites;
+
+    std::vector<pallette_t> bg_pallettes;
+    std::vector<pallette_t> obj_pallettes;
 
     u32 current_byte = 0;
 

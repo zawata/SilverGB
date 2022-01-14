@@ -12,13 +12,15 @@ struct breakpoint_exception {
     breakpoint_exception() {}
 };
 
-class GB_Core {
+namespace Silver {
+
+class Core {
 public:
     static constexpr u32 native_width = GB_S_W;
     static constexpr u32 native_height = GB_S_H;
 
-    GB_Core(Silver::File *rom, Silver::File *bootrom);
-    ~GB_Core();
+    Core(Silver::File *rom, Silver::File *bootrom = nullptr, gb_device_t device = device_GBC);
+    ~Core();
 
 
     void init_thread(bool paused = true);
@@ -66,3 +68,5 @@ private:
     u16 breakpoint = 0;
     bool bp_active = false;
 };
+
+} // namespace Silver

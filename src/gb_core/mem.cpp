@@ -1,8 +1,10 @@
 #include <nowide/iostream.hpp>
 
+#include "gb_core/defs.hpp"
 #include "gb_core/mem.hpp"
 #include "gb_core/io_reg.hpp"
 
+#include "util/bit.hpp"
 #include "util/util.hpp"
 
 #define MODE_HBLANK 0
@@ -11,9 +13,9 @@
 #define MODE_VRAM   3
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
-Memory::Memory(bool gbc_mode) :
-gbc_mode(gbc_mode) {
-    if(gbc_mode) {
+Memory::Memory(gb_device_t device) :
+device(device) {
+    if(dev_is_GBC(device)) {
         work_ram.resize(GBC_WORK_RAM_SIZE);
         ppu_ram_char.resize(GBC_VRAM_CHAR_SIZE);
     }
@@ -95,16 +97,26 @@ u8 Memory::read_reg(u8 loc) {
         //implemented in io.cpp
         break;
     case HDMA1_REG:
+        return HDMA1_DEFAULTS;
     case HDMA2_REG:
+        return HDMA2_DEFAULTS;
     case HDMA3_REG:
+        return HDMA3_DEFAULTS;
     case HDMA4_REG:
+        return HDMA4_DEFAULTS;
     case HDMA5_REG:
+        return registers.HDMA5 & HDMA5_READ_MASK;
     case RP_REG:
         return registers.RP   & RP_READ_MASK;
     case BCPS_REG:
+        return registers.BCPS & BCPS_READ_MASK;
     case BCPD_REG:
+        // implented in io.cpp
+        break;
     case OCPS_REG:
+        return registers.OCPS & OCPS_READ_MASK;
     case OCPD_REG:
+        // implented in io.cpp
         break;
     case SVBK_REG:
         return registers.SVBK & SVBK_READ_MASK;
@@ -145,9 +157,9 @@ void Memory::write_reg(u8 loc, u8 data) {
 
     //Sound Registers
     case NR10_REG: case NR11_REG: case NR12_REG: case NR13_REG: case NR14_REG:
-                   case NR21_REG: case NR22_REG: case NR23_REG: case NR24_REG:
+    case NR20_REG: case NR21_REG: case NR22_REG: case NR23_REG: case NR24_REG:
     case NR30_REG: case NR31_REG: case NR32_REG: case NR33_REG: case NR34_REG:
-                   case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
+    case NR40_REG: case NR41_REG: case NR42_REG: case NR43_REG: case NR44_REG:
     case NR50_REG: case NR51_REG: case NR52_REG:
         //implemented in io.cpp
         break;
@@ -201,11 +213,12 @@ void Memory::write_reg(u8 loc, u8 data) {
         registers.WX   = data & WX_WRITE_MASK;
         return;
     case VBK_REG:
-        if(gbc_mode) {
+        if(dev_is_GBC(device)) {
             registers.VBK = data & VBK_WRITE_MASK;
         }
         return;
     case KEY1_REG:
+    if(Bit::test(data, 0)) nowide::cout << "Speed Switch requested" << std::endl;
         registers.KEY1 = data & KEY1_WRITE_MASK;
         return;
     case ROMEN_REG:
@@ -215,6 +228,7 @@ void Memory::write_reg(u8 loc, u8 data) {
         registers.HDMA1 = data & HDMA1_WRITE_MASK;
         return;
     case HDMA2_REG:
+        if(data > 0xE0) Bit::reset(data, 6);
         registers.HDMA2 = data & HDMA2_WRITE_MASK;
         return;
     case HDMA3_REG:
@@ -230,9 +244,16 @@ void Memory::write_reg(u8 loc, u8 data) {
         registers.RP = data & RP_WRITE_MASK;
         return;
     case BCPS_REG:
+        registers.BCPS = data & BCPS_WRITE_MASK;
+        return;
     case BCPD_REG:
+        //implemented in io.cpp
+        break;
     case OCPS_REG:
+        registers.OCPS = data & OCPS_WRITE_MASK;
+        return;
     case OCPD_REG:
+        //implemented in io.cpp
         break;
     case SVBK_REG:
         registers.SVBK = data & SVBK_WRITE_MASK;
@@ -248,7 +269,7 @@ void Memory::write_reg(u8 loc, u8 data) {
         return;
     }
 
-    nowide::cerr << "io/mem::reg_write miss:" << loc << std::endl;
+    nowide::cerr << "io/mem::reg_write miss:" << as_hex(loc) << std::endl;
 }
 
 /**
@@ -277,7 +298,7 @@ u8 Memory::read_vram(u16 offset, bool bypass) {
         offset -= 0x8000;
 
         if(offset < VRAM_BANK_SIZE) {
-            if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+            if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
                 return ppu_ram_char[VRAM_BANK_SIZE + offset];
             }
             else {
@@ -299,7 +320,7 @@ void Memory::write_vram(u16 offset, u8 data) {
         offset -= 0x8000;
 
         if(offset < VRAM_BANK_SIZE) {
-            if(gbc_mode && (registers.VBK & VBK_READ_MASK)) {
+            if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
                 ppu_ram_char[VRAM_BANK_SIZE + offset] = data;
             }
             else {
@@ -347,7 +368,7 @@ u8 Memory::read_ram(u16 offset) {
         if(offset < 0x1000) {
             return work_ram[offset];
         } else {
-            if(gbc_mode) {
+            if(dev_is_GBC(device)) {
                 return work_ram[offset + bank_offset];
             } else {
                 return work_ram[offset];
@@ -367,7 +388,7 @@ void Memory::write_ram(u16 offset, u8 data) {
         if(offset < 0x1000) {
             work_ram[offset] = data;
         } else {
-            if(gbc_mode) {
+            if(dev_is_GBC(device)) {
                 work_ram[offset + bank_offset] = data;
             } else {
                 work_ram[offset] = data;

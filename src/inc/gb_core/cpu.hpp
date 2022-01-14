@@ -19,7 +19,7 @@ public:
         u16 PC;
     };
 
-    CPU(Memory *mem, IO_Bus *io, bool bootrom_enabled);
+    CPU(Memory *mem, IO_Bus *io, gb_device_t device, bool bootrom_enabled);
     ~CPU();
 
     bool tick();
@@ -32,6 +32,8 @@ public:
 
 private:
     void on_div(u16 val);
+
+    bool single_tick();
 
     void      inc_TIMA();
     u16       get_TAC_cs();
@@ -56,6 +58,14 @@ private:
 
     void stack_push(u16 n);
     u16  stack_pop();
+
+    //CPU Flags
+    bool
+        IME = 0,
+        is_halted = false,
+        halt_bug  = false,
+        is_stopped = false,
+        ei_ime_enable = false;
 
     //Op Functions
     //============

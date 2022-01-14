@@ -7,13 +7,28 @@
 #include "util/bit.hpp"
 #include "util/flags.hpp"
 
-//CPU Flags
-bool
-    IME = 0,
-    is_halted = false,
-    halt_bug  = false,
-    is_stopped = false,
-    ei_ime_enable = false;
+
+
+// TODO: these are good enough but to be completely accurate it can be made into
+// a function that accepts the rom to compute the values accurate to the game.
+// see https://gbdev.io/pandocs/Power_Up_Sequence.html#cpu-registers
+static const struct {
+    u16 af;
+    u16 bc;
+    u16 de;
+    u16 hl;
+    u16 sp;
+    u16 pc;
+} initial_reg_values[] = {
+    { 0x0100, 0xFF13, 0x00C1, 0x8403, 0xFFFE, 0x0100 }, // DMG0
+    { 0x01B0, 0x0013, 0x00D8, 0x014D, 0xFFFE, 0x0100 }, // DMG
+    { 0xFFB0, 0x0013, 0x00D8, 0x014D, 0xFFFE, 0x0100 }, // MGB
+    { 0x0100, 0x0014, 0x0000, 0xC060, 0xFFFE, 0x0100 }, // SGB
+    { 0xFF00, 0x0014, 0x0000, 0xC060, 0xFFFE, 0x0100 }, // SGB2
+    { 0x1180, 0x6100, 0x0008, 0x007C, 0xFFFE, 0x0100 }, // CGB0 //TODO not 100% sure this is the same as CGB
+    { 0x1180, 0x6100, 0x0008, 0x007C, 0xFFFE, 0x0100 }, // CGB
+    { 0x1100, 0x6200, 0x0008, 0x007C, 0xFFFE, 0x0100 }  // CGB_AGB
+};
 
 //Registers
 union {
@@ -76,7 +91,7 @@ u16 PC;
 #define make_reg_funcs(name, bit) \
  __force_inline bool get_##name() { return BitTest(F_REG, bit); } \
  __force_inline void set_##name() { F_REG = BitSet(F_REG, bit); } \
- __force_inline void change_##name(bool state) { F_REG = BitChange(F_REG, bit, (u8)state);} \
+ __force_inline void change_##name(bool state) { F_REG = BitChange(F_REG, bit, (u8)state); } \
  __force_inline void reset_##name() { F_REG = BitReset(F_REG, bit); } \
  __force_inline void flip_##name() { F_REG = BitFlip(F_REG, bit); };
 
@@ -94,7 +109,7 @@ __force_inline bool check_half_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^
 __force_inline bool      check_carry_16(u16 x, u16 y,        u32 r) { return (x^y^r)   & 0x10000; }
 __force_inline bool      check_carry_16(u16 x, u16 y, u16 z, u32 r) { return (x^y^z^r) & 0x10000; }
 
-CPU::CPU(Memory *mem, IO_Bus *io, bool bootrom_enabled = false) :
+CPU::CPU(Memory *mem, IO_Bus *io, gb_device_t device, bool bootrom_enabled = false) :
 mem(mem),
 io(io),
 inst_clocks(0),
@@ -109,13 +124,12 @@ cpu_counter(0) {
         SP_REG = 0x0000;
         PC_REG = 0x0000;
     } else {
-        nowide::cout << "Starting CPU without bootrom not supported!" << std::endl;
-        AF_REG = 0x01b0;
-        BC_REG = 0x0013;
-        DE_REG = 0x00D8;
-        HL_REG = 0x014D;
-        SP_REG = 0xFFFE;
-        PC_REG = 0x0100;
+        AF_REG = initial_reg_values[device].af;
+        BC_REG = initial_reg_values[device].bc;
+        DE_REG = initial_reg_values[device].de;
+        HL_REG = initial_reg_values[device].hl;
+        SP_REG = initial_reg_values[device].sp;
+        PC_REG = initial_reg_values[device].pc;
     }
 }
 
@@ -146,16 +160,43 @@ CPU::registers_t CPU::getRegisters() {
 #endif
 }
 
-//TODO: stop
+#define is_input_pressed()     (io->joy->read() & 0xF)
+ #define prepare_speed_switch() (Bit::test(io->mem->registers.KEY1, 0))
+#define exec_speed_switch() do {            \
+    Bit::set(io->mem->registers.KEY1, 7);   \
+    Bit::reset(io->mem->registers.KEY1, 0); \
+} while(0)
+#define is_double_speed()      (Bit::test(io->mem->registers.KEY1, 7)) //TODO: demagic?
+
 bool CPU::tick() {
+    io->gdma_tick();
+    io->hdma_tick();
+
+    if(is_double_speed()) {
+        single_tick();
+        single_tick();
+        return false; //TODO: this disables breakpoints, need to track if we're in the middle of a double-speed tick to fix
+    } else {
+        return single_tick();
+    }
+}
+
+//TODO: stop
+bool CPU::single_tick() {
     using Interrupt = Memory::Interrupt;
 
-    new_div++;
+    io->dma_tick();
+
+    new_div = ++io->div_cnt;
     if(Bit::fallen(old_div, new_div, 3)) on_div(16);
     if(Bit::fallen(old_div, new_div, 5)) on_div(64);
     if(Bit::fallen(old_div, new_div, 7)) on_div(256);
     if(Bit::fallen(old_div, new_div, 9)) on_div(1024);
     old_div = new_div;
+
+    if(io->gdma_active) {
+        return false;
+    }
 
     if(!inst_clocks) { //used to properly time the instruction execution
         u8 int_pc = 0, int_val = 0;
@@ -179,7 +220,8 @@ bool CPU::tick() {
             int_val = Interrupt::JOYPAD_INT;
         }
 
-        if(int_val) {
+        //TODO: check logic of stop with ints enabled
+        if(int_val && !io->hdma_active && !is_stopped) {
             if(is_halted) is_halted = false;
 
             //ISR transfer summary:
@@ -209,9 +251,23 @@ bool CPU::tick() {
             }
         }
 
-        // prevent inst_clocks from underflowing during HALTs.
+        // prevent inst_clocks from underflowing during HALTs and STOPs.
         // also keep CPU operating on proper M cycles.
-        if(is_halted) inst_clocks = 4;
+        if(is_stopped) {
+            if(prepare_speed_switch()) {
+                exec_speed_switch();
+            }
+
+            if(is_input_pressed()) {
+                is_stopped = false;
+            } else {
+                inst_clocks = 4;
+            }
+        }
+
+        if(is_halted) {
+            inst_clocks = 4;
+        }
     }
     inst_clocks--;
 
@@ -1620,8 +1676,7 @@ u8 CPU::halt() {
 
 u8 CPU::stop() {
     is_stopped = true;
-    PC_REG--;
-    return 1;
+    return 4;
 }
 
 //====================

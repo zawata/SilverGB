@@ -94,6 +94,13 @@
 #define NR14_READ_MASK   0x40
 #define NR14_DAT         __ARR(NR14)
 
+// Channel 2 Sweep register (Non-existant)
+#define NR20_REG         0x15
+#define NR20_WRITE_MASK  0x00
+#define NR20_READ_MASK   0x00
+#define NR20_DEFAULTS    0xFF
+#define NR20_DAT         __ARR(NR20)
+
 // Channel 2 Sound Length/Wave Pattern Duty (R/W)
 #define NR21_REG         0x16
 #define NR21_WRITE_MASK  0xFF
@@ -147,6 +154,13 @@
 #define NR34_WRITE_MASK  0xC7
 #define NR34_READ_MASK   0x40
 #define NR34_DAT         __ARR(NR34)
+
+// Channel 4 Sweep register (Non-existant)
+#define NR40_REG         0x1F
+#define NR40_WRITE_MASK  0x00
+#define NR40_READ_MASK   0x00
+#define NR40_DEFAULTS    0xFF
+#define NR40_DAT         __ARR(NR40)
 
 // Channel 4 Sound Length (R/W)
 #define NR41_REG         0x20
@@ -285,24 +299,28 @@
 #define HDMA1_REG        0x51
 #define HDMA1_WRITE_MASK 0xFF
 #define HDMA1_READ_MASK  HDMA1_WRITE_MASK
+#define HDMA1_DEFAULTS    0xFF
 #define HDMA1_DAT        __ARR(HDMA1)
 
 // GBC: HDMA Source Low
 #define HDMA2_REG        0x52
 #define HDMA2_WRITE_MASK 0xF0
 #define HDMA2_READ_MASK  HDMA2_WRITE_MASK
+#define HDMA2_DEFAULTS    0xFF
 #define HDMA2_DAT        __ARR(HDMA2)
 
 // GBC: HDMA Destination High
 #define HDMA3_REG        0x53
 #define HDMA3_WRITE_MASK 0xFF
 #define HDMA3_READ_MASK  HDMA3_WRITE_MASK
+#define HDMA3_DEFAULTS    0xFF
 #define HDMA3_DAT        __ARR(HDMA3)
 
 // GBC: HDMA Destination Low
 #define HDMA4_REG        0x54
 #define HDMA4_WRITE_MASK 0xF0
-#define HDMA4_READ_MASK  HDMA4_WRITE_MASKHDMA4_WRITE_MASK
+#define HDMA4_READ_MASK  HDMA4_WRITE_MASK
+#define HDMA4_DEFAULTS    0xFF
 #define HDMA4_DAT        __ARR(HDMA4)
 
 // GBC: HDMA Control

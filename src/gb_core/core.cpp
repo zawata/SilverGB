@@ -13,7 +13,9 @@
 
 using namespace jnk0le;
 
-GB_Core::GB_Core(Silver::File *rom, Silver::File *bootrom) {
+namespace Silver {
+
+Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) {
     screen_buffer = new u8[GB_S_P_SZ];
 
     // the Audio buffering system is threaded because it's simpler
@@ -45,17 +47,17 @@ GB_Core::GB_Core(Silver::File *rom, Silver::File *bootrom) {
     //                                       +-----+
 
     cart = new Cartridge(rom);
-    mem = new Memory(false);
+    mem = new Memory(device);
 
     apu = new APU(bootrom != nullptr);
     ppu = new PPU(mem, screen_buffer, bootrom != nullptr);
     joy = new Joypad(mem);
 
-    io = new IO_Bus(mem, apu, ppu, joy, cart, false, bootrom);
-    cpu = new CPU(mem, io, bootrom != nullptr);
+    io = new IO_Bus(mem, apu, ppu, joy, cart, device, bootrom);
+    cpu = new CPU(mem, io, device, bootrom != nullptr);
 }
 
-GB_Core::~GB_Core() {
+Core::~Core() {
     delete cpu;
     delete io;
     delete joy;
@@ -71,15 +73,14 @@ GB_Core::~GB_Core() {
 /**
  * Tick Functions
  */
-void GB_Core::tick_once() {
+void Core::tick_once() {
     // can't check breakpoints on single tick functions
     cpu->tick();
-    io->dma_tick();
     apu->tick();
     ppu->tick();
 }
 
-void GB_Core::tick_instr() {
+void Core::tick_instr() {
     for(int i = 0; i < 4; i++) {
         tick_once();
     }
@@ -90,13 +91,13 @@ void GB_Core::tick_instr() {
     }
 }
 
-void GB_Core::tick_frame() {
+void Core::tick_frame() {
     u8 tick_cntr = 0;
     bool instr_completed, frame_completed;
 
     do {
         instr_completed = cpu->tick();
-        io->dma_tick();
+
         apu->tick();
         frame_completed = ppu->tick();
 
@@ -125,11 +126,11 @@ void GB_Core::tick_frame() {
 /**
  * Interface Functions
  */
-void GB_Core::set_input_state(Joypad::button_states_t const& state) {
+void Core::set_input_state(Joypad::button_states_t const& state) {
     joy->set_input_state(state);
 }
 
-void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
+void Core::do_audio_callback(float *buff, int copy_cnt) {
     if(audio_queue->isEmpty()) {
         nowide::cerr << "audio buffer underflow" << std::endl;
         memset(buff, 0, copy_cnt * 4);
@@ -148,21 +149,27 @@ void GB_Core::do_audio_callback(float *buff, int copy_cnt) {
 /**
  * Util Functions
  */
-CPU::registers_t GB_Core::getRegistersFromCPU() {
+void write_5bit_color(u8 *loc, u16 color) {
+    *loc++ = (((color >> 0)  & 0x001F) * 527 + 23 ) >> 6;
+    *loc++ = (((color >> 5)  & 0x001F) * 527 + 23 ) >> 6;
+    *loc++ = (((color >> 10) & 0x001F) * 527 + 23 ) >> 6;
+}
+
+CPU::registers_t Core::getRegistersFromCPU() {
     return cpu->getRegisters();
 }
 
-Memory::io_registers_t GB_Core::getregistersfromIO() {
+Memory::io_registers_t Core::getregistersfromIO() {
     return mem->registers;
 }
 
-u8 GB_Core::getByteFromIO(u16 addr) { return 0;  }
+u8 Core::getByteFromIO(u16 addr) { return 0;  }
 
-u8 const* GB_Core::getScreenBuffer() {
+u8 const* Core::getScreenBuffer() {
     return screen_buffer;
 }
 
-std::vector<u8> GB_Core::getOAMEntry(int index) {
+std::vector<u8> Core::getOAMEntry(int index) {
     if(index >= 40 ) { return {}; }
 
     PPU::obj_sprite_t sprite = ppu->oam_fetch_sprite(index);
@@ -179,10 +186,11 @@ std::vector<u8> GB_Core::getOAMEntry(int index) {
             u8 out_color = ((b1 >> (7 - j)) & 1);
             out_color   |= ((b2 >> (7 - j)) & 1) << 1;
 
-            const u8 *pixel_colors = PPU::pixel_colors[(pallette >> (out_color * 2)) & 0x3];
-            ret_vec.push_back(pixel_colors[0]);
-            ret_vec.push_back(pixel_colors[1]);
-            ret_vec.push_back(pixel_colors[2]);
+            u8 colors[3] = {0};
+            write_5bit_color(colors, PPU::gb_pallette.colors[(pallette >> (out_color * 2)) & 0x3]);
+            ret_vec.push_back(colors[0]);
+            ret_vec.push_back(colors[1]);
+            ret_vec.push_back(colors[2]);
         }
     }
 
@@ -192,18 +200,18 @@ std::vector<u8> GB_Core::getOAMEntry(int index) {
 /**
  * Breakpoint Functions
  */
-void GB_Core::set_bp(u16 bp, bool en) {
+void Core::set_bp(u16 bp, bool en) {
     breakpoint = bp;
     set_bp_active(en);
 }
 
-u16 GB_Core::get_bp() { return breakpoint; }
+u16 Core::get_bp() { return breakpoint; }
 
-void GB_Core::set_bp_active(bool en) { bp_active = en; }
-bool GB_Core::get_bp_active()        { return bp_active; }
+void Core::set_bp_active(bool en) { bp_active = en; }
+bool Core::get_bp_active()        { return bp_active; }
 
 
-void GB_Core::getBGBuffer(u8 *buf) {
+void Core::getBGBuffer(u8 *buf) {
     #define reg(X) (mem->registers.X)
 
     for(int y = 0; y < 256; y++) {
@@ -234,13 +242,14 @@ void GB_Core::getBGBuffer(u8 *buf) {
                 tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
                 tile_idx *= 2;
 
-                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+
+                write_5bit_color(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::gb_pallette.colors[(reg(BGP) >> tile_idx) & 0x3]);
             }
         }
     }
 }
 
-void GB_Core::getWNDBuffer(u8 *buf) {
+void Core::getWNDBuffer(u8 *buf) {
     #define reg(X) (mem->registers.X)
 
     for(int y = 0; y < 256; y++) {
@@ -271,8 +280,10 @@ void GB_Core::getWNDBuffer(u8 *buf) {
                 tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
                 tile_idx *= 2;
 
-                memcpy(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::pixel_colors[(reg(BGP) >> tile_idx) & 0x3], 3);
+                write_5bit_color(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::gb_pallette.colors[(reg(BGP) >> tile_idx) & 0x3]);
             }
         }
     }
 }
+
+} // namespace Silver

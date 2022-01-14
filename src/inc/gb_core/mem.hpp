@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "gb_core/defs.hpp"
 #include "util/ints.hpp"
 
 #define HIGH_RAM_SIZE 0x7f
@@ -28,7 +29,7 @@ public:
         JOYPAD_INT   = 1<<4,
     };
 
-    Memory(bool gbc_mode);
+    Memory(gb_device_t device);
     ~Memory();
 
     u8   read_reg(u8 loc);
@@ -83,7 +84,7 @@ public:
 
         // GBC Registers
         u8 KEY1;
-        // ROMEN // Not an actual register 
+        // ROMEN // Not an actual register
 
         // HDMA
         u8 HDMA1;
@@ -106,10 +107,9 @@ public:
     } registers;
 
 private:
-    bool gbc_mode;
+    gb_device_t device;
 
     u16 bank_offset;
-    u16 div_cnt;
 
     std::vector<u8> work_ram;
     std::vector<u8> high_ram;
