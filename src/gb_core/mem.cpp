@@ -17,15 +17,14 @@ Memory::Memory(gb_device_t device) :
 device(device) {
     if(dev_is_GBC(device)) {
         work_ram.resize(GBC_WORK_RAM_SIZE);
-        ppu_ram_char.resize(GBC_VRAM_CHAR_SIZE);
+        ppu_ram.resize(GBC_VRAM_SIZE);
     }
     else {
         work_ram.resize(DMG_WORK_RAM_SIZE);
-        ppu_ram_char.resize(DMG_VRAM_CHAR_SIZE);
+        ppu_ram.resize(DMG_VRAM_SIZE);
     }
 
     high_ram.resize(HIGH_RAM_SIZE);
-    ppu_ram_back.resize(VRAM_BACK_SIZE);
     oam_ram.resize(OAM_RAM_SIZE);
 }
 
@@ -257,13 +256,7 @@ void Memory::write_reg(u8 loc, u8 data) {
         break;
     case SVBK_REG:
         registers.SVBK = data & SVBK_WRITE_MASK;
-        //value 1-7 is bank 1-7
-        //value 0   is bank 1
-        if(registers.SVBK == 0)
-            bank_offset = registers.SVBK * WORK_RAM_BANK_SIZE;
-        else
-            bank_offset = WORK_RAM_BANK_SIZE;
-        break;
+        return;
     case IE_REG:
         registers.IE = data & IE_WRITE_MASK;
         return;
@@ -272,41 +265,21 @@ void Memory::write_reg(u8 loc, u8 data) {
     nowide::cerr << "io/mem::reg_write miss:" << as_hex(loc) << std::endl;
 }
 
-/**
- * Only the first half of the vram is banked so the simplest way to
- * store data and process requests to and from it IMO is to separate VRAM
- * into 2 parts, character data and background data.
- *
- * The character data exists entirely in the VRAM banks while the background
- * data is unbanked.
- *
- * If a request comes in less than the bank size then we check the vram bank vector
- * and if it's higher then it goes to the unbanked background vector
- *
- * OAM is always unbanked and is just a simple read/write operation;
- *
- * ==============================================================================
- * The bypass flag is used for debugging and allows checking OAM and VRAM outside
- * of VBLANK and HBLANK
- *
- * TODO: do the writes need a bypass too?
- **/
-u8 Memory::read_vram(u16 offset, bool bypass) {
+u8 Memory::read_vram(u16 offset, bool bypass, bool bypass_bank1) {
     if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
     if(offset >= 0x8000 && offset <= 0x9FFF) {
         offset -= 0x8000;
 
-        if(offset < VRAM_BANK_SIZE) {
-            if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
-                return ppu_ram_char[VRAM_BANK_SIZE + offset];
-            }
-            else {
-                return ppu_ram_char[offset];
-            }
+        if(bypass) {
+            return ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1 : 0)) + offset];
+        }
+
+        if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
+            return ppu_ram[DMG_VRAM_SIZE + offset];
         }
         else {
-            return ppu_ram_back[offset-VRAM_BANK_SIZE];
+            return ppu_ram[offset];
         }
     }
     else {
@@ -315,20 +288,19 @@ u8 Memory::read_vram(u16 offset, bool bypass) {
     }
 }
 
-void Memory::write_vram(u16 offset, u8 data) {
+void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
     if(offset >= 0x8000 && offset <= 0x9FFF) {
         offset -= 0x8000;
 
-        if(offset < VRAM_BANK_SIZE) {
-            if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
-                ppu_ram_char[VRAM_BANK_SIZE + offset] = data;
-            }
-            else {
-                ppu_ram_char[offset] = data;
-            }
+        if(bypass) {
+            ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1: 0)) + offset] = data;
+        }
+
+        if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
+            ppu_ram[DMG_VRAM_SIZE + offset] = data;
         }
         else {
-            ppu_ram_back[offset-VRAM_BANK_SIZE] = data;
+            ppu_ram[offset] = data;
         }
     }
     else {
@@ -369,7 +341,12 @@ u8 Memory::read_ram(u16 offset) {
             return work_ram[offset];
         } else {
             if(dev_is_GBC(device)) {
-                return work_ram[offset + bank_offset];
+                offset -= 0x1000;
+                //value 1-7 is bank 1-7
+                //value 0   is bank 1
+                u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
+
+                return work_ram[offset + bank_mult * WORK_RAM_BANK_SIZE];
             } else {
                 return work_ram[offset];
             }
@@ -389,7 +366,12 @@ void Memory::write_ram(u16 offset, u8 data) {
             work_ram[offset] = data;
         } else {
             if(dev_is_GBC(device)) {
-                work_ram[offset + bank_offset] = data;
+                offset -= 0x1000;
+                //value 1-7 is bank 1-7
+                //value 0   is bank 1
+                u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
+
+                work_ram[offset + bank_mult * WORK_RAM_BANK_SIZE] = data;
             } else {
                 work_ram[offset] = data;
             }

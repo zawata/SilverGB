@@ -7,6 +7,9 @@
 #define GB_S_P    (GB_S_W * GB_S_H)            // screen pixel count
 #define GB_S_P_SZ (GB_S_P * IMAGE_FORMAT_SIZE) // screen pixel buffer size
 
+#define GB_BOOTROM_SZ 0x0100
+#define GBC_BOOTROM_SZ 0x0900
+
 #define TICKS_PER_FRAME 70224
 
 enum gb_device_t {
@@ -32,6 +35,17 @@ enum gb_device_t {
     device_GBC_cpu_cgb,
     device_GBC_cpu_cgb_agb,
     device_GBC = device_GBC_cpu_cgb,
+};
+
+constexpr const char *cpu_names[] = {
+    "dmg0",
+    "dmg",
+    "mgb",
+    "gb",
+    "sgb2",
+    "cgb0",
+    "cgb",
+    "cgb_agb"
 };
 
 #define dev_is_GB(x) (          \

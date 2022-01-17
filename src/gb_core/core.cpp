@@ -15,7 +15,8 @@ using namespace jnk0le;
 
 namespace Silver {
 
-Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) {
+Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device):
+device(device) {
     screen_buffer = new u8[GB_S_P_SZ];
 
     // the Audio buffering system is threaded because it's simpler
@@ -24,6 +25,8 @@ Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) {
     audio_queue = new Ringbuffer<std::vector<float>,4>();
     audio_vector = std::vector<float>();
     audio_vector.reserve(2048);
+
+    nowide::cout << "Starting Core with CPU: " << cpu_names[device] << std::endl;
 
     // Class Usage Heirarchy in diagram form
     // +-----+    +-----+      +-----+
@@ -50,7 +53,7 @@ Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) {
     mem = new Memory(device);
 
     apu = new APU(bootrom != nullptr);
-    ppu = new PPU(mem, screen_buffer, bootrom != nullptr);
+    ppu = new PPU(mem, screen_buffer, device, bootrom != nullptr);
     joy = new Joypad(mem);
 
     io = new IO_Bus(mem, apu, ppu, joy, cart, device, bootrom);
@@ -210,6 +213,18 @@ u16 Core::get_bp() { return breakpoint; }
 void Core::set_bp_active(bool en) { bp_active = en; }
 bool Core::get_bp_active()        { return bp_active; }
 
+#define Y_FLIP_BIT        6
+#define X_FLIP_BIT        5
+#define GBC_VRAM_BANK_BIT 3
+#define GBC_PALLETTE_MASK 0x7
+
+#define BG_PRIORITY(attr)       (Bit::test((attr), PRIORITY_BIT))
+#define BG_Y_FLIP(attr)         (Bit::test((attr), Y_FLIP_BIT))
+#define BG_X_FLIP(attr)         (Bit::test((attr), X_FLIP_BIT))
+#define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
+#define BG_PALLETTE(attr)       ((attr) & GBC_PALLETTE_MASK)
+
+//TODO: de-duplicate these functions
 
 void Core::getBGBuffer(u8 *buf) {
     #define reg(X) (mem->registers.X)
@@ -220,7 +235,13 @@ void Core::getBGBuffer(u8 *buf) {
             u8 y_tile = y / 8;
 
             u16 base = Bit::test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
-            u8 bg_idx = mem->read_vram(base + x + (y_tile * 32));
+            u16 loc = base + x + (y_tile * 32);
+            u8 bg_idx = mem->read_vram(loc, true, false);
+            u8 bg_attr;
+
+            if(dev_is_GBC(device)) {
+                bg_attr = mem->read_vram(loc, true, true);
+            }
 
             u16 tile_addr = 0;
             if(Bit::test(bg_idx, 7)) {
@@ -230,20 +251,22 @@ void Core::getBGBuffer(u8 *buf) {
                 tile_addr = 0x1000;
             }
 
+            u8 tile_y_line = y & 0x7;
+            if(dev_is_GBC(device) && BG_Y_FLIP(bg_attr)) tile_y_line = 7 - tile_y_line;
+
             tile_addr +=
                     ((bg_idx & 0x7F) << 4) |
-                    ((y & 0x7) << 1);
+                    (tile_y_line << 1);
 
-            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true),
-               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true);
+            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true, BG_VRAM_BANK(bg_attr)),
+               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true, BG_VRAM_BANK(bg_attr));
 
             for(int tile_x = 0; tile_x < 8; tile_x++) {
-                u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);
-                tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
+                u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x)) ;
+
+                u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
+                tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
                 tile_idx *= 2;
-
-
-                write_5bit_color(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::gb_pallette.colors[(reg(BGP) >> tile_idx) & 0x3]);
             }
         }
     }
@@ -258,7 +281,13 @@ void Core::getWNDBuffer(u8 *buf) {
             u8 y_tile = y / 8;
 
             u16 base = Bit::test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
-            u8 bg_idx = mem->read_vram(base + x + (y_tile * 32));
+            u16 loc = base + x + (y_tile * 32);
+            u8 bg_idx = mem->read_vram(loc, true, false);
+            u8 bg_attr;
+
+            if(dev_is_GBC(device)) {
+                bg_attr = mem->read_vram(loc, true, true);
+            }
 
             u16 tile_addr = 0;
             if(Bit::test(bg_idx, 7)) {
@@ -268,19 +297,22 @@ void Core::getWNDBuffer(u8 *buf) {
                 tile_addr = 0x1000;
             }
 
+            u8 tile_y_line = y & 0x7;
+            if(dev_is_GBC(device) && BG_Y_FLIP(bg_attr)) tile_y_line = 7 - tile_y_line;
+
             tile_addr +=
                     ((bg_idx & 0x7F) << 4) |
-                    ((y & 0x7) << 1);
+                    (tile_y_line << 1);
 
-            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true),
-               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true);
+            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true, BG_VRAM_BANK(bg_attr)),
+               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true, BG_VRAM_BANK(bg_attr));
 
             for(int tile_x = 0; tile_x < 8; tile_x++) {
-                u8 tile_idx = ((byte_1 >> (7 - tile_x)) & 1);
-                tile_idx   |= ((byte_2 >> (7 - tile_x)) & 1) << 1;
-                tile_idx *= 2;
+                u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x)) ;
 
-                write_5bit_color(&buf[((y*256) + (x * 8) + tile_x) * 3], PPU::gb_pallette.colors[(reg(BGP) >> tile_idx) & 0x3]);
+                u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
+                tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
+                tile_idx *= 2;
             }
         }
     }

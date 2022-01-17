@@ -61,6 +61,8 @@ private:
     IO_Bus *io;
     CPU *cpu;
 
+    gb_device_t device;
+
     u8 *screen_buffer = nullptr;
     jnk0le::Ringbuffer<std::vector<float>,4> *audio_queue = nullptr;
     std::vector<float> audio_vector;

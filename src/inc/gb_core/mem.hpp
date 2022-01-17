@@ -12,10 +12,8 @@
 #define DMG_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + WORK_RAM_BANK_SIZE)
 #define GBC_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + (WORK_RAM_BANK_SIZE * 7))
 
-#define VRAM_BANK_SIZE      0x1800
-#define DMG_VRAM_CHAR_SIZE  VRAM_BANK_SIZE
-#define GBC_VRAM_CHAR_SIZE  (VRAM_BANK_SIZE + VRAM_BANK_SIZE)
-#define VRAM_BACK_SIZE      0x1800
+#define DMG_VRAM_SIZE  0x3000
+#define GBC_VRAM_SIZE  (DMG_VRAM_SIZE + DMG_VRAM_SIZE)
 
 #define OAM_RAM_SIZE   0xA0
 
@@ -35,8 +33,8 @@ public:
     u8   read_reg(u8 loc);
     void write_reg(u8 loc, u8 data);
 
-    u8   read_vram(u16 loc, bool bypass = false);
-    void write_vram(u16 loc, u8 data);
+    u8   read_vram(u16 loc, bool bypass = false, bool bypass_bank1 = false);
+    void write_vram(u16 loc, u8 data, bool bypass = false, bool bypass_bank1 = false);
 
     u8   read_oam(u16 loc, bool bypass = false);
     void write_oam(u16 loc, u8 data);
@@ -113,7 +111,6 @@ private:
 
     std::vector<u8> work_ram;
     std::vector<u8> high_ram;
-    std::vector<u8> ppu_ram_char;
-    std::vector<u8> ppu_ram_back;
+    std::vector<u8> ppu_ram;
     std::vector<u8> oam_ram;
 };

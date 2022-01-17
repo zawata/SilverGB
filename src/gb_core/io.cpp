@@ -243,13 +243,10 @@ u8 IO_Bus::read_reg(u8 loc) {
 }
 
 void IO_Bus::write_reg(u8 loc, u8 data) {
-    static bool sgb_read_mode;
-
     switch(loc) {
     case P1_REG:
         if(cart->cartSupportsSGB() && (data & P1_WRITE_MASK) == 0) {
             nowide::cout << "Game may be attempting a SGB Command?" << std::endl;
-            sgb_read_mode = true;
         }
 
         joy->write(data & P1_WRITE_MASK);
@@ -312,16 +309,6 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case OCPD_REG:
         ppu->write_obj_color_data(data);
         return;
-    case SVBK_REG:
-        reg(SVBK) = data & SVBK_WRITE_MASK;
-        //value 1-7 is bank 1-7
-        //value 0   is bank 1
-        if(reg(SVBK) == 0)
-            bank_offset = reg(SVBK) * WORK_RAM_BANK_SIZE;
-        else
-            bank_offset = WORK_RAM_BANK_SIZE;
-        break;
-
     case 0x72:
         //TODO
     case 0x73:

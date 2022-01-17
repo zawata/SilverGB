@@ -30,15 +30,7 @@ public:
     } obj_sprite_t;
 
     typedef struct {
-        union {
-            struct {
-                u16 color0;
-                u16 color1;
-                u16 color2;
-                u16 color3;
-            };
-            u16 colors[4];
-        };
+        u16 colors[4];
     } pallette_t;
 
     struct fifo_color_t {
@@ -64,7 +56,7 @@ public:
         0x1081, // black
     };
 
-    PPU(Memory *mem, u8 *scrn_buf, bool bootrom_enabled);
+    PPU(Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled);
     ~PPU();
 
     bool tick();
@@ -81,13 +73,17 @@ public:
     void write_obj_color_data(u8 data);
     u8 read_obj_color_data();
 
+    //public because core needs access //TODO: befriend core maybe?
+    pallette_t bg_pallettes[8];
+    pallette_t obj_pallettes[8];
+
 private:
-    void set_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem, u8 data);
-    u8 get_color_data(u8 *reg, std::vector<pallette_t> const& pallette_mem);
+    void set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data);
+    u8 get_color_data(u8 *reg, pallette_t *pallette_mem);
 
     Memory *mem;
 
-    gb_device_t device = device_GB;
+    gb_device_t device;
     u8 *screen_buffer = NULL; //buffer for the screen, passed from core
 
     int curr_mode;
@@ -156,12 +152,17 @@ private:
         tile_addr;      // relative addr of the current tile data to fetch
 
     u8
+        attr_byte,      // GBC attributes of bg_map_byte and wnd_map_byte
         bg_map_byte,    // byte from the current tile in the bg tile map
         wnd_map_byte,   // byte from the current tile in the wnd tile map
         tile_byte_1,    // 1st byte from the current tile fetched
         tile_byte_2;    // 1st byte from the current tile fetched
 
+    bool
+        bg_map_bank_1;  // is the tile data for the bg tile data in bank 0 or 1;
+
     u8
+        tile_y_line, // GBC tile y pixel counter
         wnd_y_cntr, // window y counter
         y_cntr, // y counter
         x_cntr, // x counter
@@ -181,9 +182,6 @@ private:
     obj_sprite_t current_sprite;
     std::deque<obj_sprite_t> active_sprites;
     std::deque<obj_sprite_t> displayed_sprites;
-
-    std::vector<pallette_t> bg_pallettes;
-    std::vector<pallette_t> obj_pallettes;
 
     u32 current_byte = 0;
 

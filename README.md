@@ -2,7 +2,7 @@
 Because it's not quite gold!
 
 ## Summary
-SilverGB is gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year class regarding CPU execution pipelines, and my general knowledge of embedded development.  
+SilverGB is a gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year class regarding CPU execution pipelines, and my general knowledge of embedded development.  
 
 I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me when I first tried to start this project(as a sophmore in highschool ha!): minor knowledge of programming but major interest in doing something cool.  
 
@@ -23,7 +23,8 @@ Slight TODOs are littered throughout the code, the bigger ones are placed here:
 🚫 = Not Working  
 \- = Not Tested  
 
-✔ CPU  
+➕ CPU  
+&nbsp;&nbsp;&nbsp;&nbsp;🚫 STOP handling  
 ➕ Cartridge  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Header Parsing  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ Memory Bank Controllers  
@@ -32,6 +33,7 @@ Slight TODOs are littered throughout the code, the bigger ones are placed here:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ MBC2  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;✔ MBC3  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ RTC  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕️ MBC5  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;🚫 Others  
 ➕ Sound  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ APU  
@@ -63,9 +65,20 @@ Slight TODOs are littered throughout the code, the bigger ones are placed here:
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;️✔ VBLANK  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ Display timing  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ DMA  
-➕ Input  
+✔ Input  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Input  
-&nbsp;&nbsp;&nbsp;&nbsp;🚫 Interrupts  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ Interrupts  
+➕ GBC Functions  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ Pallette Storage  
+&nbsp;&nbsp;&nbsp;&nbsp;➕ PPU Color Support  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ New DMA  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ GDMA  
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ HDMA  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ VRAM Banking  
+&nbsp;&nbsp;&nbsp;&nbsp;➕ Speed Switching  
+🚫 SGB Functions  
+&nbsp;&nbsp;&nbsp;&nbsp;🚫 SGB Commands  
+&nbsp;&nbsp;&nbsp;&nbsp;🚫 Border Display  
 
 
 ## Features
