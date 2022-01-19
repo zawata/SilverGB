@@ -55,7 +55,7 @@ namespace Bit {
         item(item),
         item_old(*item),
         bit(bit) {
-            static_assert(std::is_integral_v<T> && std::is_unsigned_v<T>);
+            static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
         }
 
         bool risen() {
@@ -84,7 +84,7 @@ namespace Bit {
 
     template<typename T>
     struct shift_with_carry {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
         static constexpr u8 bit_count = CHAR_BIT * sizeof(T);
 
         static __force_inline
@@ -129,7 +129,7 @@ namespace Bit {
 
     template<typename T>
     class BitFieldAccessor {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
         static constexpr u8 bit_count = CHAR_BIT * sizeof(T);
 
         using key_type = std::string;

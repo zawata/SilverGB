@@ -75,7 +75,7 @@ u8 File::getByte(u32 offset) {
     return (u8)file.get();
 }
 
-size_t File::getBuffer(u32 offset, u8 *buf, size_t len) {
+size_t File::getBuffer(u32 offset, void *buf, size_t len) {
     seekFile_g(offset);
     file.read((char *)buf, len);
     return this->file.gcount();
@@ -87,7 +87,7 @@ void File::setByte(u32 offset, u8 data) {
     file.flush();
 }
 
-void File::setBuffer(u32 offset, u8 *buf, size_t len) {
+void File::setBuffer(u32 offset, void *buf, size_t len) {
     seekFile_p(offset);
     file.write((char *)buf, len);
     file.flush();

@@ -5,7 +5,7 @@
   "dependencies": [
     "zlib",
     "libnop",
-    "rtaudio",
+    "portaudio",
     "gl3w",
     "nowide",
     "sdl2",

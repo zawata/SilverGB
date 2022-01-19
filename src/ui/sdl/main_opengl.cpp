@@ -108,7 +108,7 @@ void gl_init_shaders() {
     // glDeleteShader(vert_shader);                                      check_gl_error();
 }
 
-void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
+void set_inputs(Joypad::button_states_t *buttons, SDL_KeyboardEvent *event) {
     switch(event->keysym.sym) {
     case SDLK_UP:        // DPAD up
         buttons->up     = event->type == SDL_KEYDOWN;
@@ -223,39 +223,10 @@ int main(int argc, char *argv[])
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 
-    //load GB Core
     Silver::File *rom_file = nullptr;
-    Silver::File *bios_file = nullptr;
-    #ifdef __linux__
-        nowide::cout << "in linux" << std::endl;
-        if (argc > 1) {
-            rom_file = Silver::File::openFile(argv[1]);
-        }
-        else {
-            rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/pokemon-blue.gb");
-        }
-        bios_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/DMG_ROM.bin");
-        nowide::cout << "after file" << std::endl;
-    #elif _WIN32
-        if (argc > 1) {
-            rom_file = Silver::File::openFile(argv[1]);
-        }
-        else {
-            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\SFXGenerator.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\mealybug-tearoom-tests\\ppu\\m3_bgp_change.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\dmg-acid2\\dmg-acid2.gb");
-        }
-        bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
-    #else
-
-    #endif
-
-    GB_Core *core = new GB_Core(rom_file, bios_file);
-    GB_Audio *audio = GB_Audio::init_audio(core);
-    Input_Manager::button_states_t button_state;
-
-    audio->start_audio();
+    Silver::Core *core = nullptr;
+    GB_Audio *audio = nullptr;
+    Joypad::button_states_t button_state;
 
     bool isRunning = true;
     SDL_Event event;
@@ -277,27 +248,25 @@ int main(int argc, char *argv[])
             case SDL_KEYUP:
                 set_inputs(&button_state, &event.key);
                 break;
+            case SDL_DROPFILE:
+                if(core) {
+                    delete audio;
+                    delete core;
+                    delete rom_file;
+                }
+
+                nowide::cout << event.drop.file << std::endl;
+
+                rom_file = Silver::File::openFile(event.drop.file);
+                core = new Silver::Core(rom_file, nullptr);
+                audio = GB_Audio::init_audio(core);
+                audio->start_audio();
+                break;
             case SDL_QUIT:
                 isRunning = false;
                 break;
             }
         }
-
-        core->set_input_state(button_state);
-        core->tick_frame();
-
-        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
-        glTexSubImage2D(
-                GL_TEXTURE_2D,            // target
-                0,                        // level
-                0,                        // xoffset
-                0,                        // yoffset
-                GB_S_W,                   // width
-                GB_S_H,                   // height
-                GL_RGB,                   // format
-                GL_UNSIGNED_BYTE,         // type
-                core->getScreenBuffer());                             check_gl_error();
-        glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
 
         SDL_GL_MakeCurrent(window, context);
         int w, h;
@@ -305,15 +274,38 @@ int main(int argc, char *argv[])
         glViewport(0, 0, w, h);                                       check_gl_error();
         glClear(GL_COLOR_BUFFER_BIT);                                 check_gl_error();
 
-        glActiveTexture(GL_TEXTURE0);                                 check_gl_error();
-        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
-        glUseProgram(shader_program);                                 check_gl_error();
-        glBindVertexArray(vert_arr_obj);                              check_gl_error();
-        glUniform1i(glGetUniformLocation(shader_program, "tex_data"), 0); check_gl_error();
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                        check_gl_error();
+        if(core) {
+            core->set_input_state(button_state);
+            core->tick_frame();
+
+            glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+            glTexSubImage2D(
+                    GL_TEXTURE_2D,            // target
+                    0,                        // level
+                    0,                        // xoffset
+                    0,                        // yoffset
+                    GB_S_W,                   // width
+                    GB_S_H,                   // height
+                    GL_RGB,                   // format
+                    GL_UNSIGNED_BYTE,         // type
+                    core->getScreenBuffer());                             check_gl_error();
+            glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
+
+            glActiveTexture(GL_TEXTURE0);                                 check_gl_error();
+            glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+            glUseProgram(shader_program);                                 check_gl_error();
+            glBindVertexArray(vert_arr_obj);                              check_gl_error();
+            glUniform1i(glGetUniformLocation(shader_program, "tex_data"), 0); check_gl_error();
+            glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);                        check_gl_error();
+        }
 
         // Swap the OpenGL window buffers
         SDL_GL_SwapWindow(window);
+    }
+
+    if(core) {
+        //cleanup the core
+        delete core;
     }
 
     // Release resources

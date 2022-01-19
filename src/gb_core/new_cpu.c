@@ -32,7 +32,7 @@
     break;\
 
 #define END_CYCLES \
-    default: fprintf("CYCLE ERROR: %d", __LINE__);\
+    default: fprintf(stderr, "CYCLE ERROR: %d", __LINE__);\
     }
 
 typedef int op_stat_t;

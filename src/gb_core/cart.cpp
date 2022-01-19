@@ -142,15 +142,9 @@ bool Cartridge::checkMagicNumber() const {
 }
 
 std::string Cartridge::getCartTitle() const {
-    if(isCGBCart()) {
-        u8 buf[Cartridge_Constants::CGB_TITLE_LENGTH];
-        rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::CGB_TITLE_LENGTH);
-        return std::string((char *)buf);
-    } else {
-        u8 buf[Cartridge_Constants::GB_TITLE_LENGTH];
-        rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, Cartridge_Constants::GB_TITLE_LENGTH);
-        return std::string((char *)buf);
-    }
+    u8 buf[Cartridge_Constants::GB_TITLE_LENGTH + 1] = { 0 };
+    rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, isCGBCart() ? Cartridge_Constants::CGB_TITLE_LENGTH : Cartridge_Constants::GB_TITLE_LENGTH);
+    return std::string((char *)buf);
 }
 
 u8 Cartridge::getCartVersion() const {
@@ -227,7 +221,8 @@ bool Cartridge::isCGBOnlyCart() const {
 }
 
 bool Cartridge::cartSupportsSGB() const {
-    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03;
+    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03 &&
+           rom_file->getByte(Cartridge_Constants::GB_LICENSEE_CODE_OFFSET) == 0x33;
 }
 
 

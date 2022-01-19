@@ -8,12 +8,12 @@
 struct GB_Audio {
     ~GB_Audio();
 
-    static GB_Audio *init_audio(GB_Core *core);
+    static GB_Audio *init_audio(Silver::Core *core);
 
     void start_audio();
     void stop_audio();
 private:
-    GB_Audio();
+    GB_Audio(void *audio_dev);
 
     void *audio_dev;
 };

@@ -30,10 +30,10 @@ public:
     u32 getSize();
 
     u8 getByte(u32 offset);
-    size_t getBuffer(u32 offset, u8 *buf, size_t len);
+    size_t getBuffer(u32 offset, void *buf, size_t len);
 
     void setByte(u32 offset, u8 data);
-    void setBuffer(u32 offset, u8 *buf, size_t len);
+    void setBuffer(u32 offset, void *buf, size_t len);
 
     std::string getFilename();
 
@@ -49,7 +49,7 @@ private:
 
 template<typename T>
 void File::toVector(std::vector<T> &vec) {
-    static_assert(std::is_pod<T>::value);
+    static_assert(std::is_pod<T>::value, "");
 
     u32 size = this->getSize();
 
@@ -63,8 +63,12 @@ void File::toVector(std::vector<T> &vec) {
 
 template<typename T>
 void File::fromVector(std::vector<T> const& vec) {
-    seekFile_p(0);
-    std::copy(vec.begin(), vec.end(), std::ostream_iterator<T>(file));
+    static_assert(std::is_pod<T>::value, "");
+
+    setBuffer(0, (void *)vec.data(), vec.size() * sizeof(T));
+
+    // not sure why this doesn't work? the saved file is 4-bytes too small
+    //std::copy(vec.begin(), vec.end(), std::ostream_iterator<T>(file));
 }
 
 } // namespace Silver

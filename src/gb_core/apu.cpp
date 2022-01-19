@@ -328,8 +328,6 @@ void APU::trigger(u8 chan) {
         channel_1.env_enabled = channel_1.period_counter > 0;
 
         channel_1.volume = ch1_init_vol_env();
-        nowide::cout << "trigger 1 with freq " << as_hex(ch1_freq()) << std::endl;
-        nowide::cout << "increment" << channel_1.increment << std::endl;
         // Square 1's sweep does several things
         freq_sweep_reset();
         break;
@@ -343,8 +341,6 @@ void APU::trigger(u8 chan) {
         channel_2.env_enabled = channel_2.period_counter > 0;
 
         channel_2.volume = ch2_init_vol_env();
-        nowide::cout << "trigger 2 with freq " << as_hex(ch1_freq()) << std::endl;
-
         break;
     case CHANNEL_3:
         channel_3.enabled = true;
@@ -362,7 +358,6 @@ void APU::trigger(u8 chan) {
         channel_4.env_enabled = channel_4.period_counter > 0;
 
         channel_4.volume = ch1_init_vol_env();
-        nowide::cout << "trigger 4 with freq " << as_hex(ch1_freq()) << std::endl;
         // static int trigger_count = 0;
 
         // if(trigger_count) tick_print_enabled = true;
@@ -374,6 +369,7 @@ void APU::trigger(u8 chan) {
     }
 }
 
+//TODO: all of this can be moved to the IO reg-io wrappers
 u8 APU::read_reg(u8 loc) {
     switch(loc) {
     case NR10_REG:
@@ -387,6 +383,8 @@ u8 APU::read_reg(u8 loc) {
     case NR14_REG:
         return registers.NR14 & NR14_READ_MASK;
 
+    case NR20_REG:
+        return NR20_DEFAULTS;
     case NR21_REG:
         return registers.NR21 & NR21_READ_MASK;
     case NR22_REG:
@@ -407,6 +405,8 @@ u8 APU::read_reg(u8 loc) {
     case NR34_REG:
         return registers.NR34 & NR34_READ_MASK;
 
+    case NR40_REG:
+        return NR40_DEFAULTS;
     case NR41_REG:
         return registers.NR41 & NR41_READ_MASK;
     case NR42_REG:
@@ -453,6 +453,9 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
 
     //channel 2 registers
+    case NR20_REG:
+        break;
+
     case NR21_REG:
         registers.NR21 = data & NR21_WRITE_MASK;
         channel_2.length_counter = ~ch2_snd_len() + 1;
@@ -488,6 +491,9 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
 
     //channel 4 registers
+    case NR40_REG:
+        break;
+
     case NR41_REG:
         registers.NR41 = data & NR41_WRITE_MASK;
         channel_4.length_counter = 64 - (data & 0x3F);
@@ -497,8 +503,6 @@ void APU::write_reg(u8 loc, u8 data) {
         break;
     case NR43_REG:
         registers.NR43 = data & NR43_WRITE_MASK;
-        nowide::cout << "div_ratio: " << (int)ch4_div_ratio() << std::endl;
-        nowide::cout << "shft_freq: " << (int)ch4_shft_freq() << std::endl;
         break;
     case NR44_REG:
         registers.NR44 = data & NR44_WRITE_MASK;

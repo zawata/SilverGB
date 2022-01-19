@@ -17,7 +17,7 @@ bool enable_wnd_window = false;
 
 float default_zoom = 3.0f;
 
-void set_inputs(Input_Manager::button_states_t *buttons, SDL_KeyboardEvent *event) {
+void set_inputs(Joypad::button_states_t *buttons, SDL_KeyboardEvent *event) {
     switch(event->keysym.sym) {
     case SDLK_UP:        // DPAD up
         buttons->up     = event->type == SDL_KEYDOWN;
@@ -77,42 +77,17 @@ int main(int argc, char *argv[]) {
         wnd_texture  = SDL_CreateTexture(renderer_wnd, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 256, 256);
     }
 
-    bool isRunning = true;
-
-    //load GB Core
     Silver::File *rom_file = nullptr;
-    Silver::File *bios_file = nullptr;
-    #ifdef __linux__
-        rom_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/pokemon-blue.gb");
-        bios_file = Silver::File::openFile("/mnt/c/Users/zawata/source/repos/silverGB/test_files/DMG_ROM.bin");
-    #elif _WIN32
-        if (argc > 1) {
-            rom_file = Silver::File::openFile(argv[1]);
-        }
-        else {
-            rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\SFXGenerator.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\pokemon-blue.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\mealybug-tearoom-tests\\ppu\\m3_bgp_change.gb");
-            // rom_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\dmg-acid2\\dmg-acid2.gb");
-        }
-        bios_file = Silver::File::openFile("C:\\Users\\zawata\\source\\repos\\SilverGB\\test_files\\DMG_ROM.bin");
-    #else
-
-    #endif
-
-    GB_Core *core = new GB_Core(rom_file, bios_file);
-    GB_Audio *audio = GB_Audio::init_audio(core);
-    Input_Manager::button_states_t button_state;
+    Silver::Core *core = nullptr;
+    GB_Audio *audio = nullptr;
+    Joypad::button_states_t button_state;
 
     u8 *buf = (u8 *)malloc(256 * 256 * 3);
 
+    bool isRunning = true;
     SDL_Event event;
     auto start = std::chrono::steady_clock::now();
     int frames = 0;
-
-
-    audio->start_audio();
-
     while (isRunning) {
         ++frames;
         auto now = std::chrono::steady_clock::now();
@@ -129,48 +104,72 @@ int main(int argc, char *argv[]) {
             case SDL_KEYUP:
                 set_inputs(&button_state, &event.key);
                 break;
+            case SDL_DROPFILE:
+                if(core) {
+                    delete audio;
+                    delete core;
+                    delete rom_file;
+                }
+
+                nowide::cout << event.drop.file << std::endl;
+
+                rom_file = Silver::File::openFile(event.drop.file);
+                core = new Silver::Core(rom_file, nullptr);
+                audio = GB_Audio::init_audio(core);
+                // audio->start_audio();
+                break;
             case SDL_QUIT:
                 isRunning = false;
                 break;
             }
         }
 
-        core->set_input_state(button_state);
-        core->tick_frame();
+        if(core) {
+            core->set_input_state(button_state);
+            core->tick_frame();
 
-        void *screen_dest;
-        int screen_pitch;
-        SDL_LockTexture(screen_texture, NULL, &screen_dest, &screen_pitch);
-        memcpy(screen_dest, core->getScreenBuffer(), GB_S_P_SZ);
-        SDL_UnlockTexture(screen_texture);
-        SDL_RenderCopy(renderer_screen, screen_texture, NULL, NULL);
+            void *screen_dest;
+            int screen_pitch;
+            SDL_LockTexture(screen_texture, NULL, &screen_dest, &screen_pitch);
+            memcpy(screen_dest, core->getScreenBuffer(), GB_S_P_SZ);
+            SDL_UnlockTexture(screen_texture);
+            SDL_RenderCopy(renderer_screen, screen_texture, NULL, NULL);
+        }
+
         SDL_RenderPresent(renderer_screen);
 
         if(enable_bg_window) {
-            void *bg_dest;
-            int bg_pitch;
-            SDL_LockTexture(bg_texture, NULL, &bg_dest, &bg_pitch);
-            core->getBGBuffer(buf);
-            memcpy(bg_dest, buf, 256 * 256 * 3);
-            SDL_UnlockTexture(bg_texture);
-            SDL_RenderCopy(renderer_bg, bg_texture, NULL, NULL);
+            if(core) {
+                void *bg_dest;
+                int bg_pitch;
+                SDL_LockTexture(bg_texture, NULL, &bg_dest, &bg_pitch);
+                core->getBGBuffer(buf);
+                memcpy(bg_dest, buf, 256 * 256 * 3);
+                SDL_UnlockTexture(bg_texture);
+                SDL_RenderCopy(renderer_bg, bg_texture, NULL, NULL);
+            }
             SDL_RenderPresent(renderer_bg);
         }
 
         if(enable_wnd_window) {
-            void *wnd_dest;
-            int wnd_pitch;
-            SDL_LockTexture(wnd_texture, NULL, &wnd_dest, &wnd_pitch);
-            core->getWNDBuffer(buf);
-            memcpy(wnd_dest, buf, 256 * 256 * 3);
-            SDL_UnlockTexture(wnd_texture);
-            SDL_RenderCopy(renderer_wnd, wnd_texture, NULL, NULL);
+            if(core) {
+                void *wnd_dest;
+                int wnd_pitch;
+                SDL_LockTexture(wnd_texture, NULL, &wnd_dest, &wnd_pitch);
+                core->getWNDBuffer(buf);
+                memcpy(wnd_dest, buf, 256 * 256 * 3);
+                SDL_UnlockTexture(wnd_texture);
+                SDL_RenderCopy(renderer_wnd, wnd_texture, NULL, NULL);
+            }
             SDL_RenderPresent(renderer_wnd);
         }
     }
 
-    SDL_CloseAudio();
-    delete core;
+    if(core) {
+        //cleanup the core
+        delete core;
+    }
+
     SDL_Quit();
 
     return 0;
