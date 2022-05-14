@@ -353,9 +353,8 @@ u8 Memory::read_ram(u16 offset) {\
                 offset -= WORK_RAM_BANK_SIZE;
                 //value 1-7 is bank 1-7
                 //value 0   is bank 1
-                u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
-
-                return work_ram[offset + bank_mult * WORK_RAM_BANK_SIZE];
+                u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
+                return work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)];
             } else {
                 return work_ram[offset];
             }
@@ -378,9 +377,8 @@ void Memory::write_ram(u16 offset, u8 data) {
                 offset -= WORK_RAM_BANK_SIZE;
                 //value 1-7 is bank 1-7
                 //value 0   is bank 1
-                u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
-
-                work_ram[offset + bank_mult * WORK_RAM_BANK_SIZE] = data;
+                u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
+                work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)] = data;
             } else {
                 work_ram[offset] = data;
             }

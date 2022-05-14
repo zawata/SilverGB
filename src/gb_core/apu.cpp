@@ -52,29 +52,6 @@ APU::APU(bool bootrom_enabled) {
 APU::~APU() {}
 
 void APU::init_core() {
-    registers.NR10 = 0x80;
-    registers.NR11 = 0xBF;
-    registers.NR12 = 0xF3;
-    registers.NR13 = 0xFF; // no change
-    registers.NR14 = 0xBF;
-    registers.NR21 = 0x3F;
-    registers.NR22 = 0x00;
-    registers.NR23 = 0xFF; // no change
-    registers.NR24 = 0xBF;
-    registers.NR30 = 0x7F;
-    registers.NR31 = 0xFF;
-    registers.NR32 = 0x9F;
-    registers.NR33 = 0xFF; // no change
-    registers.NR34 = 0xBF;
-    registers.NR40 = 0xFF; // no change
-    registers.NR41 = 0xFF;
-    registers.NR42 = 0x00;
-    registers.NR43 = 0x00;
-    registers.NR44 = 0xBF;
-    registers.NR50 = 0x77;
-    registers.NR51 = 0xF3;
-    registers.NR52 = 0xF1; //TODO: 0xF0 on SGB
-
     memset(&channel_1, 0 , sizeof(channel_1));
     memset(&channel_2, 0 , sizeof(channel_2));
     memset(&channel_3, 0 , sizeof(channel_3));

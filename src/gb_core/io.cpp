@@ -26,41 +26,61 @@ cart(cart),
 device(device),
 bootrom_mode(bios_file != nullptr) {
     if(bios_file == nullptr) {
-       //C++ doesn't support direct-initialization of structs until
-       // c++20 which im not going to target right now, so just init the annoying way
-
-       //FIXME: this doesn't bypass on-write effects!
-       write_reg(TIMA_REG, 0x00);
-       write_reg(TMA_REG,  0x00);
-       write_reg(TAC_REG,  0x00);
-       write_reg(NR10_REG, 0x80);
-       write_reg(NR11_REG, 0xBF);
-       write_reg(NR12_REG, 0xF3);
-       write_reg(NR14_REG, 0xBF);
-       write_reg(NR21_REG, 0x3F);
-       write_reg(NR22_REG, 0x00);
-       write_reg(NR24_REG, 0xBF);
-       write_reg(NR30_REG, 0x7F);
-       write_reg(NR31_REG, 0xFF);
-       write_reg(NR32_REG, 0x9F);
-       write_reg(NR33_REG, 0xBF);
-       write_reg(NR41_REG, 0xFF);
-       write_reg(NR42_REG, 0x00);
-       write_reg(NR43_REG, 0x00);
-       write_reg(NR44_REG, 0xBF);
-       write_reg(NR50_REG, 0x77);
-       write_reg(NR51_REG, 0xF3);
-       write_reg(NR52_REG, 0xF1);
-       write_reg(LCDC_REG, 0x91);
-       write_reg(SCY_REG,  0x00);
-       write_reg(SCX_REG,  0x00);
-       write_reg(LYC_REG,  0x00);
-       write_reg(BGP_REG,  0xFC);
-       write_reg(OBP0_REG, 0xFF);
-       write_reg(OBP1_REG, 0xFF);
-       write_reg(WY_REG,   0x00);
-       write_reg(WX_REG,   0x00);
-       write_reg(IE_REG,   0x00);
+        mem->registers.P1 =    default_reg_values[0][get_default_idx(device)];
+        mem->registers.SB =    default_reg_values[1][get_default_idx(device)];
+        mem->registers.SC =    default_reg_values[2][get_default_idx(device)];
+        mem->registers.DIV =   default_reg_values[3][get_default_idx(device)];
+        mem->registers.TIMA =  default_reg_values[4][get_default_idx(device)];
+        mem->registers.TMA =   default_reg_values[5][get_default_idx(device)];
+        mem->registers.TAC =   default_reg_values[6][get_default_idx(device)];
+        mem->registers.IF =    default_reg_values[7][get_default_idx(device)];
+        apu->registers.NR10 =  default_reg_values[8][get_default_idx(device)];
+        apu->registers.NR11 =  default_reg_values[9][get_default_idx(device)];
+        apu->registers.NR12 =  default_reg_values[10][get_default_idx(device)];
+        apu->registers.NR13 =  default_reg_values[11][get_default_idx(device)];
+        apu->registers.NR14 =  default_reg_values[12][get_default_idx(device)];
+        apu->registers.NR21 =  default_reg_values[13][get_default_idx(device)];
+        apu->registers.NR22 =  default_reg_values[14][get_default_idx(device)];
+        apu->registers.NR23 =  default_reg_values[15][get_default_idx(device)];
+        apu->registers.NR24 =  default_reg_values[16][get_default_idx(device)];
+        apu->registers.NR30 =  default_reg_values[17][get_default_idx(device)];
+        apu->registers.NR31 =  default_reg_values[18][get_default_idx(device)];
+        apu->registers.NR32 =  default_reg_values[19][get_default_idx(device)];
+        apu->registers.NR33 =  default_reg_values[20][get_default_idx(device)];
+        apu->registers.NR34 =  default_reg_values[21][get_default_idx(device)];
+        apu->registers.NR41 =  default_reg_values[22][get_default_idx(device)];
+        apu->registers.NR42 =  default_reg_values[23][get_default_idx(device)];
+        apu->registers.NR43 =  default_reg_values[24][get_default_idx(device)];
+        apu->registers.NR44 =  default_reg_values[25][get_default_idx(device)];
+        apu->registers.NR50 =  default_reg_values[26][get_default_idx(device)];
+        apu->registers.NR51 =  default_reg_values[27][get_default_idx(device)];
+        apu->registers.NR52 =  default_reg_values[28][get_default_idx(device)];
+        mem->registers.LCDC =  default_reg_values[29][get_default_idx(device)];
+        mem->registers.STAT =  default_reg_values[30][get_default_idx(device)];
+        mem->registers.SCY =   default_reg_values[31][get_default_idx(device)];
+        mem->registers.SCX =   default_reg_values[32][get_default_idx(device)];
+        mem->registers.LY =    default_reg_values[33][get_default_idx(device)];
+        mem->registers.LYC =   default_reg_values[34][get_default_idx(device)];
+        mem->registers.DMA =   default_reg_values[35][get_default_idx(device)];
+        mem->registers.BGP =   default_reg_values[36][get_default_idx(device)];
+        mem->registers.OBP0 =  default_reg_values[37][get_default_idx(device)];
+        mem->registers.OBP1 =  default_reg_values[38][get_default_idx(device)];
+        mem->registers.WY =    default_reg_values[39][get_default_idx(device)];
+        mem->registers.WX =    default_reg_values[40][get_default_idx(device)];
+        mem->registers.KEY1 =  default_reg_values[41][get_default_idx(device)];
+        mem->registers.VBK =   default_reg_values[42][get_default_idx(device)];
+        mem->registers.HDMA1 = default_reg_values[43][get_default_idx(device)];
+        mem->registers.HDMA2 = default_reg_values[44][get_default_idx(device)];
+        mem->registers.HDMA3 = default_reg_values[45][get_default_idx(device)];
+        mem->registers.HDMA4 = default_reg_values[46][get_default_idx(device)];
+        mem->registers.HDMA5 = default_reg_values[47][get_default_idx(device)];
+        mem->registers.RP =    default_reg_values[48][get_default_idx(device)];
+        mem->registers.BCPS =  default_reg_values[49][get_default_idx(device)];
+        mem->registers.BCPD =  default_reg_values[50][get_default_idx(device)];
+        mem->registers.OCPS =  default_reg_values[51][get_default_idx(device)];
+        mem->registers.OCPD =  default_reg_values[52][get_default_idx(device)];
+        mem->registers.SVBK =  default_reg_values[53][get_default_idx(device)];
+        mem->registers.IE =    default_reg_values[54][get_default_idx(device)];
     } else {
         bios_file->toVector(bootrom_buffer);
     }

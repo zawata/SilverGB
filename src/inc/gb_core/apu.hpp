@@ -82,7 +82,10 @@ struct _prn_generator {
     bool wav_out;
 };
 
+class IO_Bus;
+
 class APU {
+friend IO_Bus;
 public:
     explicit APU(bool bootrom_enabled);
     ~APU();

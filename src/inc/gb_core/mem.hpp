@@ -18,9 +18,11 @@
 #define OAM_RAM_SIZE   0xA0
 
 class Core;
+class IO_Bus;
 
 class Memory {
-    friend Core;
+friend Core;
+friend IO_Bus;
 public:
     enum Interrupt {
         VBLANK_INT   = 1<<0,

@@ -7,3 +7,11 @@
 
     #define CHAR_BIT __CHAR_BIT__
 #endif
+
+[[noreturn]] __force_inline static void unreachable() {
+#if defined(_MSC_VER)
+    __assume(false);
+#elif defined(__GNUC__)
+    __builtin_unreachable();
+#endif
+}
