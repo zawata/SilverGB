@@ -2,7 +2,6 @@
 
 #include "gb_core/defs.hpp"
 #include "gb_core/mem.hpp"
-#include "gb_core/io_reg.hpp"
 
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -265,11 +264,15 @@ void Memory::write_reg(u8 loc, u8 data) {
     nowide::cerr << "io/mem::reg_write miss:" << as_hex(loc) << std::endl;
 }
 
+/**
+ * VRAM
+ **/
+
 u8 Memory::read_vram(u16 offset, bool bypass, bool bypass_bank1) {
     if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
-    if(offset >= 0x8000 && offset <= 0x9FFF) {
-        offset -= 0x8000;
+    if(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) {
+        offset -= VIDEO_RAM_START;
 
         if(bypass) {
             return ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1 : 0)) + offset];
@@ -289,8 +292,8 @@ u8 Memory::read_vram(u16 offset, bool bypass, bool bypass_bank1) {
 }
 
 void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
-    if(offset >= 0x8000 && offset <= 0x9FFF) {
-        offset -= 0x8000;
+    if(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) {
+        offset -= VIDEO_RAM_START;
 
         if(bypass) {
             ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1: 0)) + offset] = data;
@@ -308,11 +311,14 @@ void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
     }
 }
 
+/**
+ * OAM
+ **/
 u8 Memory::read_oam(u16 offset, bool bypass) {
     if((check_mode(MODE_OAM) || check_mode(MODE_VRAM)) && !bypass) return 0xFF;
 
-    if(offset >= 0xFE00 && offset <= 0xFE9F) {
-        offset -= 0xFE00;
+    if(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) {
+        offset -= OBJECT_RAM_START;
 
         return oam_ram[offset];
     }
@@ -323,8 +329,8 @@ u8 Memory::read_oam(u16 offset, bool bypass) {
 }
 
 void Memory::write_oam(u16 offset, u8 data) {
-    if(offset >= 0xFE00 && offset <= 0xFE9F) {
-        offset -= 0xFE00;
+    if(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) {
+        offset -= OBJECT_RAM_START;
 
         oam_ram[offset] = data;
     }
@@ -333,15 +339,18 @@ void Memory::write_oam(u16 offset, u8 data) {
     }
 }
 
-u8 Memory::read_ram(u16 offset) {
-    if(offset >= 0xC000 && offset < 0xE000) {
-        offset -= 0xC000;
-
-        if(offset < 0x1000) {
+/**
+ * RAM
+ **/
+u8 Memory::read_ram(u16 offset) {\
+    if(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) {
+        if(offset <= WORK_RAM_BANK0_END) {
+            offset -= WORK_RAM_BANK0_START;
             return work_ram[offset];
         } else {
+            offset -= WORK_RAM_BANK0_START;
             if(dev_is_GBC(device)) {
-                offset -= 0x1000;
+                offset -= WORK_RAM_BANK_SIZE;
                 //value 1-7 is bank 1-7
                 //value 0   is bank 1
                 u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
@@ -359,14 +368,14 @@ u8 Memory::read_ram(u16 offset) {
 }
 
 void Memory::write_ram(u16 offset, u8 data) {
-    if(offset >= 0xC000 && offset < 0xE000) {
-        offset -= 0xC000;
-
-        if(offset < 0x1000) {
+    if(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) {
+        if(offset <= WORK_RAM_BANK0_END) {
+            offset -= WORK_RAM_BANK0_START;
             work_ram[offset] = data;
         } else {
+            offset -= WORK_RAM_BANK0_START;
             if(dev_is_GBC(device)) {
-                offset -= 0x1000;
+                offset -= WORK_RAM_BANK_SIZE;
                 //value 1-7 is bank 1-7
                 //value 0   is bank 1
                 u16 bank_mult = (registers.SVBK == 0) ? 1 : registers.SVBK;
@@ -382,9 +391,12 @@ void Memory::write_ram(u16 offset, u8 data) {
     }
 }
 
+/**
+ * HRAM
+ **/
 u8 Memory::read_hram(u16 offset) {
-    if(offset >= 0xFF80 && offset < 0xFFFF) {
-        offset -= 0xFF80;
+    if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
+        offset -= HIGH_RAM_START;
 
         return high_ram[offset];
     }
@@ -395,8 +407,8 @@ u8 Memory::read_hram(u16 offset) {
 }
 
 void Memory::write_hram(u16 offset, u8 data) {
-    if(offset >= 0xFF80 && offset < 0xFFFF) {
-        offset -= 0xFF80;
+    if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
+        offset -= HIGH_RAM_START;
 
         high_ram[offset] = data;
     }
@@ -409,7 +421,7 @@ void Memory::write_hram(u16 offset, u8 data) {
  * Interface Routines
  */
 
-// This doesn't sound liek a memory function but all it does is set the relevant IF flag so here's the best place to do it
+// This doesn't sound like a memory function but all it does is set the relevant IF bit so here's the best place to do it
 void Memory::request_interrupt(Memory::Interrupt i) {
     registers.IF |= i;
 }

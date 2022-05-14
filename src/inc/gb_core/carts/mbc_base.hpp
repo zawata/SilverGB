@@ -3,6 +3,7 @@
 #include <nowide/iostream.hpp>
 
 #include "gb_core/cart.hpp"
+#include "gb_core/defs.hpp"
 
 #include "util/util.hpp"
 
@@ -33,7 +34,7 @@ struct MBC1_Base : public MemoryBankController {
     }
 
     virtual u8 read(u16 offset) override {
-        if(bounded(offset, 0_u16, 0x3FFF_u16)) {
+        if(bounded(offset, CART_ROM_BANK0_START, CART_ROM_BANK0_END)) {
             u32 addr = (u32)offset + (rom_0_bank * ROM_BANK_SIZE);
 
             if(addr < rom_data.size()) {
@@ -42,10 +43,9 @@ struct MBC1_Base : public MemoryBankController {
             else {
                 return 0;
             }
-            return rom_data[offset];
         }
-        else if(bounded(offset, 0x4000_u16, 0x7FFF_u16)) {
-            offset -= 0x4000;
+        else if(bounded(offset, CART_ROM_BANK1_START, CART_ROM_BANK1_END)) {
+            offset -= CART_ROM_BANK1_START;
 
             u32 addr = (u32)offset + (rom_bank * ROM_BANK_SIZE);
 
@@ -56,8 +56,8 @@ struct MBC1_Base : public MemoryBankController {
                 return 0;
             }
         }
-        else if(bounded(offset, 0xA000_u16, 0xBFFF_u16)) {
-            offset -= 0xA000;
+        else if(bounded(offset, CART_RAM_START, CART_RAM_END)) {
+            offset -= CART_RAM_START;
 
             u32 addr = (u32)offset + (ram_bank * RAM_BANK_SIZE);
 
@@ -75,8 +75,8 @@ struct MBC1_Base : public MemoryBankController {
     }
 
     virtual void write(u16 offset, u8 data) override {
-        if(bounded(offset, 0xA000_u16, 0xBFFF_u16)) {
-            offset -= 0xA000;
+        if(bounded(offset, CART_RAM_START, CART_RAM_END)) {
+            offset -= CART_RAM_START;
 
             u32 addr = (u32)offset + (ram_bank * RAM_BANK_SIZE);
 

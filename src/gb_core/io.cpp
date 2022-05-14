@@ -5,10 +5,9 @@
 #include "gb_core/defs.hpp"
 #include "gb_core/io.hpp"
 #include "gb_core/mem.hpp"
-#include "gb_core/io_reg.hpp"
 
 #include "util/bit.hpp"
-#include <util/util.hpp>
+#include "util/util.hpp"
 
 #define reg(X) (mem->registers.X)
 
@@ -72,7 +71,7 @@ IO_Bus::~IO_Bus() {}
 
 u8 IO_Bus::read(u16 offset, bool bypass) {
     if(dma_active && !bypass) {
-        if(offset >= 0xFF80 && offset < 0xFFFF) {
+        if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
             return mem->read_hram(offset);
         } else {
             return 0; //TODO:
@@ -80,62 +79,62 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
     }
 
 
-    if(offset <= 0x3FFF) {
+    if(offset <= CART_ROM_BANK0_END) {
     // 16KB ROM bank 00
         if(bootrom_mode) {
             // the gameboy maps its bootrom data from 0x0000 to 0x00FF.
             // The gameboy color maps its bootrom data from 0x0000 to 0x08FF with a fallthrough from 0x100 to 0x1FF for the cartridge header.
-            if((offset <= 0x100) ||
-               (dev_is_GBC(device) && 0x200 <= offset && offset <= 0x08FF)) {
+            if((offset <= GB_BOOTROM_END) ||
+               (dev_is_GBC(device) && bounded(offset, GBC_BOOTROM_START, GBC_BOOTROM_END))) {
                 return bootrom_buffer[offset];
             }
         }
 
         return cart->read(offset);
     }
-    else if(offset <= 0x7FFF) {
+    else if(offset <= CART_ROM_BANK1_END) {
     // 16KB ROM Bank 01~NN
         return cart->read(offset); //cart will handle banking
     }
-    else if(offset <= 0x9FFF) {
+    else if(offset <= VIDEO_RAM_END) {
     // 8KB ppu RAM (VRAM)
         return mem->read_vram(offset);
     }
-    else if(offset <= 0xBFFF) {
+    else if(offset <= CART_RAM_END) {
     // 8KB External RAM
         return cart->read(offset);
     }
-    else if(offset <= 0xCFFF) {
+    else if(offset <= WORK_RAM_BANK0_END) {
     // 4KB Work RAM (WRAM) bank 0
         return mem->read_ram(offset);
     }
-    else if(offset <= 0xDFFF) {
+    else if(offset <= WORK_RAM_BANK1_END) {
     // 4KB Work RAM (WRAM) bank 1~N
         return mem->read_ram(offset);
     }
-    else if(offset <= 0xFDFF) {
+    else if(offset <= ECHO_RAM_END) {
     // Mirror of C000~DDFF (ECHO RAM)
-        return mem->read_ram(offset - 0xE000 + 0xC000);
+        return mem->read_ram(offset - ECHO_RAM_START + WORK_RAM_BANK0_START);
     }
-    else if(offset <= 0xFE9F) {
+    else if(offset <= OBJECT_RAM_END) {
     // Sprite attribute table (OAM)
         return mem->read_oam(offset);
     }
-    else if(offset <= 0xFEFF) {
+    else if(offset <= UNMAPPED_END) {
     // Not Usable
         return 0;
     }
-    else if(offset <= 0xFF7F) {
+    else if(offset <= IO_REGS_END) {
     // Registers
-        return read_reg(offset-0xFF00);
+        return read_reg(offset-IO_REGS_START);
     }
-    else if(offset <= 0xFFFE) {
+    else if(offset <= HIGH_RAM_END) {
     // High RAM (HRAM)
         return mem->read_hram(offset);
     }
-    else if(offset <= 0xFFFF) {
+    else if(offset <= IE_REG_OFFSET) {
     // Interrupts Enable Register (IE)
-        return read_reg(offset-0xFF00);
+        return read_reg(offset - IO_REGS_START);
     }
 
     nowide::cerr << "IO Overread" << std::endl;
@@ -152,56 +151,56 @@ void IO_Bus::write(u16 offset, u8 data) {
         }
     }
 
-    if(offset <= 0x3FFF) {
+    if(offset <= CART_ROM_BANK0_END) {
     // 16KB ROM bank 00
         cart->write(offset, data);
         return;
     }
-    else if(offset <= 0x7FFF) {
+    else if(offset <= CART_ROM_BANK1_END) {
     // 16KB ROM Bank 01~NN
         cart->write(offset, data);
         return;
     }
-    else if(offset <= 0x9FFF) {
+    else if(offset <= VIDEO_RAM_END) {
     // 8KB ppu RAM (VRAM)
         mem->write_vram(offset, data);
         return;
     }
-    else if(offset <= 0xBFFF) {
+    else if(offset <= CART_RAM_END) {
     // 8KB External RAM
         cart->write(offset, data);
         return;
     }
-    else if(offset <= 0xCFFF) {
+    else if(offset <= WORK_RAM_BANK0_END) {
     // 4KB Work RAM (WRAM) bank 0
         mem->write_ram(offset, data);
         return;
     }
-    else if(offset <= 0xDFFF) {
+    else if(offset <= WORK_RAM_BANK1_END) {
     // 4KB Work RAM (WRAM) bank 1~N
         mem->write_ram(offset, data);
         return;
     }
-    else if(offset <= 0xFDFF) {
+    else if(offset <= ECHO_RAM_END) {
     // Mirror of C000~DDFF (ECHO RAM)
         mem->write_ram(offset - 0xE000 + 0xC000, data);
         return;
     }
-    else if(offset <= 0xFE9F) {
+    else if(offset <= OBJECT_RAM_END) {
     // Sprite attribute table (OAM)
         mem->write_oam(offset, data);
         return;
     }
-    else if(offset <= 0xFEFF) {
+    else if(offset <= UNMAPPED_END) {
     // Not Usable
         return;
     }
-    else if(offset <= 0xFF7F) {
+    else if(offset <= IO_REGS_END) {
     // Registers
         write_reg(offset - 0xFF00, data);
         return;
     }
-    else if(offset <= 0xFFFE) {
+    else if(offset <= HIGH_RAM_END) {
     // High RAM (HRAM)
         mem->write_hram(offset, data);
         return;

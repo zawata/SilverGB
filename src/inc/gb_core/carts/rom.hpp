@@ -15,11 +15,11 @@ struct ROM_Controller : public MemoryBankController {
     MemoryBankController(cart_type, rom, ram) {}
 
     u8 read(u16 offset) override {
-        if(offset <= 0x7FFF) {
+        if(offset <= CART_ROM_BANK1_END) {
             return MemoryBankController::rom_data[offset];
         }
-        else if(offset >= 0xA000 && offset <= 0xBFFF) {
-            offset -= 0xA000;
+        else if(offset >= CART_RAM_START && offset <= CART_RAM_END) {
+            offset -= CART_RAM_START;
             if(cart_type.RAM)
                 return ram_data[offset];
             else
@@ -32,8 +32,8 @@ struct ROM_Controller : public MemoryBankController {
     }
 
     void write(u16 offset, u8 data) override {
-        if(offset >= 0xA000 && offset <= 0xBFFF) {
-            offset -= 0xA000;
+        if(offset >= CART_RAM_START && offset <= CART_RAM_END) {
+            offset -= CART_RAM_START;
             if(cart_type.RAM) {
                 MemoryBankController::ram_data[offset] = data;
             }

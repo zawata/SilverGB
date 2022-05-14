@@ -10,6 +10,7 @@
 
 #include "ints.hpp"
 #include "flags.hpp"
+#include "vector.hpp"
 
 
 #define as_hex(x) std::hex << (s64)(x) << std::dec
@@ -19,22 +20,22 @@ __force_inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { return ::memc
 /**
  * a <= value <= b
  **/
-template<typename T>
-__force_inline bool bounded(T value, T a, T b) {
-    static_assert(std::is_arithmetic<T>::value);
+template<typename T, typename L>
+__force_inline bool bounded(T value, L a, L b) {
+    static_assert(std::is_arithmetic<T>::value && (std::is_arithmetic<L>::value || std::is_enum<L>::value), "");
     return (value >= a) && (value <= b);
 }
 
 template< typename T >
 std::string itoh( T i, u8 zp = 0, bool caps = false ) {
-    static_assert(std::is_integral<T>::value);
+    static_assert(std::is_integral<T>::value, "");
 
     std::stringstream stream;
     if(caps) {
         stream << std::uppercase;
     }
 
-    stream << "0x" << std::setfill ('0') << std::setw(zp ? zp : sizeof(T)*2) << std::hex << i;
+    stream << "0x" << std::setfill('0') << std::setw(zp ? zp : sizeof(T)*2) << std::hex << (s64)i;
   return stream.str();
 }
 
@@ -67,7 +68,7 @@ __force_inline void hexDump (const char * desc, const void * addr, const int len
         }
         printf (" %02x", pc[i]);
 
-        if ((pc[i] < 0x20) || (pc[i] > 0x7e)) 
+        if ((pc[i] < 0x20) || (pc[i] > 0x7e))
             buff[i % 16] = '.';
         else
             buff[i % 16] = pc[i];

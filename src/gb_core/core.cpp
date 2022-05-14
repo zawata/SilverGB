@@ -6,7 +6,6 @@
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/joy.hpp"
-#include "gb_core/io_reg.hpp"
 #include "gb_core/ppu.hpp"
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -166,7 +165,7 @@ Memory::io_registers_t Core::getregistersfromIO() {
     return mem->registers;
 }
 
-u8 Core::getByteFromIO(u16 addr) { return 0;  }
+u8 Core::getByteFromIO(u16 addr) { return 0; }
 
 u8 const* Core::getScreenBuffer() {
     return screen_buffer;

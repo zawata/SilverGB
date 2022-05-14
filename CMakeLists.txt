@@ -16,6 +16,10 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 message("Using Toolchain file at: ${CMAKE_TOOLCHAIN_FILE}")
 
+option(BUILD_WX_UI "Build the wxWidgets UI" OFF)
+option(BUILD_SDL_UI "Build the SDL UI" OFF)
+option(BUILD_IMGUI_UI "Build the ImGui UI" OFF)
+
 project ("SilverGB")
 
 #global packages

@@ -4,7 +4,6 @@
 #include <nowide/iostream.hpp>
 
 #include "gb_core/defs.hpp"
-#include "gb_core/io_reg.hpp"
 #include "gb_core/mem.hpp"
 #include "gb_core/ppu.hpp"
 

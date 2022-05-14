@@ -1,11 +1,11 @@
 #pragma once
 
 #include "gb_core/defs.hpp"
-#include "util/file.hpp"
 #include "gb_core/cpu.hpp"
 #include "gb_core/io.hpp"
 #include "gb_core/ppu.hpp"
 
+#include "util/file.hpp"
 #include "util/ringbuffer.hpp"
 
 struct breakpoint_exception {

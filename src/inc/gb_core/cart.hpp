@@ -1,8 +1,8 @@
 #pragma once
 
 #include "util/file.hpp"
-
 #include "util/ints.hpp"
+#include "util/vector.hpp"
 
 #include <string>
 
@@ -193,15 +193,15 @@ struct MemoryBankController {
     virtual void write(u16 offset, u8 data) = 0;
     virtual void tick() {};
 protected:
-    MemoryBankController(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom_data, std::vector<u8> const& ram_data) :
+    MemoryBankController(Cartridge_Constants::cart_type_t const& cart_type, Silver::vector<u8> const& rom_data, Silver::vector<u8> const& ram_data) :
     cart_type(cart_type),
     rom_data(rom_data),
     ram_data(ram_data) {}
 
     Cartridge_Constants::cart_type_t cart_type;
 
-    std::vector<u8> rom_data;
-    std::vector<u8> ram_data;
+    Silver::vector<u8> rom_data;
+    Silver::vector<u8> ram_data;
 };
 
 class Cartridge {

@@ -22,14 +22,14 @@ typedef u64      size_t;
 #ifdef __cplusplus
 }
 
-inline std::uint8_t  operator "" _u8 (unsigned long long value) { return static_cast<std::uint8_t>(value); }
-inline std::uint16_t operator "" _u16(unsigned long long value) { return static_cast<std::uint16_t>(value); }
-inline std::uint16_t operator "" _u32(unsigned long long value) { return static_cast<std::uint16_t>(value); }
-inline std::uint64_t operator "" _u64(unsigned long long value) { return static_cast<std::uint64_t>(value); }
+inline constexpr u8  operator "" _u8 (unsigned long long value) { return static_cast<u8>(value); }
+inline constexpr u16 operator "" _u16(unsigned long long value) { return static_cast<u16>(value); }
+inline constexpr u32 operator "" _u32(unsigned long long value) { return static_cast<u32>(value); }
+inline constexpr u64 operator "" _u64(unsigned long long value) { return static_cast<u64>(value); }
 
-inline std::int8_t  operator "" _s8 (unsigned long long value) { return static_cast<std::int8_t>(value); }
-inline std::int16_t operator "" _s16(unsigned long long value) { return static_cast<std::int16_t>(value); }
-inline std::int32_t operator "" _s32(unsigned long long value) { return static_cast<std::int32_t>(value); }
-inline std::int64_t operator "" _s64(unsigned long long value) { return static_cast<std::int64_t>(value); }
+inline constexpr s8  operator "" _s8 (unsigned long long value) { return static_cast<s8>(value); }
+inline constexpr s16 operator "" _s16(unsigned long long value) { return static_cast<s16>(value); }
+inline constexpr s32 operator "" _s32(unsigned long long value) { return static_cast<s32>(value); }
+inline constexpr s64 operator "" _s64(unsigned long long value) { return static_cast<s64>(value); }
 
 #endif

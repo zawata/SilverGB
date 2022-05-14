@@ -9,6 +9,8 @@
 #include "SDL_keycode.h"
 
 #include "audio.hpp"
+#include "gb_core/defs.hpp"
+#include "util/file.hpp"
 
 GLuint screen_texture,
        shader_program;
@@ -157,7 +159,7 @@ int main(int argc, char *argv[])
     // Create the window using SDL
     window = SDL_CreateWindow("SilverGB",
         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        200, 200, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        GB_S_W * 2, GB_S_H * 2, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 
     if (window == NULL) {
         nowide::cout << SDL_GetError() << std::endl;
@@ -208,7 +210,7 @@ int main(int argc, char *argv[])
             2,
             GL_FLOAT,
             GL_FALSE,
-            4 * sizeof(GL_FLOAT),
+            4 * sizeof(float),
             (void*)0);                                                check_gl_error();
     glEnableVertexAttribArray(0);                                     check_gl_error();
     glVertexAttribPointer(
@@ -216,12 +218,14 @@ int main(int argc, char *argv[])
             2,
             GL_FLOAT,
             GL_FALSE,
-            4 * sizeof(GL_FLOAT),
+            4 * sizeof(float),
             (void*)(2 * sizeof(float)));                              check_gl_error();
     glEnableVertexAttribArray(1);                                     check_gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, vert_buff_obj);                     check_gl_error();
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
+
+    Silver::File *bios_file = Silver::File::openFile("/home/johna/Documents/SilverGB/test_files/bootroms/cgb_boot.bin");
 
     Silver::File *rom_file = nullptr;
     Silver::Core *core = nullptr;
@@ -258,7 +262,7 @@ int main(int argc, char *argv[])
                 nowide::cout << event.drop.file << std::endl;
 
                 rom_file = Silver::File::openFile(event.drop.file);
-                core = new Silver::Core(rom_file, nullptr);
+                core = new Silver::Core(rom_file, bios_file);
                 audio = GB_Audio::init_audio(core);
                 audio->start_audio();
                 break;

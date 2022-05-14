@@ -1,22 +1,20 @@
 ﻿#includes
-include_directories("./inc")
 include_directories("../res")
-
-add_subdirectory("./util")
 
 #core files
 add_subdirectory("./gb_core")
 # add_subdirectory("./gba_core")
+add_subdirectory("./util")
 
 #interfaces
-add_subdirectory("./ui/wx")
-add_subdirectory("./ui/sdl")
-# add_subdirectory("./ui/imgui")
+if(BUILD_WX_UI)
+    add_subdirectory("./ui/wx")
+endif()
 
-#TODO: remove
-# add_executable(gba_main
-#     "gba_core/main.cpp")
+if(BUILD_SDL_UI)
+    add_subdirectory("./ui/sdl")
+endif()
 
-# target_link_libraries(gba_main
-#     gba_core
-#     util)
+if(BUILD_IMGUI_UI)
+    add_subdirectory("./ui/imgui")
+endif()

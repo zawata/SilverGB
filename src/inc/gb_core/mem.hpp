@@ -17,7 +17,10 @@
 
 #define OAM_RAM_SIZE   0xA0
 
+class Core;
+
 class Memory {
+    friend Core;
 public:
     enum Interrupt {
         VBLANK_INT   = 1<<0,
@@ -50,14 +53,14 @@ public:
 
     struct io_registers_t {
         //Input
-        // P1 //implemented in Input_Manager
+        u8 P1; //implemented in Input_Manager
 
         //Serial
         u8 SB; //Serial not supported
         u8 SC;
 
         //Timer
-        // u8 DIV; // emulated
+        u8 DIV; // emulated
         u8 TIMA;
         u8 TMA;
         u8 TAC;
@@ -96,9 +99,9 @@ public:
 
         // Color Palettes
         u8 BCPS;
-        // u8 BCPD; // emulated
+        u8 BCPD; // emulated
         u8 OCPS;
-        // u8 OCPD; // emulated
+        u8 OCPD; // emulated
 
         u8 SVBK;
         u8 IE;
