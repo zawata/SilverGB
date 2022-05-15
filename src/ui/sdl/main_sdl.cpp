@@ -1,3 +1,5 @@
+#include <SDL_render.h>
+#include <SDL_video.h>
 #include <chrono>
 
 // remove win32 mix/max defines
@@ -170,6 +172,22 @@ int main(int argc, char *argv[]) {
         delete core;
     }
 
+    if(enable_wnd_window) {
+        SDL_DestroyTexture(wnd_texture);
+        SDL_DestroyRenderer(renderer_wnd);
+        SDL_DestroyWindow(window_wnd);
+    }
+
+    if(enable_bg_window) {
+        SDL_DestroyTexture(bg_texture);
+        SDL_DestroyRenderer(renderer_bg);
+        SDL_DestroyWindow(window_bg);
+    }
+    SDL_DestroyTexture(screen_texture);
+    SDL_DestroyRenderer(renderer_screen);
+    SDL_DestroyWindow(window_screen);
+
+    free(buf);
     SDL_Quit();
 
     return 0;

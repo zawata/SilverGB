@@ -313,6 +313,7 @@ int main(int argc, char *argv[])
     }
 
     // Release resources
+    delete bios_file;
     SDL_GL_DeleteContext(context);
     SDL_Quit();
 
