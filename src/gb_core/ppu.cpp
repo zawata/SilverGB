@@ -3,6 +3,7 @@
 
 #include <nowide/iostream.hpp>
 
+#include "gb_core/cart.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/mem.hpp"
 #include "gb_core/ppu.hpp"
@@ -58,7 +59,17 @@
 #define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
 #define BG_PALLETTE(attr)       ((attr) & GBC_PALLETTE_MASK)
 
-void write_5bit_color(u8 *loc, u16 color) {
+constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b) {
+    return r | (((u16)g) << 5) | (((u16)b) << 10);
+}
+
+void rgb15_to_rgb555(u8 *loc, u16 color) {
+    *loc++ = ((color >> 0)  & 0x001F);
+    *loc++ = ((color >> 5)  & 0x001F);
+    *loc++ = ((color >> 10) & 0x001F);
+}
+
+void rgb15_to_rgb888(u8 *loc, u16 color) {
     u8 r = ((color >> 0)  & 0x001F);
     *loc++ = (r << 3) | (r >> 2);
     u8 g = ((color >> 5)  & 0x001F);
@@ -67,37 +78,277 @@ void write_5bit_color(u8 *loc, u16 color) {
     *loc++ = (b << 3) | (b >> 2);
 }
 
-PPU::PPU(Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled = false) :
+constexpr u8 inverse_title_checksums[] = {
+    0x00, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x4d, 0x00, 0x00,
+    0x23, 0x00, 0x00, 0x00, 0x16, 0x1d, 0x02, 0x22, 0x49, 0x13, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x47, 0x43, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x1b, 0x14, 0x03, 0x00, 0x00, 0x24, 0x00, 0x00, 0x07, 0x0a, 0x0e, 0x3f,
+    0x00, 0x00, 0x00, 0x2a, 0x00, 0x00, 0x42, 0x00, 0x00, 0x28, 0x00, 0x20, 0x00, 0x00, 0x29, 0x00,
+    0x00, 0x00, 0x36, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x11, 0x00, 0x00, 0x0b, 0x3c, 0x00, 0x00,
+    0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x3e, 0x2b, 0x12, 0x4b, 0x40, 0x00, 0x3d, 0x00, 0x1c,
+    0x0f, 0x39, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x00, 0x01, 0x00, 0x00, 0x2d, 0x08, 0x00, 0x00, 0x00,
+    0x21, 0x00, 0x09, 0x00, 0x00, 0x19, 0x00, 0x1f, 0x00, 0x1a, 0x35, 0x00, 0x3a, 0x38, 0x00, 0x00,
+    0x00, 0x00, 0x27, 0x00, 0x00, 0x44, 0x00, 0x00, 0x15, 0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x00, 0x4c,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x45, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x2f, 0x00,
+    0x00, 0x04, 0x00, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+    0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x2e, 0x00, 0x06, 0x00, 0x4e, 0x00, 0x26, 0x25, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1e,
+};
+
+#define AMBIGUOUS_CHK_IDXS_START 0x41_u8
+#define AMBIGUOUS_CHK_IDXS_END   0x4e_u8 //inclusive
+
+constexpr char title_fourth_chars[][4] = {
+    "BUR",
+    "ER",
+    "FA",
+    "AR",
+    "A ",
+    "RI",
+    "BN",
+    "EA",
+    "KI",
+    "EL",
+    "KI",
+    " C",
+    "RE",
+    "- "
+};
+
+#define _CVT(shf, idx) ((shf) << 5 | (idx))
+constexpr u8 pallette_triplet_ids_and_flags[] = {
+    _CVT(0x3, 0x1c), _CVT(0x0, 0x08), _CVT(0x0, 0x12), _CVT(0x5, 0x03), _CVT(0x5, 0x02), _CVT(0x0, 0x07), _CVT(0x4, 0x07), _CVT(0x2, 0x0b),
+    _CVT(0x1, 0x00), _CVT(0x0, 0x12), _CVT(0x3, 0x05), _CVT(0x5, 0x08), _CVT(0x0, 0x16), _CVT(0x5, 0x09), _CVT(0x4, 0x06), _CVT(0x5, 0x11),
+    _CVT(0x3, 0x08), _CVT(0x5, 0x00), _CVT(0x4, 0x07), _CVT(0x3, 0x06), _CVT(0x0, 0x12), _CVT(0x5, 0x01), _CVT(0x1, 0x10), _CVT(0x1, 0x1c),
+    _CVT(0x0, 0x12), _CVT(0x4, 0x05), _CVT(0x0, 0x12), _CVT(0x3, 0x04), _CVT(0x0, 0x1b), _CVT(0x0, 0x07), _CVT(0x0, 0x06), _CVT(0x3, 0x0f),
+    _CVT(0x3, 0x0e), _CVT(0x3, 0x0e), _CVT(0x5, 0x0e), _CVT(0x5, 0x0f), _CVT(0x3, 0x0f), _CVT(0x5, 0x12), _CVT(0x5, 0x0f), _CVT(0x5, 0x12),
+    _CVT(0x5, 0x08), _CVT(0x5, 0x0b), _CVT(0x3, 0x0f), _CVT(0x5, 0x0f), _CVT(0x4, 0x06), _CVT(0x5, 0x0e), _CVT(0x5, 0x02), _CVT(0x5, 0x02),
+    _CVT(0x0, 0x12), _CVT(0x5, 0x0f), _CVT(0x0, 0x13), _CVT(0x0, 0x12), _CVT(0x5, 0x01), _CVT(0x3, 0x0e), _CVT(0x5, 0x0f), _CVT(0x5, 0x0f),
+    _CVT(0x5, 0x0d), _CVT(0x0, 0x06), _CVT(0x2, 0x0c), _CVT(0x3, 0x0e), _CVT(0x5, 0x0f), _CVT(0x5, 0x0f), _CVT(0x0, 0x12), _CVT(0x3, 0x1c),
+    _CVT(0x5, 0x0c), _CVT(0x5, 0x08), _CVT(0x3, 0x0a), _CVT(0x3, 0x0e), _CVT(0x0, 0x13), _CVT(0x5, 0x00), _CVT(0x1, 0x0d), _CVT(0x5, 0x08),
+    _CVT(0x1, 0x0b), _CVT(0x5, 0x0c), _CVT(0x3, 0x04), _CVT(0x5, 0x0c), _CVT(0x3, 0x0d), _CVT(0x4, 0x07), _CVT(0x5, 0x1c), _CVT(0x3, 0x00),
+    _CVT(0x5, 0x14), _CVT(0x0, 0x13), _CVT(0x3, 0x12), _CVT(0x3, 0x1c), _CVT(0x5, 0x15), _CVT(0x5, 0x0e), _CVT(0x5, 0x0e), _CVT(0x3, 0x1c),
+    _CVT(0x3, 0x1c), _CVT(0x3, 0x05), _CVT(0x5, 0x02), _CVT(0x3, 0x0c), _CVT(0x3, 0x04), _CVT(0x4, 0x05),
+};
+#undef _CVT
+
+constexpr u8 triplet_pallette_idxs[][3] = {
+    { 16,   22,    8 },
+    { 17,    4,   13 },
+    { 32,    0,   14 },
+    { 32,    4,   15 },
+    {  4,    4,    7 },
+    {  4,   22,   18 },
+    {  4,   22,   20 },
+    { 28,   22,   24 },
+    { 19,   31,    9 },
+    { 16,   28,   10 },
+    { 30,   30,   11 },
+    {  4,   23,   28 },
+    { 17,   22,    2 },
+    {  4,    0,    2 },
+    {  4,   28,    3 },
+    { 28,    3,    0 },
+    {  3,   28,    4 },
+    { 21,   28,    4 },
+    {  3,   28,    0 },
+    {  4,    3,   27 },
+    { 25,    3,   28 },
+    {  0,   28,    8 },
+    {  5,    5,    5 },
+    {  3,   28,   12 },
+    {  4,    3,   28 },
+    {  0,    0,    1 },
+    { 28,    3,    6 },
+    { 26,   26,   26 },
+    {  4,   28,   29 }
+};
+
+#define rgb(...) rgb555_to_rgb15(__VA_ARGS__)
+constexpr PPU::pallette_t compat_pallettes[] = {
+/* 00 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x15,0x0C), rgb(0x10,0x06,0x00), rgb(0x00,0x00,0x00) },
+/* 01 */  { rgb(0x1F,0x1C,0x18), rgb(0x19,0x13,0x10), rgb(0x10,0x0D,0x05), rgb(0x0B,0x06,0x01) },
+/* 02 */  { rgb(0x1F,0x1F,0x1F), rgb(0x11,0x11,0x1B), rgb(0x0A,0x0A,0x11), rgb(0x00,0x00,0x00) },
+/* 03 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0F,0x1F,0x06), rgb(0x00,0x10,0x00), rgb(0x00,0x00,0x00) }, // 30 starts on the last color here
+/* 04 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x10,0x10), rgb(0x12,0x07,0x07), rgb(0x00,0x00,0x00) },
+/* 05 */  { rgb(0x1F,0x1F,0x1F), rgb(0x14,0x14,0x14), rgb(0x0A,0x0A,0x0A), rgb(0x00,0x00,0x00) },
+/* 06 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x00), rgb(0x0F,0x09,0x00), rgb(0x00,0x00,0x00) },
+/* 07 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0F,0x1F,0x00), rgb(0x16,0x0E,0x00), rgb(0x00,0x00,0x00) },
+/* 08 */  { rgb(0x1F,0x1F,0x1F), rgb(0x15,0x15,0x10), rgb(0x08,0x0E,0x0F), rgb(0x00,0x00,0x00) },
+/* 09 */  { rgb(0x14,0x13,0x1F), rgb(0x1F,0x1F,0x00), rgb(0x00,0x0C,0x00), rgb(0x00,0x00,0x00) },
+/* 10 */  { rgb(0x1F,0x1F,0x19), rgb(0x0C,0x1D,0x1D), rgb(0x13,0x10,0x06), rgb(0x0B,0x0B,0x0B) },
+/* 11 */  { rgb(0x16,0x16,0x1F), rgb(0x1F,0x1F,0x12), rgb(0x15,0x0B,0x08), rgb(0x00,0x00,0x00) },
+/* 12 */  { rgb(0x1F,0x1F,0x14), rgb(0x1F,0x12,0x12), rgb(0x12,0x12,0x1F), rgb(0x00,0x00,0x00) },
+/* 13 */  { rgb(0x1F,0x1F,0x13), rgb(0x12,0x16,0x1F), rgb(0x0C,0x12,0x0E), rgb(0x00,0x07,0x07) },
+/* 14 */  { rgb(0x0D,0x1F,0x00), rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x0A,0x09), rgb(0x00,0x00,0x00) },
+/* 15 */  { rgb(0x0A,0x1B,0x00), rgb(0x1F,0x10,0x00), rgb(0x1F,0x1F,0x00), rgb(0x1F,0x1F,0x1F) },
+/* 16 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x0E,0x00), rgb(0x12,0x08,0x00), rgb(0x00,0x00,0x00) },
+/* 17 */  { rgb(0x1F,0x18,0x08), rgb(0x1F,0x1A,0x00), rgb(0x12,0x07,0x00), rgb(0x09,0x00,0x00) },
+/* 18 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0A,0x1F,0x00), rgb(0x1F,0x08,0x00), rgb(0x00,0x00,0x00) },
+/* 19 */  { rgb(0x1F,0x0C,0x0A), rgb(0x1A,0x00,0x00), rgb(0x0C,0x00,0x00), rgb(0x00,0x00,0x00) },
+/* 20 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x13,0x00), rgb(0x1F,0x00,0x00), rgb(0x00,0x00,0x00) },
+/* 21 */  { rgb(0x1F,0x1F,0x1F), rgb(0x00,0x1F,0x00), rgb(0x06,0x10,0x00), rgb(0x00,0x09,0x00) },
+/* 22 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0B,0x17,0x1F), rgb(0x1F,0x00,0x00), rgb(0x00,0x00,0x1F) }, // 31 starts on the last color here
+/* 23 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x0F), rgb(0x00,0x10,0x1F), rgb(0x1F,0x00,0x00) },
+/* 24 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x00), rgb(0x1F,0x00,0x00), rgb(0x00,0x00,0x00) },
+/* 25 */  { rgb(0x1F,0x1F,0x00), rgb(0x1F,0x00,0x00), rgb(0x0C,0x00,0x00), rgb(0x00,0x00,0x00) },
+/* 26 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x19,0x00), rgb(0x13,0x0C,0x00), rgb(0x00,0x00,0x00) },
+/* 27 */  { rgb(0x00,0x00,0x00), rgb(0x00,0x10,0x10), rgb(0x1F,0x1B,0x00), rgb(0x1F,0x1F,0x1F) }, // 32 starts on the last color here
+/* 28 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0C,0x14,0x1F), rgb(0x00,0x00,0x1F), rgb(0x00,0x00,0x00) },
+/* 29 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0F,0x1F,0x06), rgb(0x00,0x0C,0x18), rgb(0x00,0x00,0x00) },
+
+// straddled pallettes get their own entries
+/* 30 */  { rgb(0x00,0x00,0x00), rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x10,0x10), rgb(0x12,0x07,0x07) },
+/* 31 */  { rgb(0x00,0x00,0x1F), rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x0F), rgb(0x00,0x10,0x1F) },
+/* 32 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x1F), rgb(0x0C,0x14,0x1F), rgb(0x00,0x00,0x1F) },
+
+};
+#undef rgb
+
+PPU::PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled = false) :
+cart(cart),
 mem(mem),
 device(device),
 screen_buffer(scrn_buf) {
     //TODO: demagic
 
-    if(!bootrom_enabled) {
-        nowide::cout << "Starting PPU without bootrom not supported!" << std::endl;
-       new_frame = true;
-       first_frame = true;
-
-       frame_clock_count = 0;
-
-       for(int i = 0; i < 8; i++) {
-           bg_pallettes[i].colors[0] = 0x7F;
-           bg_pallettes[i].colors[1] = 0x7F;
-           bg_pallettes[i].colors[2] = 0x7F;
-           bg_pallettes[i].colors[3] = 0x7F;
-       }
+    // Set object priority defaults, GBC will flip this later for cmg-compat mode if applicable
+    // or we'll do it if there emulating the bootrom
+    if(dev_is_GB(device)) {
+        obj_priority_mode = true;
+    } else if(dev_is_GBC(device)) {
+        obj_priority_mode = false;
     }
+
+    bool cgb_mode = dev_is_GBC(device) && cart->isCGBCart();
+
+    if(!bootrom_enabled) {
+        nowide::cout << "Starting PPU without bootrom not fully supported!" << std::endl;
+
+        if(dev_is_GB(device)) {
+            bg_pallettes[0] = gb_pallette;
+        } else if(dev_is_GBC(device)) {
+            if(cart->isCGBCart()) {
+                for(int i = 0; i < 8; i++) {
+                    bg_pallettes[i] = { 0x7F, 0x7F, 0x7F, 0x7F };
+                }
+            } else {
+                // set dmg-style object priority
+                obj_priority_mode = true;
+
+                /**
+                 * Setup DMG Compatibility Mode pallettes
+                 *
+                 * 🌠 Shit to know 🌠:
+                 *  - TODO: talk about title hashing.
+                 *
+                 *  - The pallettes are organized into triplets(above)
+                 *  - triplets are 3 indexes into the pallette color table.
+                 *  - But because Nintendo®, they also introduced "pallette shuffling flags"
+                 *    - this is why pallette_triplet_id isn't just an ID into the triplet table(or why we can't just do away with the pallette_triplet_ids_and_flags)
+                 *  - in each triplet:
+                 *    - BGP is always the last index
+                 *    - OBP0 is either the first or last index(depending on the first shuffle bit)
+                 *    - OBP1 is any index depending on the value of the second and third bit.
+                 **/
+
+                u8 compat_plt_id = 0;
+                if(cart->cartSupportsGBCCompatMode()) {
+                    compat_plt_id = inverse_title_checksums[cart->computeTitleChecksum()];
+
+                    // if this title has an "ambiguous checksum", we need to further
+                    // differentiate by the 4th character of the cart title
+                    if(bounded(compat_plt_id, AMBIGUOUS_CHK_IDXS_START, AMBIGUOUS_CHK_IDXS_END)) {
+                        char cart_char = cart->getCartTitle()[3];
+
+                        //get the letter list that corresponds to this index and search it for the 4th char in the cart title
+                        const char *found_char = strchr(title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START], cart_char);
+                        //if the char title is in the list
+                        if(found_char != NULL) {
+                            //offset the pallette index based on which index the letter was found.
+                            auto x = title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START] - found_char;
+                            compat_plt_id += x * (AMBIGUOUS_CHK_IDXS_END - AMBIGUOUS_CHK_IDXS_START);
+                        } else {
+                            //otherwise use the default pallette
+                            compat_plt_id = 0;
+                        }
+                    }
+                }
+
+                //decode pallette id
+                u8 pallette_triplet_id = pallette_triplet_ids_and_flags[compat_plt_id];
+                u8 shuffle_flags = pallette_triplet_id >> 5;
+                const u8 (*triplet)[3] = &(triplet_pallette_idxs[pallette_triplet_id & 0x1F]);
+
+                pallette_t OBP0, OBP1;
+                //theres probably a cleaner way to implement this logic but this is easier
+                switch(shuffle_flags & 0x3) {
+                // remember, OBP0 = 0, OBP1 = 1 in both the triplet and the obj_pallette, BGP = 2 in the triplet.
+                case 0b000:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    break;
+                case 0b001:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    break;
+                case 0b010:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[0]]; // same as OBP0
+                    break;
+                case 0b011:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[0]]; // same as OBP0
+                    break;
+                case 0b100:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[1]];
+                    break;
+                case 0b101:
+                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
+                    obj_pallettes[1] = compat_pallettes[(*triplet)[1]];
+                    break;
+                //these cases don't appear be used.
+                case 0b110:
+                case 0b111:
+                default:
+                    nowide::cerr << "compat: unknown case: " << (shuffle_flags & 0x3) << std::endl;
+                }
+
+                //BGP never changes from the 3rd offset
+                bg_pallettes[0] = compat_pallettes[(*triplet)[2]];
+
+                nowide::cout << "compat palletes chosen:" << std::endl;
+                nowide::cout << "BGP: " << bg_pallettes[0].to_rgb24_string() << std::endl;
+                nowide::cout << "OBP0: " << obj_pallettes[0].to_rgb24_string() << std::endl;
+                nowide::cout << "OBP1: " << obj_pallettes[1].to_rgb24_string() << std::endl;
+            }
+        }
+    }
+
+    new_frame = true;
+    first_frame = true;
+
+    frame_clock_count = 0;
 
     wnd_enabled_bit = new Bit::BitWatcher<u8>(&reg(LCDC), LCDC_WINDOW_ENABLED_BIT);
 }
 
 PPU::~PPU() {}
 
-bool PPU::tick() {
-    return ppu_tick();
-}
-
 void PPU::set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data) {
+    /**
+     * (O/B)CPS Register Bit Format
+     * IPPPPCCB
+     *
+     * I - incremenet after write
+     * P - pallette number(out of 16)
+     * C - color number( out of 4)
+     * B - high or low byte of color
+     * */
+
     bool high_byte = Bit::test(*reg, 0);
     u8 color_idx = (*reg & 0x6) >> 1;
     u8 pallette_idx = (*reg & 0x38) >> 3;
@@ -142,6 +393,13 @@ void PPU::write_obj_color_data(u8 data) {
 
 u8 PPU::read_obj_color_data() {
     return get_color_data(&reg(BCPS), bg_pallettes);
+}
+
+void PPU::set_obj_priority(bool obj_has_priority) {
+    //true on DMG and CGB Compat Mode
+    // false on CGB
+    //TODO: we don't currently use this flag. fix that
+    obj_priority_mode = obj_has_priority;
 }
 
 /**
@@ -194,8 +452,8 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
             color.color_idx = tile_idx;
         } else {
             tile_idx <<= 1;
-            color.pallette = const_cast<pallette_t *>(&gb_pallette);
             //TODO: we're special casing the object pallettes for GB. should we fix this?
+            color.pallette = const_cast<pallette_t *>(&gb_pallette);
             color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
         }
 
@@ -457,7 +715,7 @@ void PPU::ppu_tick_vram() {
 
             // if frame is disabled, don't draw pixel data
             if (!frame_disable) {
-                write_5bit_color(screen_buffer + current_byte, bg_color.pallette->colors[bg_color.color_idx]);
+                rgb15_to_rgb555(screen_buffer + current_byte, bg_color.pallette->colors[bg_color.color_idx]);
                 current_byte += 3;
             }
         }
@@ -491,7 +749,7 @@ void PPU::ppu_tick_vram() {
     }
 }
 
-bool PPU::ppu_tick() {
+bool PPU::tick() {
 /**
  * TODO:
  *  - Looks like the GB Die has finally been extracted so eventually it would be wise
@@ -636,12 +894,10 @@ bool PPU::ppu_tick() {
     old_LY  = reg(LY);
     coin_bit_signal = Bit::test(reg(STAT), STAT_COIN_BIT);
 
-    bool
-        mode2_int = (Bit::test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
-        mode1_int = (Bit::test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
-        mode0_int = (Bit::test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK),
-        throw_stat =
-            coin_int                                    ||
+    bool mode2_int  = (Bit::test(reg(STAT), STAT_MODE_2_INT_BIT) && process_step == SCANLINE_OAM),
+         mode1_int  = (Bit::test(reg(STAT), STAT_MODE_1_INT_BIT) && process_step == VBLANK),
+         mode0_int  = (Bit::test(reg(STAT), STAT_MODE_0_INT_BIT) && process_step == HBLANK),
+         throw_stat = coin_int                          ||
             (mode2_int && (mode2_int != old_mode2_int)) ||
             (mode1_int && (mode1_int != old_mode1_int)) ||
             (mode0_int && (mode0_int != old_mode0_int));

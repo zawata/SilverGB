@@ -10,7 +10,7 @@
 #include <wx/glcanvas.h>
 #include <wx/string.h>
 
-#include "cfg.hpp"
+#include "cfg/cfg.hpp"
 
 inline std::string wx_to_utf8(wxString wx) {
 #if wxCHECK_VERSION(3,1,5)
@@ -59,7 +59,7 @@ inline wxGLCanvas *init_wxGLCanvas(wxWindow *parent) {
 #endif
 }
 
-inline void add_to_MRU(Config *config, std::string path) {
+inline void add_to_MRU(std::shared_ptr<Config> config, std::string path) {
     auto& recent_files = config->fileSettings.recent_files;
 
     recent_files.erase(std::remove_if(recent_files.begin(), recent_files.end(), [path](auto const& file) {

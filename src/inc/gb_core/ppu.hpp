@@ -1,16 +1,23 @@
 #pragma once
 
 #include <ratio>
+#include <sstream>
 #include <type_traits>
 #include <vector>
 #include <deque>
 
+#include "gb_core/cart.hpp"
 #include "gb_core/defs.hpp"
 #include "gb_core/mem.hpp"
 
 #include "util/bit.hpp"
 #include "util/ints.hpp"
-#include "util/CircularQueue.hpp"
+#include "util/circular_queue.hpp"
+#include "util/util.hpp"
+
+constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b);
+void rgb15_to_rgb555(u8 *loc, u16 color);
+void rgb15_to_rgb888(u8 *loc, u16 color);
 
 class PPU {
 public:
@@ -31,6 +38,22 @@ public:
 
     typedef struct {
         u16 colors[4];
+
+        std::string to_rgb15_string() {
+            return itoh(colors[0], 4, true) + " " + itoh(colors[1], 4, true) + " " + itoh(colors[2], 4, true) + " " + itoh(colors[3], 4, true);
+        }
+
+        std::string to_rgb24_string() {
+            u8 cc[3];
+            std::stringstream ss;
+            ss << std::hex;
+            for(int i = 0; i < 4; i++) {
+                if(i != 0) ss << ", ";
+                rgb15_to_rgb888(cc, colors[i]);
+                ss << "#" << itoh(cc[0], 2, true, false) << itoh(cc[1], 2, true, false) << itoh(cc[2], 2, true, false);
+            }
+            return ss.str();
+        }
     } pallette_t;
 
     struct fifo_color_t {
@@ -56,7 +79,7 @@ public:
         0x1081, // black
     };
 
-    PPU(Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled);
+    PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled);
     ~PPU();
 
     bool tick();
@@ -72,6 +95,7 @@ public:
     u8 read_bg_color_data();
     void write_obj_color_data(u8 data);
     u8 read_obj_color_data();
+    void set_obj_priority(bool obj_has_priority);
 
     //public because core needs access //TODO: befriend core maybe?
     pallette_t bg_pallettes[8];
@@ -81,6 +105,7 @@ private:
     void set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data);
     u8 get_color_data(u8 *reg, pallette_t *pallette_mem);
 
+    Cartridge *cart;
     Memory *mem;
 
     gb_device_t device;
@@ -144,7 +169,8 @@ private:
     bool
         coin_bit_signal = false,
         pause_bg_fifo = true,
-        skip_sprite_clock = false;
+        skip_sprite_clock = false,
+        obj_priority_mode = true;
 
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map

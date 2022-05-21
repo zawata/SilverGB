@@ -1,6 +1,3 @@
-#if defined(PA_ENABLE_DEBUG_OUTPUT)
-    #undef PA_ENABLE_DEBUG_OUTPUT
-#endif
 #include "portaudio.h"
 
 #include "audio.hpp"

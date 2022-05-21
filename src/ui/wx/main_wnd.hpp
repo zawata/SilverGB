@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <memory>
 
 #include <Corrade/Containers/Reference.h>
 
@@ -23,7 +24,6 @@
 
 #include <Magnum/Shaders/Flat.h>
 
-#include "util/file.hpp"
 
 // https://wiki.wxwidgets.org/Troubleshooting_building_wxWidgets_using_Microsoft_VC#MSVC_8.0_.282005.29_Windows_XP_Manifest_Build_Problems
 #define wxUSE_NO_MANIFEST 1
@@ -41,7 +41,11 @@
 #endif
 
 #include "gb_core/core.hpp"
-#include "util/CircularQueue.hpp"
+#include "gb_core/defs.hpp"
+#include "util/circular_queue.hpp"
+#include "util/file.hpp"
+
+#include "cfg/cfg.hpp"
 
 /**
  * Class Forward Declarations
@@ -91,19 +95,20 @@ public:
 
 private:
     wxGLCanvas *glcanvas = nullptr;
-    GB_Core *core = nullptr;
+    Silver::Core *core = nullptr;
 
     RollingFrameTimeBuffer *frame_times = nullptr;
     Silver::File *rom_file = nullptr;
     Silver::File *bios_file = nullptr;
 
-    GL::Texture2D tex;
-    Shaders::Flat2D shader;
+    GL::Texture2D *tex = nullptr;
+    Shaders::Flat2D *shader = nullptr;
 
     std::chrono::high_resolution_clock::time_point prev_tp;
 
     ExecMode exec_mode = execMode_NORMAL;
     DisplayMode display_mode = displayMode_FIT;
+    gb_device_t dev = device_GB;
 
 public:
     Silver_ExecutionManager(wxGLCanvas *glcanvas);
@@ -113,6 +118,7 @@ public:
     void setBIOS(std::string filename);
 
     void setExecMode(ExecMode mode);
+    void setDevice(gb_device_t dev);
     void setDisplayMode(DisplayMode mode);
 
     void startCore();
@@ -139,6 +145,7 @@ public:
     void setBIOS(wxCommandEvent &event);
 
     void setExecMode(wxCommandEvent &event);
+    void setDevice(wxCommandEvent& event);
     void setDisplayMode(wxCommandEvent &event);
     void setScaledSize(wxCommandEvent& event);
 
@@ -149,10 +156,11 @@ public:
     void OnAbout(wxCommandEvent& event);
 
     void onIdle(wxIdleEvent& evt);
-
+    void onResize(wxSizeEvent &);
     void onPaint(wxPaintEvent &);
 
 private:
+    std::shared_ptr<Config> config;
     wxGLCanvas *glcanvas = nullptr;
     wxGLContext *wx_gl_ctxt = nullptr;
     Silver_ExecutionManager *exec_mngr = nullptr;
@@ -161,43 +169,3 @@ private:
 
     wxDECLARE_EVENT_TABLE();
 };
-
-
-// class Silver_renderPane : public wxGLCanvas {
-//     wxGLContext*	m_context = nullptr;
-
-//     GLuint
-//         screen_texture,
-//         screen_texture_fbo;
-//     bool draw_screen_fbo;
-
-
-// public:
-//     Silver_renderPane(wxFrame *parent, const wxGLAttributes& canvasAttrs);
-//     virtual ~Silver_renderPane();
-
-//     void initGL();
-
-//     void onResize(wxSizeEvent& evt);
-//     void onRender(wxPaintEvent& evt);
-
-//     GLuint getScreenTextureID();
-//     GLuint getScreenTextureFBOID();
-
-//     void setDrawScreenFBO(bool draw);
-
-//     int getWidth();
-//     int getHeight();
-
-//     // events
-//     void mouseMoved(wxMouseEvent& event);
-//     void mouseDown(wxMouseEvent& event);
-//     void mouseWheelMoved(wxMouseEvent& event);
-//     void mouseReleased(wxMouseEvent& event);
-//     void rightClick(wxMouseEvent& event);
-//     void mouseLeftWindow(wxMouseEvent& event);
-//     void keyPressed(wxKeyEvent& event);
-//     void keyReleased(wxKeyEvent& event);
-
-//     DECLARE_EVENT_TABLE()
-// };

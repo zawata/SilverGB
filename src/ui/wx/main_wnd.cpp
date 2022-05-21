@@ -25,51 +25,10 @@
 #include "gb_core/defs.hpp"
 
 #include "main_wnd.hpp"
-#include "cfg.hpp"
+#include "main_menu.hpp"
+
+#include "cfg/cfg.hpp"
 #include "helpers.hpp"
-
-Config *config;
-
-enum {
-    #define wxID_next() (wxID_HIGHEST + __LINE__)
-
-    id_File_LoadROM = wxID_next(),
-    id_File_Recents_NoRecentFiles = wxID_next(),
-
-    id_File_Recents_FileIdx0 = wxID_next(),
-    id_File_Recents_FileIdx1 = wxID_next(),
-    id_File_Recents_FileIdx2 = wxID_next(),
-    id_File_Recents_FileIdx3 = wxID_next(),
-    id_File_Recents_FileIdx4 = wxID_next(),
-    id_File_Recents_FileIdx5 = wxID_next(),
-    id_File_Recents_FileIdx6 = wxID_next(),
-    id_File_Recents_FileIdx7 = wxID_next(),
-    id_File_Recents_FileIdx8 = wxID_next(),
-    id_File_Recents_FileIdx9 = wxID_next(),
-
-    id_File_Quit = wxID_EXIT,
-
-    id_Emulation_SetBIOS = wxID_next(),
-    id_Emulation_ExecMode_Normal = wxID_next(),
-    id_Emulation_ExecMode_StepClk = wxID_next(),
-    id_Emulation_ExecMode_StepInstr = wxID_next(),
-    id_Emulation_ExecMode_StepFrame = wxID_next(),
-    id_Emulation_step = wxID_next(),
-
-    id_View_DisplayMode_Stretch = wxID_next(),
-    id_View_DisplayMode_Fit = wxID_next(),
-    id_View_DisplayMode_Center = wxID_next(),
-    id_View_Size_1x1 = wxID_next(),
-    id_View_Size_2x2 = wxID_next(),
-    id_View_Size_3x3 = wxID_next(),
-    id_View_Size_4x4 = wxID_next(),
-    id_View_Size_5x5 = wxID_next(),
-    id_View_Size_6x6 = wxID_next(),
-    id_View_Size_7x7 = wxID_next(),
-    id_View_Size_8x8 = wxID_next(),
-
-    id_Help_About = wxID_ABOUT,
-};
 
 wxBEGIN_EVENT_TABLE(Silver_mainFrame, wxFrame)
     EVT_MENU(id_File_LoadROM, Silver_mainFrame::loadROM)
@@ -79,16 +38,20 @@ wxBEGIN_EVENT_TABLE(Silver_mainFrame, wxFrame)
 
     EVT_MENU(id_Emulation_SetBIOS, Silver_mainFrame::setBIOS)
 
-    EVT_MENU(id_Emulation_ExecMode_Normal, Silver_mainFrame::setExecMode)
-    EVT_MENU(id_Emulation_ExecMode_StepClk, Silver_mainFrame::setExecMode)
+    EVT_MENU(id_Emulation_Device_Gameboy,       Silver_mainFrame::setDevice)
+    EVT_MENU(id_Emulation_Device_Super_Gameboy, Silver_mainFrame::setDevice)
+    EVT_MENU(id_Emulation_Device_Gameboy_Color, Silver_mainFrame::setDevice)
+
+    EVT_MENU(id_Emulation_ExecMode_Normal,    Silver_mainFrame::setExecMode)
+    EVT_MENU(id_Emulation_ExecMode_StepClk,   Silver_mainFrame::setExecMode)
     EVT_MENU(id_Emulation_ExecMode_StepInstr, Silver_mainFrame::setExecMode)
     EVT_MENU(id_Emulation_ExecMode_StepFrame, Silver_mainFrame::setExecMode)
 
     EVT_MENU(id_Emulation_step, Silver_mainFrame::stepExecution)
 
     EVT_MENU(id_View_DisplayMode_Stretch, Silver_mainFrame::setDisplayMode)
-    EVT_MENU(id_View_DisplayMode_Fit, Silver_mainFrame::setDisplayMode)
-    EVT_MENU(id_View_DisplayMode_Center, Silver_mainFrame::setDisplayMode)
+    EVT_MENU(id_View_DisplayMode_Fit,     Silver_mainFrame::setDisplayMode)
+    EVT_MENU(id_View_DisplayMode_Center,  Silver_mainFrame::setDisplayMode)
 
     EVT_MENU_RANGE(id_View_Size_1x1, id_View_Size_8x8, Silver_mainFrame::setScaledSize)
 
@@ -96,161 +59,6 @@ wxBEGIN_EVENT_TABLE(Silver_mainFrame, wxFrame)
 
     EVT_IDLE(Silver_mainFrame::onIdle)
 wxEND_EVENT_TABLE()
-
-
-class MenuManager {
-    Config *config;
-
-    static constexpr const char * file_label = "File";
-    wxMenu *generateFileMenu() {
-        wxMenu *fileMenu = new wxMenu(); {
-            fileMenu->Append(id_File_LoadROM,  "Load Rom\tCtrl-F");
-            wxMenu *fileRecentsMenu = new wxMenu(); {
-                if(config->fileSettings.recent_files.empty()) {
-                    fileRecentsMenu->Append(id_File_Recents_NoRecentFiles, "No Recent Files");
-                    fileRecentsMenu->Enable(id_File_Recents_NoRecentFiles, false);
-                } else {
-                    int cntr = 0;
-                    for(auto const& file : config->fileSettings.recent_files) {
-                        fileRecentsMenu->Append(id_File_Recents_FileIdx0 + cntr++, wxFileName(file).GetFullName(), file);
-                    }
-                }
-            }
-            fileMenu->AppendSubMenu(fileRecentsMenu, "Recent Files");
-
-            fileMenu->Append(id_File_Quit, "Exit\tCtrl-W");
-        }
-
-        return fileMenu;
-    }
-
-    static constexpr const char * emulation_label = "Emulation";
-    wxMenu *generateEmulationMenu() {
-        wxMenu *emuMenu = new wxMenu(); {
-            emuMenu->AppendCheckItem(id_Emulation_SetBIOS, "Set BIOS");
-            wxMenu *execModeMenu = new wxMenu(); {
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_Normal,    "Normal");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepClk,   "Step Clock Cycle");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepInstr, "Step Instruction");
-                execModeMenu->AppendRadioItem(id_Emulation_ExecMode_StepFrame, "Step Frame");
-
-                execModeMenu->Check(id_Emulation_ExecMode_Normal, true );
-            }
-            emuMenu->AppendSubMenu(execModeMenu, "Execution Mode", "Set Execution Mode");
-
-            emuMenu->Append(id_Emulation_step, "Step\tCtrl-T", "Step According to Execution Mode");
-
-            if(!config->emulationSettings.bios_file.empty()) {
-                emuMenu->Check(id_Emulation_SetBIOS, true);
-                emuMenu->Enable(id_Emulation_SetBIOS, false);
-            }
-        }
-
-        return emuMenu;
-    }
-
-    static constexpr const char * view_label = "View";
-    wxMenu *generateViewMenu() {
-        wxMenu *viewMenu = new wxMenu(); {
-            wxMenu *dispModeMenu = new wxMenu(); {
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Fit,     "Fit");
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Stretch, "Stretch");
-                dispModeMenu->AppendRadioItem(id_View_DisplayMode_Center,  "Fixed");
-
-                dispModeMenu->Check(id_View_DisplayMode_Fit, true );
-            }
-            viewMenu->AppendSubMenu(dispModeMenu, "Display Mode");
-
-            wxMenu *sizeMenu = new wxMenu(); {
-                sizeMenu->AppendRadioItem(id_View_Size_1x1, "x1");
-                sizeMenu->AppendRadioItem(id_View_Size_2x2, "x2");
-                sizeMenu->AppendRadioItem(id_View_Size_3x3, "x3");
-                sizeMenu->AppendRadioItem(id_View_Size_4x4, "x4");
-                sizeMenu->AppendRadioItem(id_View_Size_5x5, "x5");
-                sizeMenu->AppendRadioItem(id_View_Size_6x6, "x6");
-                sizeMenu->AppendRadioItem(id_View_Size_7x7, "x7");
-                sizeMenu->AppendRadioItem(id_View_Size_8x8, "x8");
-
-                auto size = config->viewSettings.size;
-                sizeMenu->Check(id_View_Size_1x1 + size - 1, true );
-            }
-            viewMenu->AppendSubMenu(sizeMenu, "Size");
-        }
-
-        return viewMenu;
-    }
-
-    static constexpr const char * help_label = "Help";
-    wxMenu *generateHelpMenu() {
-        wxMenu *helpMenu = new wxMenu(); {
-            helpMenu->Append(id_Help_About, "About\tF1", "Show about dialog");
-        }
-
-        return helpMenu;
-    }
-
-public:
-    MenuManager(Config *config): config(config) {}
-
-    void regenerateFileMenu(wxMenuBar *menuBar) {
-        int idx = menuBar->FindMenu(file_label);
-
-        if(idx != wxNOT_FOUND) {
-            wxMenu *menu = menuBar->Replace(idx, generateFileMenu(), file_label);
-            delete menu;
-            return;
-        }
-
-        assert(false);
-    }
-
-    void regenerateEmulationMenu(wxMenuBar *menuBar) {
-        int idx = menuBar->FindMenu(emulation_label);
-
-        if(idx != wxNOT_FOUND) {
-            wxMenu *menu = menuBar->Replace(idx, generateEmulationMenu(), emulation_label);
-            delete menu;
-            return;
-        }
-
-        assert(false);
-    }
-
-    void regenerateViewMenu(wxMenuBar *menuBar) {
-        int idx = menuBar->FindMenu(view_label);
-
-        if(idx != wxNOT_FOUND) {
-            wxMenu *menu = menuBar->Replace(idx, generateViewMenu(), view_label);
-            delete menu;
-            return;
-        }
-
-        assert(false);
-    }
-
-    void regenerateHelpMenu(wxMenuBar *menuBar) {
-        int idx = menuBar->FindMenu(help_label);
-
-        if(idx != wxNOT_FOUND) {
-            wxMenu *menu = menuBar->Replace(idx, generateHelpMenu(), help_label);
-            delete menu;
-            return;
-        }
-
-        assert(false);
-    }
-
-    wxMenuBar *generateMenuBar() {
-        wxMenuBar *menuBar = new wxMenuBar();
-
-        menuBar->Append(generateFileMenu(), "File");
-        menuBar->Append(generateEmulationMenu(), "Emulation");
-        menuBar->Append(generateViewMenu(), "View");
-        menuBar->Append(generateHelpMenu(), "Help");
-
-        return menuBar;
-    }
-};
 
 /*********************************************************************
  * SilverGB Application
@@ -265,15 +73,9 @@ wxIMPLEMENT_APP_CONSOLE(SilverGBApp);
 #endif
 
 
-
 bool SilverGBApp::OnInit() {
-    if ( !wxApp::OnInit() )
+    if (!wxApp::OnInit())
         return false;
-
-    nowide::cout << "🎉" << std::endl;
-
-    //TODO: this needs to be moved to the frame
-    config = new Config();
 
     Silver_mainFrame* frame = new Silver_mainFrame("SilverGB");
 
@@ -287,11 +89,11 @@ Silver_mainFrame::Silver_mainFrame(const wxString& title) :
     wxFrame{nullptr, wxID_ANY, title},
     mgnm_ctxt{Magnum::NoCreate},
     glcanvas(init_wxGLCanvas((wxWindow *)this)),
-    wx_gl_ctxt(new wxGLContext{glcanvas})
+    wx_gl_ctxt(new wxGLContext{glcanvas}),
+    config(std::make_shared<Config>())
 {
-    Show(true);
-    glcanvas->SetCurrent(*wx_gl_ctxt);
-    mgnm_ctxt.create();
+    SetMenuBar(MenuManager(config).generateMenuBar());
+    SetIcon(wxIcon(wxICON(silver_icon)));
 
     wxBoxSizer* bSizer = new wxBoxSizer{wxVERTICAL};
     bSizer->Add(glcanvas, 1, wxALL|wxEXPAND);
@@ -300,16 +102,15 @@ Silver_mainFrame::Silver_mainFrame(const wxString& title) :
     bSizer->Fit(this);
 
     glcanvas->Connect(wxEVT_PAINT, wxPaintEventHandler(Silver_mainFrame::onPaint), nullptr, this);
-    glcanvas->Refresh(); //force a paint event to init GL
+    glcanvas->Connect(wxEVT_SIZE, wxSizeEventHandler(Silver_mainFrame::onResize), nullptr, this);
+
+    Show(true);
 
     exec_mngr = new Silver_ExecutionManager(glcanvas);
 
-    SetMenuBar(MenuManager(config).generateMenuBar());
-    SetIcon(wxIcon(wxICON(silver_icon)));
-
     // 2 is the default scaling factor
-    SetClientSize(wxSize(GB_Core::native_width, GB_Core::native_height) * 2);
-    SetMinClientSize(wxSize(GB_Core::native_width, GB_Core::native_height));\
+    SetClientSize(wxSize(Silver::Core::native_width, Silver::Core::native_height) * 2);
+    SetMinClientSize(wxSize(Silver::Core::native_width, Silver::Core::native_height));\
     Centre(wxBOTH);
 }
 
@@ -319,7 +120,8 @@ void Silver_mainFrame::loadROM(wxCommandEvent& event) {
             wxT("Open ROM file"),
             "",
             "",
-            wxT("Gameboy ROM files (*.gb;*.bin)|*.gb;*.bin"),
+            wxT("Gameboy ROM files (*.gb;*.bin)|*.gb;*.bin|"
+                "Gameboy Color ROM files (*.gbc;*.bin)|*.gbc;*.bin"),
             wxFD_OPEN|wxFD_FILE_MUST_EXIST);
     if (openFileDialog.ShowModal() != wxID_OK)
         return;
@@ -382,6 +184,22 @@ void Silver_mainFrame::setExecMode(wxCommandEvent& event) {
     assert(false);
 }
 
+void Silver_mainFrame::setDevice(wxCommandEvent& event) {
+    switch(event.GetId()) {
+    case id_Emulation_Device_Gameboy:
+        exec_mngr->setDevice(gb_device_t::device_GB);
+        return;
+    case id_Emulation_Device_Super_Gameboy:
+        exec_mngr->setDevice(gb_device_t::device_SGB);
+        return;
+    case id_Emulation_Device_Gameboy_Color:
+        exec_mngr->setDevice(gb_device_t::device_GBC);
+        return;
+        return;
+    }
+    assert(false);
+}
+
 void Silver_mainFrame::setDisplayMode(wxCommandEvent& event) {
     switch(event.GetId()) {
     case id_View_DisplayMode_Stretch:
@@ -423,7 +241,7 @@ void Silver_mainFrame::setScaledSize(wxCommandEvent& event) {
         break;
     }
 
-    SetClientSize(wxSize(GB_Core::native_width,GB_Core::native_height) * scaling_factor);
+    SetClientSize(wxSize(Silver::Core::native_width,Silver::Core::native_height) * scaling_factor);
 }
 
 void Silver_mainFrame::stepExecution(wxCommandEvent& event) {
@@ -447,7 +265,29 @@ void Silver_mainFrame::onIdle(wxIdleEvent& evt) {
     if(exec_mngr) evt.RequestMore(exec_mngr->execLoop());
 }
 
+void Silver_mainFrame::onResize(wxSizeEvent&) {
+    //https://github.com/wxWidgets/wxWidgets/issues/16193
+#if 0
+    nowide::cout << "sizing" << std::endl;
+    nowide::cout << "window " << (IsShown() ? "shown" : "not shown") << std::endl;
+    nowide::cout << "window " << (IsShownOnScreen() ? "shown on screen" : "not shown on screen") << std::endl;
+    nowide::cout << "canvas " << (glcanvas->IsShown() ? "shown" : "not shown") << std::endl;
+    nowide::cout << "canvas " << (glcanvas->IsShownOnScreen() ? "shown on screen" : "not shown on screen") << std::endl;
+#endif
+
+    static bool initialized = false;
+    if(!initialized && glcanvas->IsShownOnScreen()) {
+        glcanvas->SetCurrent(*wx_gl_ctxt);
+        mgnm_ctxt.create();
+        Refresh(false); // force a paint event to init opengl
+        initialized = true;
+    }
+}
+
 void Silver_mainFrame::onPaint(wxPaintEvent&) {
+#if 0
+    // nowide::cout << "painting" << std::endl;
+#endif
     if(exec_mngr) exec_mngr->onGLDraw();
 }
 
@@ -470,6 +310,7 @@ Silver_ExecutionManager::~Silver_ExecutionManager() {
 void Silver_ExecutionManager::setROM(std::string filename)  { rom_file = Silver::File::openFile(filename); }
 void Silver_ExecutionManager::setBIOS(std::string filename) { bios_file = Silver::File::openFile(filename); }
 void Silver_ExecutionManager::setExecMode(ExecMode mode) { std::wcout << "set execMode: " << (this->exec_mode = mode) << std::endl; }
+void Silver_ExecutionManager::setDevice(gb_device_t dev) { this->dev = dev; }
 void Silver_ExecutionManager::setDisplayMode(DisplayMode mode) { this->display_mode = mode; }
 
 void Silver_ExecutionManager::startCore() {
@@ -480,7 +321,7 @@ void Silver_ExecutionManager::startCore() {
         return;
     }
 
-    core = new GB_Core(rom_file, bios_file);
+    core = new Silver::Core(rom_file, bios_file, this->dev);
 }
 
 bool Silver_ExecutionManager::execLoop() {
@@ -525,7 +366,7 @@ bool Silver_ExecutionManager::execLoop() {
         screen_data.resize(GB_S_P_SZ);
         memcpy(screen_data.data(), core->getScreenBuffer(), GB_S_P_SZ);
 
-        tex.setSubImage(
+        tex->setSubImage(
                 0,
                 {0,0},
                 GL::BufferImage2D(
@@ -561,7 +402,7 @@ void Silver_ExecutionManager::execStep() {
     using namespace Magnum;
     using namespace Magnum::GL;
     Containers::ArrayView<const void> screen_view{core->getScreenBuffer(), GB_S_P_SZ};
-    tex.setSubImage(
+    tex->setSubImage(
             0,
             {0,0},
             GL::BufferImage2D(
@@ -575,15 +416,20 @@ void Silver_ExecutionManager::execStep() {
 }
 
 void Silver_ExecutionManager::onGLDraw() {
-    //initialize on firs draw
+    // initialize texture/shaders on first draw because the context needs to be made
+    // current first and who the fuck knows when that happens.
+    //
+    // TODO: not sure how likely it is that the paint even will fire before the resize event but
+    // if that happens we're probably gonna crash. that being said I'm not sure how to check if
+    // we've got a graphics context right here so just...hope we don't crash?
     static bool initialized = false;
     if(!initialized) {
         initialized = true;
 
-        shader = Shaders::Flat2D(Shaders::Flat3D::Flag::Textured);
-        tex = GL::Texture2D();
+        shader = new Shaders::Flat2D(Shaders::Flat3D::Flag::Textured);
+        tex = new GL::Texture2D();
 
-        tex.setWrapping(GL::SamplerWrapping::ClampToEdge)
+        tex->setWrapping(GL::SamplerWrapping::ClampToEdge)
                 .setMagnificationFilter(GL::SamplerFilter::Linear)
                 .setMinificationFilter(GL::SamplerFilter::Linear)
                 .setStorage(1, GL::TextureFormat::RGB8, Vector2i(GB_S_W, GB_S_H));
@@ -594,7 +440,7 @@ void Silver_ExecutionManager::onGLDraw() {
             .setViewport({{0,0},{glcanvas->GetSize().x, glcanvas->GetSize().y}});
 
     /*******************************
-     * Drawing this out because I keep forgeting it
+     * Drawing this out because I keep forgetting it
 
     Vertex Coordinate System:
 
@@ -640,7 +486,7 @@ void Silver_ExecutionManager::onGLDraw() {
                     Shaders::Flat2D::Position{},
                     Shaders::Flat2D::TextureCoordinates{});
 
-    shader.bindTexture(tex).draw(std::move(mesh));
+    shader->bindTexture(*tex).draw(std::move(mesh));
 
     glcanvas->SwapBuffers();
 }

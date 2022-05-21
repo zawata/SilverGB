@@ -202,20 +202,20 @@ bool CPU::single_tick() {
         u8 int_pc = 0, int_val = 0;
         bool int_set = false;
 
-        Interrupt curr_interupts = check_interrupts();
-        if(curr_interupts & Interrupt::VBLANK_INT) {
+        Interrupt curr_interrupts = check_interrupts();
+        if(curr_interrupts & Interrupt::VBLANK_INT) {
             int_pc = VBLANK_INT_OFFSET;
             int_val = Interrupt::VBLANK_INT;
-        } else if(curr_interupts & Interrupt::LCD_STAT_INT) {
+        } else if(curr_interrupts & Interrupt::LCD_STAT_INT) {
             int_pc = LCD_STAT_INT_OFFSET;
             int_val = Interrupt::LCD_STAT_INT;
-        } else if(curr_interupts & Interrupt::TIMER_INT) {
+        } else if(curr_interrupts & Interrupt::TIMER_INT) {
             int_pc = TIMER_INT_OFFSET;
             int_val = Interrupt::TIMER_INT;
-        } else if(curr_interupts & Interrupt::SERIAL_INT) {
+        } else if(curr_interrupts & Interrupt::SERIAL_INT) {
             int_pc = SERIAL_INT_OFFSET;
             int_val = Interrupt::SERIAL_INT;
-        } else if(curr_interupts & Interrupt::JOYPAD_INT) {
+        } else if(curr_interrupts & Interrupt::JOYPAD_INT) {
             int_pc = JOYPAD_INT_OFFSET;
             int_val = Interrupt::JOYPAD_INT;
         }

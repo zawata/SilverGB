@@ -154,8 +154,8 @@ namespace Cartridge_Constants {
 
     static const u16 CGB_FLAG                       = 0x0143;
 
-    static const u16 SGB_LICENSEE_CODE_BYTE1_OFFSET = 0x0144;
-    static const u16 SGB_LICENSEE_CODE_BYTE2_OFFSET = 0x0145;
+    static const u16 NEW_LICENSEE_CODE_BYTE1_OFFSET = 0x0144;
+    static const u16 NEW_LICENSEE_CODE_BYTE2_OFFSET = 0x0145;
 
     static const u16 SGB_FLAG                       = 0x0146;
 
@@ -165,7 +165,7 @@ namespace Cartridge_Constants {
 
     static const u16 DESTINATION_OFFSET             = 0x014A;
 
-    static const u16 GB_LICENSEE_CODE_OFFSET        = 0x014B;
+    static const u16 OLD_LICENSEE_CODE_OFFSET       = 0x014B;
 
     static const u16 VERSION_NUMBER                 = 0x014C;
 
@@ -224,7 +224,15 @@ public:
     bool isCGBCart() const;
     bool isCGBOnlyCart() const;
 
+    u8 getOldLicenseeCode() const;
+    u16 getNewLicenseeCode() const;
+
     bool cartSupportsSGB() const;
+    u8 cartSupportsGBCCompatMode() const;
+
+    u8 computeTitleChecksum() const;
+    u8 computeHeaderChecksum() const;
+    u16 computeGlobalChecksum() const;
 
     bool checkHeaderChecksum() const;
     bool checkGlobalChecksum() const;

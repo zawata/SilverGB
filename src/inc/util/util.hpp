@@ -27,7 +27,7 @@ __force_inline bool bounded(T value, L a, L b) {
 }
 
 template< typename T >
-std::string itoh( T i, u8 zp = 0, bool caps = false ) {
+std::string itoh( T i, u8 zp = 0, bool caps = false, bool include_hex_delim = true) {
     static_assert(std::is_integral<T>::value, "");
 
     std::stringstream stream;
@@ -35,7 +35,7 @@ std::string itoh( T i, u8 zp = 0, bool caps = false ) {
         stream << std::uppercase;
     }
 
-    stream << "0x" << std::setfill('0') << std::setw(zp ? zp : sizeof(T)*2) << std::hex << (s64)i;
+    stream << (include_hex_delim ? "0x" : "") << std::setfill('0') << std::setw(zp ? zp : sizeof(T)*2) << std::hex << (s64)i;
   return stream.str();
 }
 

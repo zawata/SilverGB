@@ -314,6 +314,7 @@ int main(int argc, char *argv[])
 
     // Release resources
     delete bios_file;
+    delete audio;
     SDL_GL_DeleteContext(context);
     SDL_Quit();
 

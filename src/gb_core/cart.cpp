@@ -1,4 +1,5 @@
 #include <cassert>
+#include <numeric>
 #include <vector>
 
 #include <nowide/iostream.hpp>
@@ -155,7 +156,6 @@ Cartridge_Constants::cart_type_t Cartridge::getCartType() const {
     return cart_type;
 }
 
-
 Cartridge_Constants::rom_size_t Cartridge::getROMSize() const {
     using namespace Cartridge_Constants;
 
@@ -220,25 +220,68 @@ bool Cartridge::isCGBOnlyCart() const {
     return rom_file->getByte(Cartridge_Constants::CGB_FLAG) == 0xC0;
 }
 
-bool Cartridge::cartSupportsSGB() const {
-    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03 &&
-           rom_file->getByte(Cartridge_Constants::GB_LICENSEE_CODE_OFFSET) == 0x33;
+u8 Cartridge::getOldLicenseeCode() const {
+    return rom_file->getByte(Cartridge_Constants::OLD_LICENSEE_CODE_OFFSET);
 }
 
+u16 Cartridge::getNewLicenseeCode() const {
+    return (rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE1_OFFSET) << 8) |
+            rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE2_OFFSET);
+}
 
-bool Cartridge::checkHeaderChecksum() const {
+bool Cartridge::cartSupportsSGB() const {
+    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03 &&
+           rom_file->getByte(Cartridge_Constants::OLD_LICENSEE_CODE_OFFSET) == 0x33;
+}
+
+u8 Cartridge::cartSupportsGBCCompatMode() const {
+    u8 old_licensee_code = rom_file->getByte(Cartridge_Constants::OLD_LICENSEE_CODE_OFFSET);
+    if(old_licensee_code == 0x33) {
+        return rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE1_OFFSET) == '0' && // 0x30
+               rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE2_OFFSET) == '1';   // 0x31
+    } else {
+        return old_licensee_code == 1;
+    }
+}
+
+u8 Cartridge::computeTitleChecksum() const {
+    return std::accumulate(
+        rom_file->begin() + 0x134,
+        rom_file->begin() + 0x143,
+        0_u8);
+}
+
+u8 Cartridge::computeHeaderChecksum() const {
     u16 x = 0;
     for(u16 i = 0x134; i <= 0x14C; i++) {
         x = x - rom_file->getByte(i) - 1;
     }
 
-    return (x & 0x00FF_u16) == rom_file->getByte(Cartridge_Constants::HEADER_CHECKSUM_OFFSET);
+    return x & 0x00FF_u16;
+}
+
+u16 Cartridge::computeGlobalChecksum() const {
+    //TODO: I didn't actually test this :)
+    u16 i = std::accumulate<>(
+        rom_file->begin(),
+        rom_file->end(),
+        0_u16);
+
+    i -= rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_HI_OFFSET);
+    i -= rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_LO_OFFSET);
+
+    return i;
+}
+
+bool Cartridge::checkHeaderChecksum() const {
+    return computeHeaderChecksum() == rom_file->getByte(Cartridge_Constants::HEADER_CHECKSUM_OFFSET);
 }
 
 bool Cartridge::checkGlobalChecksum() const {
-    //return false until I care enough to figure out how this is calculated.
-    // real gameboy hardware doesn't even use this.
-    return false;
+    u16 global_checksum = (rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_HI_OFFSET) << 8) |
+                           rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_LO_OFFSET);
+
+    return computeHeaderChecksum() == global_checksum;
 }
 
 //forward IO calls to controller interface

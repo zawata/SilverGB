@@ -11,8 +11,35 @@
 
 namespace Silver {
 
-class File {
+class File;
+
+class FileIterator {
+friend File;
+    File* f;
+    u32 o;
+    FileIterator(File *f, u32 o);
 public:
+    ~FileIterator();
+
+    FileIterator &operator ++();
+    FileIterator operator ++(int);
+    FileIterator operator +(u32 i) const;
+
+    FileIterator &operator --();
+    FileIterator operator --(int);
+    FileIterator operator -(u32 i) const;
+
+    u8 operator *();
+
+    bool operator ==(FileIterator const&b) const;
+    bool operator !=(FileIterator const&b) const;
+};
+
+class File {
+friend FileIterator;
+public:
+    using iterator = FileIterator;
+
     ~File();
 
     static File *openFile(std::string filename, bool write=false, bool trunc=false);
@@ -34,6 +61,9 @@ public:
 
     void setByte(u32 offset, u8 data);
     void setBuffer(u32 offset, void *buf, size_t len);
+
+    FileIterator begin();
+    FileIterator end();
 
     std::string getFilename();
 

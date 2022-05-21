@@ -82,6 +82,11 @@ bootrom_mode(bios_file != nullptr) {
         mem->registers.SVBK =  default_reg_values[53][get_default_idx(device)];
         mem->registers.IE =    default_reg_values[54][get_default_idx(device)];
     } else {
+        // I know these are supposed to be initialized to something other than 0 on startup,
+        // but some of them care causing crashes so zero them for now.
+        // TODO: figuire out the best init values.
+        mem->registers = { 0 };
+        apu->registers = { 0 };
         bios_file->toVector(bootrom_buffer);
     }
 
@@ -327,6 +332,9 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         return;
     case OCPD_REG:
         ppu->write_obj_color_data(data);
+        return;
+    case OPRI_REG:
+        ppu->set_obj_priority(data);
         return;
     case 0x72:
         //TODO

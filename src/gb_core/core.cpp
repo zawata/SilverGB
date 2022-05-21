@@ -52,7 +52,7 @@ device(device) {
     mem = new Memory(device);
 
     apu = new APU(bootrom != nullptr);
-    ppu = new PPU(mem, screen_buffer, device, bootrom != nullptr);
+    ppu = new PPU(cart, mem, screen_buffer, device, bootrom != nullptr);
     joy = new Joypad(mem);
 
     io = new IO_Bus(mem, apu, ppu, joy, cart, device, bootrom);

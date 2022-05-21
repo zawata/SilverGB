@@ -24,7 +24,8 @@ find_path(LIBNOP_INCLUDE_DIRS "nop/protocol.h")
 
 target_include_directories(gb_main_wx
 		PRIVATE ${LIBNOP_INCLUDE_DIRS}
-		PRIVATE ${wxWidgets_INCLUDE_DIRS})
+		PRIVATE ${wxWidgets_INCLUDE_DIRS}
+		PRIVATE "../common")
 target_compile_definitions(gb_main_wx
 		PRIVATE ${wxWidgets_DEFINITIONS})
 target_compile_options(gb_main_wx

@@ -7,6 +7,19 @@
 
 namespace Silver {
 
+FileIterator::FileIterator(File *f, u32 o): f(f), o(o) {}
+FileIterator::~FileIterator() {}
+
+FileIterator &FileIterator::operator ++()                           { o++; return *this; }
+FileIterator  FileIterator::operator ++(int)                        { return FileIterator(f, o++); }
+FileIterator  FileIterator::operator +(u32 i) const                 { return FileIterator(f, o + i); }
+FileIterator &FileIterator::operator --()                           { o--; return *this; }
+FileIterator  FileIterator::operator --(int)                        { return FileIterator(f, o--); }
+FileIterator  FileIterator::operator -(u32 i) const                 { return FileIterator(f, o - i); }
+u8            FileIterator::operator *()                            { return f->getByte(o); }
+bool          FileIterator::operator ==(FileIterator const&b) const { return f == b.f && o == b.o; }
+bool          FileIterator::operator !=(FileIterator const&b) const { return !(*this == b); }
+
 File::File(std::string const& filename) :
 filename(filename) {}
 
@@ -91,6 +104,14 @@ void File::setBuffer(u32 offset, void *buf, size_t len) {
     seekFile_p(offset);
     file.write((char *)buf, len);
     file.flush();
+}
+
+FileIterator File::begin() {
+    return FileIterator(this, 0);
+}
+
+FileIterator File::end() {
+    return FileIterator(this, getSize());
 }
 
 std::string File::getFilename() {
