@@ -197,6 +197,7 @@ protected:
     cart_type(cart_type),
     rom_data(rom_data),
     ram_data(ram_data) {}
+    virtual ~MemoryBankController() {}
 
     Cartridge_Constants::cart_type_t cart_type;
 

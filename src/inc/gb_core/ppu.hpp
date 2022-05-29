@@ -36,7 +36,7 @@ public:
         // u8 obj_idx;
     } obj_sprite_t;
 
-    typedef struct {
+    typedef struct palette_t {
         u16 colors[4];
 
         std::string to_rgb15_string() {
@@ -54,25 +54,25 @@ public:
             }
             return ss.str();
         }
-    } pallette_t;
+    } palette_t;
 
     struct fifo_color_t {
         u8 color_idx;
-        pallette_t *pallette;
+        palette_t *palette;
         bool is_transparent;
         bool priority;
     };
 
     // TODO: make this user-configurable
     // http://www.budmelvin.com/dev/15bitconverter.html
-    // static constexpr pallette_t gb_pallette = {
+    // static constexpr palette_t gb_palette = {
     //     0x7FFF, // white
     //     0x6B5A, // lightgrey
     //     0x35AD, // dimgrey
     //     0x0000, // black
     // };
 
-    static constexpr pallette_t gb_pallette = {
+    static constexpr palette_t gb_palette = {
         0x6BDC, // white
         0x3B10, // lightgrey
         0x29C6, // dimgrey
@@ -98,12 +98,12 @@ public:
     void set_obj_priority(bool obj_has_priority);
 
     //public because core needs access //TODO: befriend core maybe?
-    pallette_t bg_pallettes[8];
-    pallette_t obj_pallettes[8];
+    palette_t bg_palettes[8];
+    palette_t obj_palettes[8];
 
 private:
-    void set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data);
-    u8 get_color_data(u8 *reg, pallette_t *pallette_mem);
+    void set_color_data(u8 *reg, palette_t *palette_mem, u8 data);
+    u8 get_color_data(u8 *reg, palette_t *palette_mem);
 
     Cartridge *cart;
     Memory *mem;

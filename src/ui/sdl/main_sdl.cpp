@@ -79,6 +79,7 @@ int main(int argc, char *argv[]) {
         wnd_texture  = SDL_CreateTexture(renderer_wnd, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 256, 256);
     }
 
+    Silver::File *bios_file = Silver::File::openFile("/home/johna/Documents/SilverGB/test_files/bootroms/cgb_boot.bin");
     Silver::File *rom_file = nullptr;
     Silver::Core *core = nullptr;
     GB_Audio *audio = nullptr;
@@ -116,7 +117,7 @@ int main(int argc, char *argv[]) {
                 nowide::cout << event.drop.file << std::endl;
 
                 rom_file = Silver::File::openFile(event.drop.file);
-                core = new Silver::Core(rom_file, nullptr);
+                core = new Silver::Core(rom_file, bios_file);
                 audio = GB_Audio::init_audio(core);
                 // audio->start_audio();
                 break;
@@ -171,6 +172,10 @@ int main(int argc, char *argv[]) {
         //cleanup the core
         delete core;
     }
+
+    delete rom_file;
+    delete bios_file;
+    delete audio;
 
     if(enable_wnd_window) {
         SDL_DestroyTexture(wnd_texture);

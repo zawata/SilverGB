@@ -226,7 +226,6 @@ int main(int argc, char *argv[])
     glBindVertexArray(0);
 
     Silver::File *bios_file = Silver::File::openFile("/home/johna/Documents/SilverGB/test_files/bootroms/cgb_boot.bin");
-
     Silver::File *rom_file = nullptr;
     Silver::Core *core = nullptr;
     GB_Audio *audio = nullptr;

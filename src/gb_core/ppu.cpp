@@ -25,9 +25,9 @@
 #define PRIORITY_BIT      7
 #define Y_FLIP_BIT        6
 #define X_FLIP_BIT        5
-#define GB_PALLETTE_BIT   4
+#define GB_PALETTE_BIT   4
 #define GBC_VRAM_BANK_BIT 3
-#define GBC_PALLETTE_MASK 0x7
+#define GBC_PALETTE_MASK 0x7
 
 #define STAT_COIN_INT_BIT   6
 #define STAT_MODE_2_INT_BIT 5
@@ -49,15 +49,15 @@
 #define OBJ_PRIORITY(obj)      (Bit::test((obj).attrs, PRIORITY_BIT))
 #define OBJ_Y_FLIP(obj)        (Bit::test((obj).attrs, Y_FLIP_BIT))
 #define OBJ_X_FLIP(obj)        (Bit::test((obj).attrs, X_FLIP_BIT))
-#define OBJ_GB_PALLETTE(obj)   (Bit::test((obj).attrs, GB_PALLETTE_BIT)) //false if obj pallette 0
+#define OBJ_GB_PALETTE(obj)   (Bit::test((obj).attrs, GB_PALETTE_BIT)) //false if obj palette 0
 #define OBJ_GBC_VRAM_BANK(obj) (Bit::test((obj).attrs, GBC_VRAM_BANK_BIT)) //false if bank 0
-#define OBJ_GBC_PALLETTE(obj)  ((obj).attrs & GBC_PALLETTE_MASK)
+#define OBJ_GBC_PALETTE(obj)  ((obj).attrs & GBC_PALETTE_MASK)
 
 #define BG_PRIORITY(attr)       (Bit::test((attr), PRIORITY_BIT))
 #define BG_Y_FLIP(attr)         (Bit::test((attr), Y_FLIP_BIT))
 #define BG_X_FLIP(attr)         (Bit::test((attr), X_FLIP_BIT))
 #define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
-#define BG_PALLETTE(attr)       ((attr) & GBC_PALLETTE_MASK)
+#define BG_PALETTE(attr)       ((attr) & GBC_PALETTE_MASK)
 
 constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b) {
     return r | (((u16)g) << 5) | (((u16)b) << 10);
@@ -118,7 +118,7 @@ constexpr char title_fourth_chars[][4] = {
 };
 
 #define _CVT(shf, idx) ((shf) << 5 | (idx))
-constexpr u8 pallette_triplet_ids_and_flags[] = {
+constexpr u8 palette_triplet_ids_and_flags[] = {
     _CVT(0x3, 0x1c), _CVT(0x0, 0x08), _CVT(0x0, 0x12), _CVT(0x5, 0x03), _CVT(0x5, 0x02), _CVT(0x0, 0x07), _CVT(0x4, 0x07), _CVT(0x2, 0x0b),
     _CVT(0x1, 0x00), _CVT(0x0, 0x12), _CVT(0x3, 0x05), _CVT(0x5, 0x08), _CVT(0x0, 0x16), _CVT(0x5, 0x09), _CVT(0x4, 0x06), _CVT(0x5, 0x11),
     _CVT(0x3, 0x08), _CVT(0x5, 0x00), _CVT(0x4, 0x07), _CVT(0x3, 0x06), _CVT(0x0, 0x12), _CVT(0x5, 0x01), _CVT(0x1, 0x10), _CVT(0x1, 0x1c),
@@ -134,7 +134,7 @@ constexpr u8 pallette_triplet_ids_and_flags[] = {
 };
 #undef _CVT
 
-constexpr u8 triplet_pallette_idxs[][3] = {
+constexpr u8 triplet_palette_idxs[][3] = {
     { 16,   22,    8 },
     { 17,    4,   13 },
     { 32,    0,   14 },
@@ -167,7 +167,7 @@ constexpr u8 triplet_pallette_idxs[][3] = {
 };
 
 #define rgb(...) rgb555_to_rgb15(__VA_ARGS__)
-constexpr PPU::pallette_t compat_pallettes[] = {
+constexpr PPU::palette_t compat_palettes[] = {
 /* 00 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x15,0x0C), rgb(0x10,0x06,0x00), rgb(0x00,0x00,0x00) },
 /* 01 */  { rgb(0x1F,0x1C,0x18), rgb(0x19,0x13,0x10), rgb(0x10,0x0D,0x05), rgb(0x0B,0x06,0x01) },
 /* 02 */  { rgb(0x1F,0x1F,0x1F), rgb(0x11,0x11,0x1B), rgb(0x0A,0x0A,0x11), rgb(0x00,0x00,0x00) },
@@ -199,7 +199,7 @@ constexpr PPU::pallette_t compat_pallettes[] = {
 /* 28 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0C,0x14,0x1F), rgb(0x00,0x00,0x1F), rgb(0x00,0x00,0x00) },
 /* 29 */  { rgb(0x1F,0x1F,0x1F), rgb(0x0F,0x1F,0x06), rgb(0x00,0x0C,0x18), rgb(0x00,0x00,0x00) },
 
-// straddled pallettes get their own entries
+// straddled palettes get their own entries
 /* 30 */  { rgb(0x00,0x00,0x00), rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x10,0x10), rgb(0x12,0x07,0x07) },
 /* 31 */  { rgb(0x00,0x00,0x1F), rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x0F), rgb(0x00,0x10,0x1F) },
 /* 32 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x1F,0x1F), rgb(0x0C,0x14,0x1F), rgb(0x00,0x00,0x1F) },
@@ -228,29 +228,29 @@ screen_buffer(scrn_buf) {
         nowide::cout << "Starting PPU without bootrom not fully supported!" << std::endl;
 
         if(dev_is_GB(device)) {
-            bg_pallettes[0] = gb_pallette;
+            bg_palettes[0] = gb_palette;
         } else if(dev_is_GBC(device)) {
             if(cart->isCGBCart()) {
                 for(int i = 0; i < 8; i++) {
-                    bg_pallettes[i] = { 0x7F, 0x7F, 0x7F, 0x7F };
+                    bg_palettes[i] = { 0x7F, 0x7F, 0x7F, 0x7F };
                 }
             } else {
                 // set dmg-style object priority
                 obj_priority_mode = true;
 
                 /**
-                 * Setup DMG Compatibility Mode pallettes
+                 * Setup DMG Compatibility Mode palettes
                  *
                  * 🌠 Shit to know 🌠:
                  *  - TODO: talk about title hashing.
                  *
-                 *  - The pallettes are organized into triplets(above)
-                 *  - triplets are 3 indexes into the pallette color table.
-                 *  - But because Nintendo®, they also introduced "pallette shuffling flags"
-                 *    - this is why pallette_triplet_id isn't just an ID into the triplet table(or why we can't just do away with the pallette_triplet_ids_and_flags)
+                 *  - The palettes are organized into triplets(above)
+                 *  - triplets are 3 indexes into the palette color table.
+                 *  - But because Nintendo®, they also introduced "palette shuffling flags"
+                 *    - this is why palette_triplet_id isn't just an ID into the triplet table(or why we can't just do away with the palette_triplet_ids_and_flags)
                  *  - in each triplet:
                  *    - BGP is always the last index
-                 *    - OBP0 is either the first or last index(depending on the first shuffle bit)
+                 *    - OBP0 is either the first or last index depending on the first shuffle bit
                  *    - OBP1 is any index depending on the value of the second and third bit.
                  **/
 
@@ -267,48 +267,48 @@ screen_buffer(scrn_buf) {
                         const char *found_char = strchr(title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START], cart_char);
                         //if the char title is in the list
                         if(found_char != NULL) {
-                            //offset the pallette index based on which index the letter was found.
+                            //offset the palette index based on which index the letter was found.
                             auto x = title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START] - found_char;
                             compat_plt_id += x * (AMBIGUOUS_CHK_IDXS_END - AMBIGUOUS_CHK_IDXS_START);
                         } else {
-                            //otherwise use the default pallette
+                            //otherwise use the default palette
                             compat_plt_id = 0;
                         }
                     }
                 }
 
-                //decode pallette id
-                u8 pallette_triplet_id = pallette_triplet_ids_and_flags[compat_plt_id];
-                u8 shuffle_flags = pallette_triplet_id >> 5;
-                const u8 (*triplet)[3] = &(triplet_pallette_idxs[pallette_triplet_id & 0x1F]);
+                //decode palette id
+                u8 palette_triplet_id = palette_triplet_ids_and_flags[compat_plt_id];
+                u8 shuffle_flags = palette_triplet_id >> 5;
+                const u8 (*triplet)[3] = &(triplet_palette_idxs[palette_triplet_id & 0x1F]);
 
-                pallette_t OBP0, OBP1;
+                palette_t OBP0, OBP1;
                 //theres probably a cleaner way to implement this logic but this is easier
                 switch(shuffle_flags & 0x3) {
-                // remember, OBP0 = 0, OBP1 = 1 in both the triplet and the obj_pallette, BGP = 2 in the triplet.
+                // remember, OBP0 = 0, OBP1 = 1 in both the triplet and the obj_palette, BGP = 2 in the triplet.
                 case 0b000:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    obj_palettes[0] = compat_palettes[(*triplet)[2]]; // same as BGP
+                    obj_palettes[1] = compat_palettes[(*triplet)[2]]; // same as BGP
                     break;
                 case 0b001:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[2]]; // same as BGP
+                    obj_palettes[0] = compat_palettes[(*triplet)[0]];
+                    obj_palettes[1] = compat_palettes[(*triplet)[2]]; // same as BGP
                     break;
                 case 0b010:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[0]]; // same as OBP0
+                    obj_palettes[0] = compat_palettes[(*triplet)[2]]; // same as BGP
+                    obj_palettes[1] = compat_palettes[(*triplet)[0]]; // same as OBP0
                     break;
                 case 0b011:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[0]]; // same as OBP0
+                    obj_palettes[0] = compat_palettes[(*triplet)[0]];
+                    obj_palettes[1] = compat_palettes[(*triplet)[0]]; // same as OBP0
                     break;
                 case 0b100:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[2]]; // same as BGP
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[1]];
+                    obj_palettes[0] = compat_palettes[(*triplet)[2]]; // same as BGP
+                    obj_palettes[1] = compat_palettes[(*triplet)[1]];
                     break;
                 case 0b101:
-                    obj_pallettes[0] = compat_pallettes[(*triplet)[0]];
-                    obj_pallettes[1] = compat_pallettes[(*triplet)[1]];
+                    obj_palettes[0] = compat_palettes[(*triplet)[0]];
+                    obj_palettes[1] = compat_palettes[(*triplet)[1]];
                     break;
                 //these cases don't appear be used.
                 case 0b110:
@@ -318,12 +318,12 @@ screen_buffer(scrn_buf) {
                 }
 
                 //BGP never changes from the 3rd offset
-                bg_pallettes[0] = compat_pallettes[(*triplet)[2]];
+                bg_palettes[0] = compat_palettes[(*triplet)[2]];
 
                 nowide::cout << "compat palletes chosen:" << std::endl;
-                nowide::cout << "BGP: " << bg_pallettes[0].to_rgb24_string() << std::endl;
-                nowide::cout << "OBP0: " << obj_pallettes[0].to_rgb24_string() << std::endl;
-                nowide::cout << "OBP1: " << obj_pallettes[1].to_rgb24_string() << std::endl;
+                nowide::cout << "BGP: " << bg_palettes[0].to_rgb24_string() << std::endl;
+                nowide::cout << "OBP0: " << obj_palettes[0].to_rgb24_string() << std::endl;
+                nowide::cout << "OBP1: " << obj_palettes[1].to_rgb24_string() << std::endl;
             }
         }
     }
@@ -336,22 +336,26 @@ screen_buffer(scrn_buf) {
     wnd_enabled_bit = new Bit::BitWatcher<u8>(&reg(LCDC), LCDC_WINDOW_ENABLED_BIT);
 }
 
-PPU::~PPU() {}
+PPU::~PPU() {
+    delete bg_fifo;
+    delete sp_fifo;
+    delete wnd_enabled_bit;
+}
 
-void PPU::set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data) {
+void PPU::set_color_data(u8 *reg, palette_t *palette_mem, u8 data) {
     /**
      * (O/B)CPS Register Bit Format
      * IPPPPCCB
      *
      * I - incremenet after write
-     * P - pallette number(out of 16)
+     * P - palette number(out of 16)
      * C - color number( out of 4)
      * B - high or low byte of color
      * */
 
     bool high_byte = Bit::test(*reg, 0);
     u8 color_idx = (*reg & 0x6) >> 1;
-    u8 pallette_idx = (*reg & 0x38) >> 3;
+    u8 palette_idx = (*reg & 0x38) >> 3;
 
     if(Bit::test(*reg, 7)) {
         *reg = 0x80 | ((*reg + 1) & 0x3F);
@@ -359,7 +363,7 @@ void PPU::set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data) {
 
     // Deny color write if in mode 3
     if(process_step != SCANLINE_VRAM) {
-        u16 *color = &pallette_mem[pallette_idx].colors[color_idx];
+        u16 *color = &palette_mem[palette_idx].colors[color_idx];
 
         if(high_byte) {
             *color = (*color & 0x00FF) | ((u16)data << 8);
@@ -369,30 +373,30 @@ void PPU::set_color_data(u8 *reg, pallette_t *pallette_mem, u8 data) {
     }
 }
 
-u8 PPU::get_color_data(u8 *reg, pallette_t *pallette_mem) {
+u8 PPU::get_color_data(u8 *reg, palette_t *palette_mem) {
     u8 byte_idx = *reg & 0x1;
     u8 color_idx = (*reg & 0x6) >> 1;
-    u8 pallette_idx = (*reg & 0x38) >> 3;
+    u8 palette_idx = (*reg & 0x38) >> 3;
 
-    pallette_t pallette = pallette_mem[pallette_idx];
+    palette_t palette = palette_mem[palette_idx];
 
-    return pallette.colors[color_idx] & (0xFF << (8 * byte_idx));
+    return (palette.colors[color_idx] >> (8 * byte_idx)) & 0xFF;
 }
 
 void PPU::write_bg_color_data(u8 data) {
-    set_color_data(&reg(BCPS), bg_pallettes, data);
+    set_color_data(&reg(BCPS), bg_palettes, data);
 }
 
 u8 PPU::read_bg_color_data() {
-    return get_color_data(&reg(BCPS), bg_pallettes);
+    return get_color_data(&reg(BCPS), bg_palettes);
 }
 
 void PPU::write_obj_color_data(u8 data) {
-    set_color_data(&reg(OCPS), obj_pallettes, data);
+    set_color_data(&reg(OCPS), obj_palettes, data);
 }
 
 u8 PPU::read_obj_color_data() {
-    return get_color_data(&reg(BCPS), bg_pallettes);
+    return get_color_data(&reg(BCPS), bg_palettes);
 }
 
 void PPU::set_obj_priority(bool obj_has_priority) {
@@ -434,7 +438,7 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
     u8 sprite_tile_1 = mem->read_vram(addr, true, bank1),
        sprite_tile_2 = mem->read_vram(addr + 1, true, bank1);
 
-    u8 pallette = !OBJ_GB_PALLETTE(curr_sprite) ? reg(OBP0) : reg(OBP1);
+    u8 palette = !OBJ_GB_PALETTE(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
     for(int i = 0; i < 8; i++) {
         u8 pix_idx = i;
@@ -448,13 +452,13 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
         fifo_color_t color{};
 
         if(dev_is_GBC(device)) {
-            color.pallette = &obj_pallettes[OBJ_GBC_PALLETTE(curr_sprite)];
+            color.palette = &obj_palettes[OBJ_GBC_PALETTE(curr_sprite)];
             color.color_idx = tile_idx;
         } else {
             tile_idx <<= 1;
-            //TODO: we're special casing the object pallettes for GB. should we fix this?
-            color.pallette = const_cast<pallette_t *>(&gb_pallette);
-            color.color_idx = static_cast<u8>((pallette >> tile_idx) & 0x3_u8);
+            //TODO: we're special casing the object palettes for GB. should we fix this?
+            color.palette = const_cast<palette_t *>(&gb_palette);
+            color.color_idx = static_cast<u8>((palette >> tile_idx) & 0x3_u8);
         }
 
         color.is_transparent = tile_idx == 0;
@@ -652,12 +656,12 @@ void PPU::ppu_tick_vram() {
 
                 if(dev_is_GBC(device)) {
                     color.priority = BG_PRIORITY(attr_byte);
-                    color.pallette = &bg_pallettes[BG_PALLETTE(attr_byte)];
+                    color.palette = &bg_palettes[BG_PALETTE(attr_byte)];
                     color.color_idx = tile_idx & 0x3_u8;
                 } else {
                     tile_idx <<= 1;
                     color.priority = false;
-                    color.pallette = const_cast<pallette_t *>(&gb_pallette);
+                    color.palette = const_cast<palette_t *>(&gb_palette);
                     color.color_idx = (reg(BGP) >> tile_idx) & 0x3_u8;
                 }
 
@@ -715,7 +719,7 @@ void PPU::ppu_tick_vram() {
 
             // if frame is disabled, don't draw pixel data
             if (!frame_disable) {
-                rgb15_to_rgb555(screen_buffer + current_byte, bg_color.pallette->colors[bg_color.color_idx]);
+                rgb15_to_rgb888(screen_buffer + current_byte, bg_color.palette->colors[bg_color.color_idx]);
                 current_byte += 3;
             }
         }

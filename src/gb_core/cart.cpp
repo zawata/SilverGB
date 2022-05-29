@@ -50,6 +50,7 @@ bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buff
     }
 
     ram_file->toVector(ram_buffer);
+    delete ram_file;
 
     nowide::cout << "SAV File: loaded" << std::endl;
     return true;
@@ -71,6 +72,7 @@ bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ra
 
     nowide::cout << "SAV File: saved" << std::endl;
     ram_file->fromVector(ram_buffer);
+    delete ram_file;
 
     return true;
 }
@@ -134,6 +136,11 @@ Cartridge::~Cartridge() {
     if(cart_type.BATTERY) {
         saveRAMFile(get_ram_file_name(rom_file->getFilename()), controller->ram_data);
     }
+
+    if(controller) {
+        delete controller;
+    }
+
 };
 
 bool Cartridge::checkMagicNumber() const {

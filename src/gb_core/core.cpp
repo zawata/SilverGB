@@ -179,7 +179,7 @@ std::vector<u8> Core::getOAMEntry(int index) {
     u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
 
     std::vector<u8> ret_vec;
-    u8 pallette = mem->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
+    u8 palette = mem->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
     for( int i = 0; i < 16; i += 2 ) {
         u8 b1 = mem->read_oam(base_addr | i),
            b2 = mem->read_oam(base_addr | i + 1);
@@ -189,7 +189,7 @@ std::vector<u8> Core::getOAMEntry(int index) {
             out_color   |= ((b2 >> (7 - j)) & 1) << 1;
 
             u8 colors[3] = {0};
-            write_5bit_color(colors, PPU::gb_pallette.colors[(pallette >> (out_color * 2)) & 0x3]);
+            write_5bit_color(colors, PPU::gb_palette.colors[(palette >> (out_color * 2)) & 0x3]);
             ret_vec.push_back(colors[0]);
             ret_vec.push_back(colors[1]);
             ret_vec.push_back(colors[2]);
@@ -215,13 +215,13 @@ bool Core::get_bp_active()        { return bp_active; }
 #define Y_FLIP_BIT        6
 #define X_FLIP_BIT        5
 #define GBC_VRAM_BANK_BIT 3
-#define GBC_PALLETTE_MASK 0x7
+#define GBC_PALETTE_MASK 0x7
 
 #define BG_PRIORITY(attr)       (Bit::test((attr), PRIORITY_BIT))
 #define BG_Y_FLIP(attr)         (Bit::test((attr), Y_FLIP_BIT))
 #define BG_X_FLIP(attr)         (Bit::test((attr), X_FLIP_BIT))
 #define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
-#define BG_PALLETTE(attr)       ((attr) & GBC_PALLETTE_MASK)
+#define BG_PALETTE(attr)        ((attr) & GBC_PALETTE_MASK)
 
 //TODO: de-duplicate these functions
 

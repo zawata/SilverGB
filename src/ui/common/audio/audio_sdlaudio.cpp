@@ -31,6 +31,7 @@ GB_Audio *GB_Audio::init_audio(Silver::Core *core) {
 }
 
 GB_Audio::~GB_Audio() {
+    SDL_CloseAudioDevice(*(SDL_AudioDeviceID *)audio_dev);
     SDL_CloseAudio();
     delete static_cast<SDL_AudioDeviceID *>(this->audio_dev);
 }
