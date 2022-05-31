@@ -88,7 +88,9 @@ u8 Memory::read_reg(u8 loc) {
     case WX_REG:
         return registers.WX   & WX_READ_MASK;
     case VBK_REG:
-        return registers.VBK  | 0xFE; //all bits but bit0 one are set to 1
+        return VBK_DEFAULTS | (registers.VBK & VBK_READ_MASK);
+    case KEY0_REG:
+        return registers.KEY0 & KEY0_READ_MASK;
     case KEY1_REG:
         return registers.KEY1 & KEY1_READ_MASK;
     case ROMEN_REG:
@@ -215,6 +217,9 @@ void Memory::write_reg(u8 loc, u8 data) {
             registers.VBK = data & VBK_WRITE_MASK;
         }
         return;
+    case KEY0_REG:
+        registers.KEY0 = data & KEY0_WRITE_MASK;
+        return;
     case KEY1_REG:
     if(Bit::test(data, 0)) nowide::cout << "Speed Switch requested" << std::endl;
         registers.KEY1 = data & KEY1_WRITE_MASK;
@@ -267,7 +272,6 @@ void Memory::write_reg(u8 loc, u8 data) {
 /**
  * VRAM
  **/
-
 u8 Memory::read_vram(u16 offset, bool bypass, bool bypass_bank1) {
     if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
@@ -299,7 +303,7 @@ void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
             ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1: 0)) + offset] = data;
         }
 
-        if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
+        if(dev_is_GBC(device) && !get_dmg_compat_mode() && (registers.VBK & VBK_WRITE_MASK)) {
             ppu_ram[DMG_VRAM_SIZE + offset] = data;
         }
         else {
@@ -422,4 +426,16 @@ void Memory::write_hram(u16 offset, u8 data) {
 // This doesn't sound like a memory function but all it does is set the relevant IF bit so here's the best place to do it
 void Memory::request_interrupt(Memory::Interrupt i) {
     registers.IF |= i;
+}
+
+void Memory::set_dmg_compat_mode(bool compat_mode) {
+    std::cout << "set c " << compat_mode << std::endl;
+    if(compat_mode) {
+        Bit::set(&registers.KEY0, 2);
+    } else {
+        Bit::reset(&registers.KEY0, 2);
+    }
+}
+bool Memory::get_dmg_compat_mode() {
+    return Bit::test(registers.KEY0, 2);
 }

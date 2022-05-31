@@ -414,6 +414,11 @@ static constexpr const u8 default_reg_values[55][4] =
 #define WX_WRITE_MASK    0xFF
 #define WX_READ_MASK     WX_WRITE_MASK
 
+// GBC: Compat Mode
+#define KEY0_REG         0x4C
+#define KEY0_WRITE_MASK  0x0C
+#define KEY0_READ_MASK   KEY0_WRITE_MASK
+
 // GBC: Prepare Speed Switch
 #define KEY1_REG         0x4D
 #define KEY1_WRITE_MASK  0x01
@@ -423,6 +428,7 @@ static constexpr const u8 default_reg_values[55][4] =
 #define VBK_REG          0x4F
 #define VBK_WRITE_MASK   0x01
 #define VBK_READ_MASK    VBK_WRITE_MASK
+#define VBK_DEFAULTS     0xFE
 
 // hidden: Bootstrap Enable
 #define ROMEN_REG        0x50

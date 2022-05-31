@@ -69,7 +69,7 @@ Slight TODOs are littered throughout the code, the bigger ones are placed here:
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Input  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ Interrupts  
 ➕ GBC Functions  
-&nbsp;&nbsp;&nbsp;&nbsp;✔ Pallette Storage  
+&nbsp;&nbsp;&nbsp;&nbsp;✔ Palette Storage  
 &nbsp;&nbsp;&nbsp;&nbsp;➕ PPU Color Support  
 &nbsp;&nbsp;&nbsp;&nbsp;✔ New DMA  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;➕ GDMA  

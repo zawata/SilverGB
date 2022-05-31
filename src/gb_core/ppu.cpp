@@ -237,6 +237,7 @@ screen_buffer(scrn_buf) {
             } else {
                 // set dmg-style object priority
                 obj_priority_mode = true;
+                mem->set_dmg_compat_mode(true);
 
                 /**
                  * Setup DMG Compatibility Mode palettes

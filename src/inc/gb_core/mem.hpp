@@ -52,6 +52,8 @@ public:
 
     void request_interrupt(Interrupt i);
 
+    void set_dmg_compat_mode(bool compat_mode);
+    bool get_dmg_compat_mode();
 
     struct io_registers_t {
         //Input
@@ -86,6 +88,7 @@ public:
         u8 VBK;
 
         // GBC Registers
+        u8 KEY0;
         u8 KEY1;
         // ROMEN // Not an actual register
 
