@@ -6,6 +6,7 @@ add_library(gb_core
         "cpu_disassem.cpp"
         "joy.cpp"
         "io.cpp"
+        "initial_state.cpp"
         "mem.cpp"
         "ppu.cpp")
 

@@ -66,8 +66,5 @@ private:
         gdma_tick_cnt = 0;
 
     u16 bank_offset;
-    u16 div_cnt;
-
-    std::vector<u8> work_ram;
-    std::vector<u8> high_ram;
+    u16 div_cnt = 0;
 };

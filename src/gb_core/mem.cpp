@@ -12,7 +12,7 @@
 #define MODE_VRAM   3
 #define check_mode(x) ((registers.STAT & 0x3) == x)
 
-Memory::Memory(gb_device_t device) :
+Memory::Memory(gb_device_t device, bool bootrom_enabled) :
 device(device) {
     if(dev_is_GBC(device)) {
         work_ram.resize(GBC_WORK_RAM_SIZE);
@@ -25,6 +25,19 @@ device(device) {
 
     high_ram.resize(HIGH_RAM_SIZE);
     oam_ram.resize(OAM_RAM_SIZE);
+
+
+    if(!bootrom_enabled) {
+        if(dev_is_GBC(device)) {
+            memcpy(oam_ram.data(), oam_ram_CGB_initial_state, oam_ram.size());
+            memcpy(ppu_ram.data(), ppu_ram_CGB_initial_state, ppu_ram.size());
+            memcpy(high_ram.data(), high_ram_CGB_initial_state, high_ram.size());
+            memcpy(work_ram.data(), work_ram_CGB_initial_state, work_ram.size());
+        }
+        else {
+            //TODO:
+        }
+    }
 }
 
 Memory::~Memory() {}

@@ -95,6 +95,7 @@ public:
     u8 read_bg_color_data();
     void write_obj_color_data(u8 data);
     u8 read_obj_color_data();
+
     void set_obj_priority(bool obj_has_priority);
 
     //public because core needs access //TODO: befriend core maybe?
@@ -112,23 +113,6 @@ private:
     u8 *screen_buffer = NULL; //buffer for the screen, passed from core
 
     int curr_mode;
-
-    struct __registers {
-        u8 LCDC;
-        u8 STAT;
-        u8 SCY;
-        u8 SCX;
-        u8 LY;
-        u8 LYC;
-        u8 DMA;
-        u8 BGP;
-        u8 OBP0;
-        u8 OBP1;
-        u8 WY;
-        u8 WX;
-
-        u8 VBK;
-    } registers;
 
     /**
      * PPU Variables

@@ -32,7 +32,7 @@ public:
         JOYPAD_INT   = 1<<4,
     };
 
-    Memory(gb_device_t device);
+    Memory(gb_device_t device, bool bootrom_enabled);
     ~Memory();
 
     u8   read_reg(u8 loc);

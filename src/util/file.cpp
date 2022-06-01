@@ -23,7 +23,9 @@ bool          FileIterator::operator !=(FileIterator const&b) const { return !(*
 File::File(std::string const& filename) :
 filename(filename) {}
 
-File::~File() {}
+File::~File() {
+    file.close();
+}
 
 File *File::createFile(std::string filename) {
     if(nowide::ifstream(filename)) return nullptr; //don't create file if it exists

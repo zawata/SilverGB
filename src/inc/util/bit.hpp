@@ -9,7 +9,6 @@
 #include "flags.hpp"
 
 namespace Bit {
-
     __force_inline bool  test(u64 reg,  u8 i) { return ((reg >> i) & 1); }
     __force_inline void   set(u8  *reg, u8 i) {       *reg |=  (1 << i); }
     __force_inline void   set(u16 *reg, u8 i) {       *reg |=  (1U << i); }
@@ -33,12 +32,10 @@ namespace Bit {
         return test(s_old, bit) && !test(s_new, bit);
     }
 
-
     __force_inline
     bool risen(u64 s_old, u64 s_new, u8 bit) {
         return !test(s_old, bit) && test(s_new, bit);
     }
-
 
     __force_inline
     bool changed(u64 s_old, u64 s_new, u8 bit) {

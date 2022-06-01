@@ -46,17 +46,15 @@ inline bool _duty_check(u8 duty, u8 wv_count) {
 }
 
 APU::APU(bool bootrom_enabled) {
-    init_core();
+    // TODO: figuire out the best init values.
     registers = { 0 };
-}
-APU::~APU() {}
 
-void APU::init_core() {
     memset(&channel_1, 0 , sizeof(channel_1));
     memset(&channel_2, 0 , sizeof(channel_2));
     memset(&channel_3, 0 , sizeof(channel_3));
     memset(&channel_4, 0 , sizeof(channel_4));
 }
+APU::~APU() {}
 
 // The wiki Table
 //Square 1: Sweep -> Timer -> Duty -> Length Counter -> Envelope -> Mixer
@@ -73,7 +71,7 @@ void APU::init_core() {
 /**
  * Simple Event Flow:
  *
- *  All audio is clocked by the Master Clock which is executed and timed by the CPU.
+ *  All audio is clocked by the Master Clock which is executed and timed by the Core.
  * this is called upon by the tick function which is executed on every tick of the master clock.
  *
  *  This tick function runs both the Timer and the Frame Sequencer.

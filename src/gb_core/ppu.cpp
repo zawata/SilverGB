@@ -214,7 +214,7 @@ device(device),
 screen_buffer(scrn_buf) {
     //TODO: demagic
 
-    // Set object priority defaults, GBC will flip this later for cmg-compat mode if applicable
+    // Set object priority defaults, GBC will flip this later for dmg-compat mode if applicable
     // or we'll do it if there emulating the bootrom
     if(dev_is_GB(device)) {
         obj_priority_mode = true;
@@ -229,6 +229,7 @@ screen_buffer(scrn_buf) {
 
         if(dev_is_GB(device)) {
             bg_palettes[0] = gb_palette;
+            obj_palettes[0] = gb_palette;
         } else if(dev_is_GBC(device)) {
             if(cart->isCGBCart()) {
                 for(int i = 0; i < 8; i++) {
@@ -447,21 +448,20 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
             pix_idx = 7 - pix_idx;
         }
 
-        u8 tile_idx = ((sprite_tile_1 >> (7 - pix_idx)) & 1);
-        tile_idx   |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
+        u8 tile_idx  = ((sprite_tile_1 >> (7 - pix_idx)) & 1);
+           tile_idx |= ((sprite_tile_2 >> (7 - pix_idx)) & 1) << 1;
 
         fifo_color_t color{};
-
+        u8 palette_idx;
         if(dev_is_GBC(device)) {
-            color.palette = &obj_palettes[OBJ_GBC_PALETTE(curr_sprite)];
+            palette_idx = OBJ_GBC_PALETTE(curr_sprite);
             color.color_idx = tile_idx;
         } else {
             tile_idx <<= 1;
-            //TODO: we're special casing the object palettes for GB. should we fix this?
-            color.palette = const_cast<palette_t *>(&gb_palette);
+            palette_idx = 0;
             color.color_idx = static_cast<u8>((palette >> tile_idx) & 0x3_u8);
         }
-
+        color.palette = &obj_palettes[palette_idx];
         color.is_transparent = tile_idx == 0;
         color.priority = !OBJ_PRIORITY(curr_sprite);
 
@@ -654,18 +654,19 @@ void PPU::ppu_tick_vram() {
                 tile_idx   |= ((tile_byte_2 >> x_pixel) & 1) << 1;
 
                 fifo_color_t color{};
-
+                u8 palette_idx;
                 if(dev_is_GBC(device)) {
                     color.priority = BG_PRIORITY(attr_byte);
-                    color.palette = &bg_palettes[BG_PALETTE(attr_byte)];
+                    palette_idx = BG_PALETTE(attr_byte);
                     color.color_idx = tile_idx & 0x3_u8;
                 } else {
                     tile_idx <<= 1;
                     color.priority = false;
-                    color.palette = const_cast<palette_t *>(&gb_palette);
+                    palette_idx = 0;
                     color.color_idx = (reg(BGP) >> tile_idx) & 0x3_u8;
                 }
 
+                color.palette = &bg_palettes[palette_idx];
                 color.is_transparent = false;
 
                 bg_fifo->enqueue(color);

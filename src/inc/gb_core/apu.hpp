@@ -101,8 +101,8 @@ public:
     void write_wavram(u8 loc, u8 data);
 
 private:
-    u32 tick_counter;
-    u16 frame_sequence_cntr;
+    u32 tick_counter = 0;
+    u16 frame_sequence_cntr = 0;
 
     struct :
         public _volume_envelope,
@@ -172,7 +172,6 @@ private:
     inline u16 ch3_freq()           { return reg(NR33) | ((u16)(reg(NR34) & 0x7) << 8); }
 
     inline u8  ch3_len_cntr_en()    { return reg(NR34) >> 6; }
-
     #undef reg
 
     /**
@@ -250,9 +249,8 @@ private:
 
     inline u8 getDivisor(u8 i) {
         const u8 t[8] = { 8, 16, 32, 48, 64, 80, 96, 112 };
-        return t[i & 0x7]; }
-
-    void init_core();
+        return t[i & 0x7];
+    }
 
     void timer_clock(u8 chan);
     void length_counter_clock(u8 chan);

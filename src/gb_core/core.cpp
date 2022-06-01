@@ -28,9 +28,13 @@ device(device) {
     nowide::cout << "Starting Core with CPU: " << cpu_names[device] << std::endl;
 
     // Class Usage Heirarchy in diagram form
-    // +-----+    +-----+      +-----+
-    // | CPU | -> | IO_ | -+-> | PPU | --+
-    // +-----+    +-----+  |   +-----+   |
+    // +-----+    +-----+      +------+
+    // | CPU | -> | IO_ | -+-> | CART |
+    // +-----+    +-----+  |   +------+
+    //    |          |     |
+    //    |          |     |   +-----+
+    //    |          |     +-> | PPU | --+
+    //    |          |     |   +-----+   |
     //    |          |     |             |
     //    |          |     |   +-----+   |
     //    |          |     +-> | APU | --+
@@ -38,18 +42,14 @@ device(device) {
     //    |          |     |             |
     //    |          |     |   +-----+   |
     //    |          |     +-> | JOY | --+
-    //    |          |     |   +-----+   |
-    //    |          |     |             |
-    //    |          |     |   +------+  |
-    //    |          |     +-> | CART |  |
-    //    |          |         +------+  |
+    //    |          |         +-----+   |
     //    |          |                   |
     //    |          |                   |   +-----+
     //    +----------+-------------------+-> | MEM |
     //                                       +-----+
 
     cart = new Cartridge(rom);
-    mem = new Memory(device);
+    mem = new Memory(device, bootrom != nullptr);
 
     apu = new APU(bootrom != nullptr);
     ppu = new PPU(cart, mem, screen_buffer, device, bootrom != nullptr);
@@ -215,7 +215,7 @@ bool Core::get_bp_active()        { return bp_active; }
 #define Y_FLIP_BIT        6
 #define X_FLIP_BIT        5
 #define GBC_VRAM_BANK_BIT 3
-#define GBC_PALETTE_MASK 0x7
+#define GBC_PALETTE_MASK  0x7
 
 #define BG_PRIORITY(attr)       (Bit::test((attr), PRIORITY_BIT))
 #define BG_Y_FLIP(attr)         (Bit::test((attr), Y_FLIP_BIT))
@@ -265,10 +265,24 @@ void Core::getBGBuffer(u8 *buf) {
 
                 u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
                 tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
-                tile_idx *= 2;
+
+                u8 color_idx;
+                u8 palette_idx;
+                if(dev_is_GBC(device)) {
+                    color_idx = tile_idx & 0x3_u8;
+                    palette_idx = BG_PALETTE(bg_attr);
+                } else {
+                    tile_idx <<= 1;
+                    color_idx = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
+                    palette_idx = 0;
+                }
+
+                rgb15_to_rgb888(&buf[((y*256) + (x * 8) + tile_x) * 3], ppu->bg_palettes[palette_idx].colors[color_idx]);
             }
         }
     }
+
+    #undef reg
 }
 
 void Core::getWNDBuffer(u8 *buf) {
@@ -311,10 +325,22 @@ void Core::getWNDBuffer(u8 *buf) {
 
                 u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
                 tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
-                tile_idx *= 2;
+                u8 color_idx;
+                u8 palette_idx;
+                if(dev_is_GBC(device)) {
+                    color_idx = tile_idx & 0x3_u8;
+                    palette_idx = BG_PALETTE(bg_attr);
+                } else {
+                    tile_idx <<= 1;
+                    color_idx = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
+                    palette_idx = 0;
+                }
+
+                rgb15_to_rgb888(&buf[((y*256) + (x * 8) + tile_x) * 3], ppu->bg_palettes[palette_idx].colors[color_idx]);
             }
         }
     }
+    #undef reg
 }
 
 } // namespace Silver
