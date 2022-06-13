@@ -699,7 +699,6 @@ void PPU::ppu_tick_vram() {
             bg_color.color_idx = 0;
         }
 
-
         //if drawing a sprite, dequeue a sprite pixel
         if(sp_fifo->size() > 0) {
             fifo_color_t s_color;
@@ -726,8 +725,11 @@ void PPU::ppu_tick_vram() {
             }
         }
 
+        // rest of this cycle is prepping for next one
+        x_cntr++;
 
-        if(LCDC_OBJ_ENABLED ) {
+        // Check Active Sprites to see if we should start displaying them
+        if(LCDC_OBJ_ENABLED) {
             for(auto sprite : active_sprites) {
                 if(x_cntr - (x_sc % 8) == sprite.pos_x) {
                     pause_bg_fifo = true;
@@ -736,22 +738,26 @@ void PPU::ppu_tick_vram() {
             }
         }
 
-        if(!in_window) {
-            if (LCDC_WINDOW_ENABLED && x_cntr >= reg(WX) && y_cntr >= reg(WY)) {
-                in_window = true;
-                vram_fetch_step = WM_0;
-                bg_fifo->clear();
-            }
+        // Check if we should switch to Window Rendering
+        // I don't know where this +1 comes from... without it the window renders 1 pixel too early
+        // TODO: just like...figure out why?
+        if(!in_window && LCDC_WINDOW_ENABLED && x_cntr >= (reg(WX) + 1) && y_cntr >= reg(WY)) {
+            in_window = true;
+            vram_fetch_step = WM_0;
+            bg_fifo->clear();
+            wnd_map_addr =
+                0x9800 |
+                ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
+                (wnd_y_cntr & 0xf8) << 2;
         }
 
+        //if we finish the line, move to hblank and increment the window counter *if we're windowing*
         if(pix_clock_count == 160) {
             if (in_window) {
                 wnd_y_cntr++;
             }
             process_step = HBLANK;
         }
-
-        x_cntr++;
     }
 }
 
@@ -851,11 +857,6 @@ bool PPU::tick() {
                 ((LCDC_BG_TILE_MAP) ? 0x0400 : 0) |
                 (((y_cntr+y_sc) & 0xf8) << 2) |
                 (x_sc >> 3);
-
-            wnd_map_addr =
-                0x9800 |
-                ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
-                (wnd_y_cntr & 0xf8) << 2;
 
         } else if(y_cntr < 154) {
             process_step = VBLANK;

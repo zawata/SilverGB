@@ -18,7 +18,7 @@ u8 get_default_idx(gb_device_t device) {
 
 #define __UK 0x00 // unknown value
 constexpr u8 default_reg_values[55][4] =
-/*             DMG0/cb, DMG/MGB SGB/SGB2 CGB/AGB
+/*             DMG0/cb, DMG/MGB SGB/SGB2 CGB/AGB */
 /* P1    */ {{ 0xCF,    0xCF,   0xCF,    0xCF },
 /* SB    */  { 0x00,    0x00,   0x00,    0x00 },
 /* SC    */  { 0x7E,    0x7E,   0x7E,    0x7F },
