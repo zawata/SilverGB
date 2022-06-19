@@ -6,31 +6,22 @@
     "zlib",
     "libnop",
     "portaudio",
-    "gl3w",
+    {
+      "name": "glad",
+      "platform": "!emscripten",
+      "features": ["gl-api-42"]
+    },
+    {
+      "name": "glad",
+      "features": ["gles2-api-30"],
+      "platform": "emscripten"
+    },
     "nowide",
     "sdl2",
+    "argparse",
     {
-      "name":"magnum",
-      "default-features": false,
-      "features": ["shaders"]
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["glxcontext"],
-      "platform": "linux"
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["cglcontext"],
-      "platform": "osx"
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["wglcontext"],
-      "platform": "windows"
+      "name": "nativefiledialog",
+      "platform": "!emscripten"
     },
     {
       "name": "sdl2",

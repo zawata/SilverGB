@@ -1,12 +1,12 @@
 find_package(SDL2 CONFIG REQUIRED)
-find_package(gl3w CONFIG REQUIRED)
+find_package(glad CONFIG REQUIRED)
 find_package(portaudio CONFIG REQUIRED)
 
 add_executable(gb_main_sdl
 		"main_sdl.cpp"
 		"../common/audio/audio_sdlaudio.cpp")
 target_include_directories(gb_main_sdl
-		PRIVATE "../common/audio/")
+		PRIVATE "../common/")
 target_link_libraries(gb_main_sdl
 		gb_core
 		util
@@ -16,9 +16,10 @@ target_link_libraries(gb_main_sdl
 
 add_executable(gb_main_opengl
 		"main_opengl.cpp"
-		"../common/audio/audio_portaudio.cpp")
+		"../common/audio/audio_portaudio.cpp"
+		"../common/gl/gl.cpp")
 target_include_directories(gb_main_opengl
-		PRIVATE "../common/audio/")
+		PRIVATE "../common/")
 target_link_libraries(gb_main_opengl
 		gb_core
 		util
@@ -26,7 +27,7 @@ target_link_libraries(gb_main_opengl
 		nowide::nowide
 		SDL2::SDL2
 		SDL2::SDL2main
-		unofficial::gl3w::gl3w)
+		glad::glad)
 
 # Fix for wayland>=1.20 and SDL2 < 2.0.20, remove once sdl fixes this
 find_package(PkgConfig)

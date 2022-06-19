@@ -1,5 +1,10 @@
 #pragma once
 
+// macro            compiler     platform
+// MSC_VER          msvc         windows
+// __GNUC__         clang/gcc    linux/macos
+// __EMSCRIPTEN__   emscripten   wasm
+
 #if defined(_MSC_VER)
     #define __force_inline __forceinline
 #elif defined(__GNUC__)
