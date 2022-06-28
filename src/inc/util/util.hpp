@@ -27,7 +27,7 @@ __force_inline bool bounded(T value, L a, L b) {
 }
 
 template< typename T >
-std::string itoh( T i, u8 zp = 0, bool caps = false, bool include_hex_delim = true) {
+__force_inline std::string itoh( T i, u8 zp = 0, bool caps = false, bool include_hex_delim = true) {
     static_assert(std::is_integral<T>::value, "");
 
     std::stringstream stream;

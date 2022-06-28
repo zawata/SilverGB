@@ -89,11 +89,13 @@ bootrom_mode(bios_file != nullptr) {
 IO_Bus::~IO_Bus() {}
 
 u8 IO_Bus::read(u16 offset, bool bypass) {
+    // TODO: this is technically not accurate
+    // see future_work/failing_tests/dma/read_read
     if(dma_active && !bypass) {
         if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
             return mem->read_hram(offset);
         } else {
-            return 0; //TODO:
+            return 0xFF; //TODO:
         }
     }
 
@@ -233,7 +235,7 @@ void IO_Bus::write(u16 offset, u8 data) {
     nowide::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
 }
 
-// Some REgisters have special behavior (such as instantaneous sampling and on-change behavior)
+// Some Registers have special behavior (such as instantaneous sampling and on-change behavior)
 // and putting this in mem would introduce cyclic dependencies, so we introduce register-IO wrapper functions to handle it
 u8 IO_Bus::read_reg(u8 loc) {
     switch(loc) {

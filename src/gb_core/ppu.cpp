@@ -334,14 +334,11 @@ screen_buffer(scrn_buf) {
     first_frame = true;
 
     frame_clock_count = 0;
-
-    wnd_enabled_bit = new Bit::BitWatcher<u8>(&reg(LCDC), LCDC_WINDOW_ENABLED_BIT);
 }
 
 PPU::~PPU() {
     delete bg_fifo;
     delete sp_fifo;
-    delete wnd_enabled_bit;
 }
 
 void PPU::set_color_data(u8 *reg, palette_t *palette_mem, u8 data) {
@@ -507,6 +504,13 @@ void PPU::ppu_tick_oam() {
         //reuse sprite_counter for rendering
         sprite_counter = 0;
         process_step = SCANLINE_VRAM;
+
+        // calculate background map address
+        bg_map_addr =
+            (0x9800) |
+            ((LCDC_BG_TILE_MAP) ? 0x0400 : 0) |
+            (((y_cntr+reg(SCY)) & 0xf8) << 2) |
+            (reg(SCX) >> 3);
     }
 }
 
@@ -565,7 +569,7 @@ void PPU::ppu_tick_vram() {
             tile_addr += 0x1000;
         }
 
-        tile_y_line = ((y_cntr + y_sc) & 0x7);
+        tile_y_line = ((y_cntr + reg(SCY)) & 0x7);
         if(dev_is_GBC(device) && BG_Y_FLIP(attr_byte)) {
             tile_y_line = (7 - tile_y_line);
         }
@@ -715,7 +719,7 @@ void PPU::ppu_tick_vram() {
         }
 
         //skip first 8 pixels and first pixels of partially offscreen tiles
-        if(x_cntr >= 8 + (x_sc % 8)) {
+        if(x_cntr >= 8 + (reg(SCX) % 8)) {
             pix_clock_count++;
 
             // if frame is disabled, don't draw pixel data
@@ -725,13 +729,21 @@ void PPU::ppu_tick_vram() {
             }
         }
 
+        //if we finish the line, move to hblank and increment the window counter *if we're windowing*
+        if(pix_clock_count == 160) {
+            if (in_window) {
+                wnd_y_cntr++;
+            }
+            process_step = HBLANK;
+        }
+
         // rest of this cycle is prepping for next one
         x_cntr++;
 
         // Check Active Sprites to see if we should start displaying them
         if(LCDC_OBJ_ENABLED) {
             for(auto sprite : active_sprites) {
-                if(x_cntr - (x_sc % 8) == sprite.pos_x) {
+                if(x_cntr - (reg(SCX) % 8) == sprite.pos_x) {
                     pause_bg_fifo = true;
                     displayed_sprites.push_back(sprite);
                 }
@@ -749,14 +761,6 @@ void PPU::ppu_tick_vram() {
                 0x9800 |
                 ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
                 (wnd_y_cntr & 0xf8) << 2;
-        }
-
-        //if we finish the line, move to hblank and increment the window counter *if we're windowing*
-        if(pix_clock_count == 160) {
-            if (in_window) {
-                wnd_y_cntr++;
-            }
-            process_step = HBLANK;
         }
     }
 }
@@ -783,12 +787,13 @@ bool PPU::tick() {
         return false;
     }
 
-    if(wnd_enabled_bit->risen()) {
+    if(Bit::risen(old_LCDC, reg(LCDC), LCDC_WINDOW_ENABLED_BIT)) {
         wnd_map_addr =
             0x9800 |
             ((LCDC_WINDOW_TILE_MAP) ? 0x0400 : 0) |
             wnd_y_cntr << 2;
     }
+    old_LCDC = reg(LCDC);
 
     /**
      * Occurs on Every Frame
@@ -808,9 +813,9 @@ bool PPU::tick() {
         current_byte = 0;
 
         wnd_y_cntr = 0;
-        y_cntr = 0;
+        //this is incremented to zero at the start of the first line
+        y_cntr = -1;
         new_line = true;
-        first_line = true;
 
         vblank_int_requested = false;
     }
@@ -822,11 +827,7 @@ bool PPU::tick() {
         new_line = false;
         skip_fetch = true;
 
-        if(first_line) {
-            first_line = false;
-        } else {
-            y_cntr++;
-        }
+        y_cntr++;
 
         x_cntr = 0;
         pix_clock_count = 0;
@@ -844,20 +845,9 @@ bool PPU::tick() {
         reg(LY) = y_cntr; //set LY
 
         if(y_cntr < 144) {
-            //lock scroll for the current line
-            x_sc = reg(SCX);
-            y_sc = reg(SCY);
-
             process_step = SCANLINE_OAM;
             oam_fetch_step = OAM_0;
             vram_fetch_step = BM_0;
-
-            bg_map_addr =
-                (0x9800) |
-                ((LCDC_BG_TILE_MAP) ? 0x0400 : 0) |
-                (((y_cntr+y_sc) & 0xf8) << 2) |
-                (x_sc >> 3);
-
         } else if(y_cntr < 154) {
             process_step = VBLANK;
         } else {

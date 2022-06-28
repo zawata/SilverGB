@@ -121,8 +121,6 @@ private:
     CircularQueue<fifo_color_t> *sp_fifo = new CircularQueue<fifo_color_t>(160);
     u8 process_step;
 
-    Bit::BitWatcher<u8> *wnd_enabled_bit;
-
     int frame_clock_count = 0; // count of clocks in a frame
     int line_clock_count = 0;  // count of clocks in a line
     int pix_clock_count = 0; //pixels clocked in currenrt line
@@ -156,6 +154,8 @@ private:
         skip_sprite_clock = false,
         obj_priority_mode = true;
 
+    u8 old_LCDC;
+
     u16
         bg_map_addr,    // addr of the current tile in the bg  tile map
         wnd_map_addr,   // addr of the current tile in the wnd tile map
@@ -175,22 +175,19 @@ private:
         tile_y_line, // GBC tile y pixel counter
         wnd_y_cntr, // window y counter
         y_cntr, // y counter
-        x_cntr, // x counter
-        x_sc,   // x_scroll locked at beginning of line
-        y_sc;   // y_scroll locked as beginning of line
+        x_cntr; // x counter
 
     bool
         first_frame = false,   // first frame after lcd enable
         frame_disable = false, // disable pixel output for current frame(used with first frame)
         new_frame = false,     // the first clock tick of a new frame
-        first_line = false,    // the first clock tick of the first line
         new_line = false,      // the first clock tick of a new line
         skip_fetch = false,    // the first VRAM access of a new line
         in_window = false;     // are we in window mode
 
     int sprite_counter = 0;
     obj_sprite_t current_sprite;
-    std::deque<obj_sprite_t> active_sprites;
+    std::vector<obj_sprite_t> active_sprites;
     std::deque<obj_sprite_t> displayed_sprites;
 
     u32 current_byte = 0;

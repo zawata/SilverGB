@@ -42,38 +42,6 @@ namespace Bit {
         return test(s_old, bit) != test(s_new, bit);
     }
 
-    template<typename T>
-    class BitWatcher {
-        T *item;
-        T item_old;
-        u8 bit;
-    public:
-        explicit BitWatcher(T *item, u8 bit):
-        item(item),
-        item_old(*item),
-        bit(bit) {
-            static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
-        }
-
-        bool risen() {
-            bool ret = Bit::risen(item_old, *item, bit);
-            item_old = *item;
-            return ret;
-        }
-
-        bool fallen() {
-            bool ret = Bit::fallen(item_old, *item, bit);
-            item_old = *item;
-            return ret;
-        }
-
-        bool changed() {
-            bool ret = Bit::fallen(item_old, *item, bit);
-            item_old = *item;
-            return ret;
-        }
-    };
-
     template<typename T> __force_inline
     T sign_extend(T reg, u8 sign_bit) {
         return (reg ^ (1U << sign_bit)) - (1U << sign_bit);

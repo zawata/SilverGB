@@ -99,11 +99,11 @@ void Core::tick_frame() {
 
     do {
         instr_completed = cpu->tick();
-
         apu->tick();
         frame_completed = ppu->tick();
 
-        if(instr_completed && cpu->getRegisters().PC == breakpoint && bp_active) {
+
+        if(bp_active && instr_completed && cpu->getRegisters().PC == breakpoint) {
             bp_active = false;
             throw breakpoint_exception();
         }
