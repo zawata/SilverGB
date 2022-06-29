@@ -1,0 +1,105 @@
+﻿---
+Language: Cpp
+BasedOnStyle:  LLVM
+
+AccessModifierOffset: -4
+AlignArrayOfStructures: Right
+AlignConsecutiveMacros: Consecutive
+AlignConsecutiveAssignments: Consecutive
+# AlignConsecutiveBitFields: Consecutive
+AlignConsecutiveDeclarations: Consecutive
+AlignOperands:   AlignAfterOperator
+AllowAllArgumentsOnNextLine: false # TODO
+AllowAllConstructorInitializersOnNextLine: false  # TODO
+AllowAllParametersOfDeclarationOnNextLine: false  # TODO
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Inline
+AlwaysBreakBeforeMultilineStrings: true
+AlwaysBreakTemplateDeclarations: Yes
+AttributeMacros:
+  - __force_inline
+BinPackArguments: false
+BinPackParameters: false
+# BitFieldColonSpacing: Both
+BraceWrapping:
+  AfterCaseLabel:  false
+  AfterClass:      false
+  AfterControlStatement: Never # maybe MultiLine?
+  AfterEnum:       false
+  AfterFunction:   false
+  AfterNamespace:  false
+  # AfterObjCDeclaration: false
+  AfterStruct:     false
+  AfterUnion:      false
+  AfterExternBlock: false
+  BeforeCatch:     false
+  BeforeElse:      false
+  BeforeLambdaBody: false
+  BeforeWhile:     false
+  IndentBraces:    false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+# BreakAfterJavaFieldAnnotations: false
+BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBraces: Attach
+BreakBeforeConceptDeclarations: true
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: AfterColon
+# BreakConstructorInitializersBeforeComma: false
+BreakInheritanceList: AfterColon
+BreakStringLiterals: true
+ColumnLimit:     120 # TODO: determine the best value
+# CommentPragmas:  '^ IWYU pragma:' # TODO: is this useful?
+CompactNamespaces: false
+# ConstructorInitializerAllOnOneLineOrOnePerLine: false # deprecated
+ConstructorInitializerIndentWidth: 8
+ContinuationIndentWidth: 8
+Cpp11BracedListStyle: true
+DeriveLineEnding: true
+DerivePointerAlignment: false
+# DisableFormat:   false
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+ExperimentalAutoDetectBinPacking: false # TODO: should we use this?
+FixNamespaceComments: true
+# ForEachMacros:
+#   - foreach
+#   - Q_FOREACH
+#   - BOOST_FOREACH
+# IfMacros:
+#   - KJ_IF_MAYBE
+IncludeBlocks:   Regroup
+IncludeCategories:
+    # system inclusions
+  - Regex:           '^<[^\/]*?>'
+    Priority:        1
+    # anything inside < & >
+  - Regex:           '^<.+>'
+    Priority:        2
+    # core includes
+  - Regex:           '^"(gb_core|gba_core)/'
+    Priority:        3
+    # util includes
+  - Regex:           '^"(util)/'
+    Priority:        4
+    # everything else
+  - Regex:           '.*'
+    Priority:        5
+IncludeIsMainRegex: '$'
+IncludeIsMainSourceRegex: '$'
+IndentPPDirectives: BeforeHash
+IndentExternBlock: NoIndent
+IndentWidth:     4
+# InsertTrailingCommas: None
+# JavaScriptQuotes: Leave
+# JavaScriptWrapImports: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+PPIndentWidth:   2
+ShortNamespaceLines: 0
+SortIncludes:    CaseInsensitive
+SpaceAfterTemplateKeyword: false
+SpaceBeforeParens: Never
+SpacesInContainerLiterals: false
+...
+
