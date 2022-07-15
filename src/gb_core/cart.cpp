@@ -1,30 +1,28 @@
+#include "gb_core/cart.hpp"
+
 #include <cassert>
+#include <nowide/iostream.hpp>
 #include <numeric>
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
-#include "gb_core/cart.hpp"
-
-#include "util/file.hpp"
-#include "util/util.hpp"
-#include "util/ints.hpp"
-#include "util/bit.hpp"
-
-#include "gb_core/defs.hpp"
-
-#include "gb_core/carts/rom.hpp"
 #include "gb_core/carts/mbc1.hpp"
 #include "gb_core/carts/mbc2.hpp"
 #include "gb_core/carts/mbc3.hpp"
 #include "gb_core/carts/mbc5.hpp"
+#include "gb_core/carts/rom.hpp"
+#include "gb_core/defs.hpp"
+
+#include "util/bit.hpp"
+#include "util/file.hpp"
+#include "util/ints.hpp"
+#include "util/util.hpp"
 
 /**
  * Cartridge Data
  */
 std::string get_ram_file_name(std::string rom_file_name) {
     std::string ram_file_name = rom_file_name;
-    auto ext = rom_file_name.find_last_of('.') + 1;
+    auto        ext           = rom_file_name.find_last_of('.') + 1;
 
     ram_file_name.erase(ext, std::string::npos);
     ram_file_name.append("sav");
@@ -56,12 +54,11 @@ bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buff
     return true;
 }
 
-bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer) {
+bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const &ram_buffer) {
     Silver::File *ram_file;
     if(Silver::File::fileExists(ram_file_name)) {
         ram_file = Silver::File::openFile(ram_file_name, true, true);
-    }
-    else {
+    } else {
         ram_file = Silver::File::createFile(ram_file_name);
     }
 
@@ -77,16 +74,17 @@ bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ra
     return true;
 }
 
-Cartridge::Cartridge(Silver::File *f) :
-rom_file(f),
-cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
+Cartridge::Cartridge(Silver::File *f):
+        rom_file(f),
+        cart_type(Cartridge_Constants::cart_type_t::getCartType(
+                rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
     std::vector<u8> rom;
     std::vector<u8> ram;
 
     f->toVector(rom);
     assert(rom.size() == getROMSize());
 
-    //open ram info
+    // open ram info
     if(cart_type.RAM && getRAMSize() > 0) {
         ram.resize(getRAMSize());
 
@@ -97,27 +95,27 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
 
     if(cart_type.ROM) {
         controller = new ROM_Controller(cart_type, rom, ram);
-    } else if (cart_type.MBC1) {
+    } else if(cart_type.MBC1) {
         controller = new MBC1_Controller(cart_type, rom, ram);
-    } else if (cart_type.MBC2) {
+    } else if(cart_type.MBC2) {
         nowide::cerr << "MBC2 not supported, emulator will now segfault" << std::endl;
-        //controller = new MBC2_Controller(cart_type, rom, ram);
-    } else if (cart_type.MBC3) {
+        // controller = new MBC2_Controller(cart_type, rom, ram);
+    } else if(cart_type.MBC3) {
         controller = new MBC3_Controller(cart_type, rom, ram);
-    } else if (cart_type.MBC5) {
-        //controller = new MBC5_Controller(cart_type, rom, ram);
+    } else if(cart_type.MBC5) {
+        // controller = new MBC5_Controller(cart_type, rom, ram);
         nowide::cerr << "MBC5 not supported, emulator will now segfault" << std::endl;
-    } else if (cart_type.MBC6) {
+    } else if(cart_type.MBC6) {
         nowide::cerr << "MBC6 not supported, emulator will now segfault" << std::endl;
-    } else if (cart_type.MBC7) {
+    } else if(cart_type.MBC7) {
         nowide::cerr << "MBC7 not supported, emulator will now segfault" << std::endl;
-    } else if (cart_type.HuC1) {
+    } else if(cart_type.HuC1) {
         nowide::cerr << "HuC1 not supported, emulator will now segfault" << std::endl;
-    } else if (cart_type.HuC3) {
+    } else if(cart_type.HuC3) {
         nowide::cerr << "HuC3 not supported, emulator will now segfault" << std::endl;
     }
 
-    //debug info
+    // debug info
     nowide::cout << "cart:      " << getCartTitle() << std::endl;
     nowide::cout << "cart type: " << (std::string)getCartType() << std::endl;
     nowide::cout << "cart rom:  " << getROMSize() << std::endl;
@@ -125,8 +123,7 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
         nowide::cout << "cart ram:  " << getRAMSize();
         if(cart_type.BATTERY) {
             nowide::cout << ", Battery-Backed" << std::endl;
-        }
-        else {
+        } else {
             nowide::cout << std::endl;
         }
     }
@@ -140,7 +137,6 @@ Cartridge::~Cartridge() {
     if(controller) {
         delete controller;
     }
-
 };
 
 bool Cartridge::checkMagicNumber() const {
@@ -150,8 +146,10 @@ bool Cartridge::checkMagicNumber() const {
 }
 
 std::string Cartridge::getCartTitle() const {
-    u8 buf[Cartridge_Constants::GB_TITLE_LENGTH + 1] = { 0 };
-    rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, isCGBCart() ? Cartridge_Constants::CGB_TITLE_LENGTH : Cartridge_Constants::GB_TITLE_LENGTH);
+    u8 buf[Cartridge_Constants::GB_TITLE_LENGTH + 1] = {0};
+    rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET,
+                        buf,
+                        isCGBCart() ? Cartridge_Constants::CGB_TITLE_LENGTH : Cartridge_Constants::GB_TITLE_LENGTH);
     return std::string((char *)buf);
 }
 
@@ -232,13 +230,13 @@ u8 Cartridge::getOldLicenseeCode() const {
 }
 
 u16 Cartridge::getNewLicenseeCode() const {
-    return (rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE1_OFFSET) << 8) |
-            rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE2_OFFSET);
+    return (rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE1_OFFSET) << 8)
+         | rom_file->getByte(Cartridge_Constants::NEW_LICENSEE_CODE_BYTE2_OFFSET);
 }
 
 bool Cartridge::cartSupportsSGB() const {
-    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03 &&
-           rom_file->getByte(Cartridge_Constants::OLD_LICENSEE_CODE_OFFSET) == 0x33;
+    return rom_file->getByte(Cartridge_Constants::SGB_FLAG) == 0x03
+        && rom_file->getByte(Cartridge_Constants::OLD_LICENSEE_CODE_OFFSET) == 0x33;
 }
 
 u8 Cartridge::cartSupportsGBCCompatMode() const {
@@ -252,10 +250,7 @@ u8 Cartridge::cartSupportsGBCCompatMode() const {
 }
 
 u8 Cartridge::computeTitleChecksum() const {
-    return std::accumulate(
-        rom_file->begin() + 0x134,
-        rom_file->begin() + 0x143,
-        0_u8);
+    return std::accumulate(rom_file->begin() + 0x134, rom_file->begin() + 0x143, 0_u8);
 }
 
 u8 Cartridge::computeHeaderChecksum() const {
@@ -268,11 +263,8 @@ u8 Cartridge::computeHeaderChecksum() const {
 }
 
 u16 Cartridge::computeGlobalChecksum() const {
-    //TODO: I didn't actually test this :)
-    u16 i = std::accumulate<>(
-        rom_file->begin(),
-        rom_file->end(),
-        0_u16);
+    // TODO: I didn't actually test this :)
+    u16 i = std::accumulate<>(rom_file->begin(), rom_file->end(), 0_u16);
 
     i -= rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_HI_OFFSET);
     i -= rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_LO_OFFSET);
@@ -285,12 +277,16 @@ bool Cartridge::checkHeaderChecksum() const {
 }
 
 bool Cartridge::checkGlobalChecksum() const {
-    u16 global_checksum = (rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_HI_OFFSET) << 8) |
-                           rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_LO_OFFSET);
+    u16 global_checksum = (rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_HI_OFFSET) << 8)
+                        | rom_file->getByte(Cartridge_Constants::GLOBAL_CHECKSUM_LO_OFFSET);
 
     return computeHeaderChecksum() == global_checksum;
 }
 
-//forward IO calls to controller interface
-u8   Cartridge::read(u16 offset)  { return controller->read(offset); }
-void Cartridge::write(u16 offset, u8 data) { controller->write(offset, data); }
+// forward IO calls to controller interface
+u8 Cartridge::read(u16 offset) {
+    return controller->read(offset);
+}
+void Cartridge::write(u16 offset, u8 data) {
+    controller->write(offset, data);
+}
