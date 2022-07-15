@@ -194,7 +194,7 @@ constexpr PPU::palette_t compat_palettes[] = {
 };
 #undef rgb
 
-PPU::PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled = false) :
+PPU::PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled = false):
         cart(cart), mem(mem), device(device), screen_buffer(scrn_buf) {
     // TODO: demagic
 

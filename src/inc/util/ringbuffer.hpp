@@ -1,3 +1,4 @@
+// clang-format off
 /*!
  * \file ringbuffer.hpp
  * \version 2.0.3

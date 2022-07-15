@@ -2,7 +2,6 @@
 
 #include <cstdlib>
 #include <cstring>
-
 #include <nowide/iostream.hpp>
 
 #include "util/ints.hpp"
@@ -13,15 +12,15 @@ public:
     CircularQueue<T>(size_t size);
     ~CircularQueue<T>();
 
-    bool enqueue(T const& elem);
+    bool enqueue(T const &elem);
     bool dequeue(T &elem);
     bool dequeue();
 
     size_t size(void);
-    void clear(void);
+    void   clear(void);
 
-    T const& at(size_t idx);
-    void replace(size_t idx, T const& elem);
+    T const &at(size_t idx);
+    void     replace(size_t idx, T const &elem);
 
 protected:
     T *start, *head, *tail, *end;
@@ -44,11 +43,7 @@ T *CircularQueue<T>::_get_pos(size_t idx) {
 }
 
 template<typename T>
-CircularQueue<T>::CircularQueue(size_t size):
-start(new T[size + 1]),
-head(start),
-tail(start),
-end(start+size+1) {}
+CircularQueue<T>::CircularQueue(size_t size): start(new T[size + 1]), head(start), tail(start), end(start + size + 1) {}
 
 template<typename T>
 CircularQueue<T>::~CircularQueue() {
@@ -56,22 +51,21 @@ CircularQueue<T>::~CircularQueue() {
 }
 
 template<typename T>
-bool CircularQueue<T>::enqueue(T const& elem) {
-    if((tail+1) != head) {
+bool CircularQueue<T>::enqueue(T const &elem) {
+    if((tail + 1) != head) {
         tail++;
 
         if(tail == end) {
             if(head == start) {
                 tail--;
                 return false;
-            }
-            else tail = start;
+            } else
+                tail = start;
         }
 
         *tail = elem;
         return true;
-    }
-    else {
+    } else {
         return false;
     }
 }
@@ -80,7 +74,8 @@ template<typename T>
 bool CircularQueue<T>::dequeue(T &elem) {
     if(head != tail) {
         head++;
-        if(head == end) head = start;
+        if(head == end)
+            head = start;
 
         elem = *head;
         return true;
@@ -93,7 +88,8 @@ template<typename T>
 bool CircularQueue<T>::dequeue() {
     if(head != tail) {
         head++;
-        if(head == end) head = start;
+        if(head == end)
+            head = start;
 
         return true;
     }
@@ -103,9 +99,12 @@ bool CircularQueue<T>::dequeue() {
 
 template<typename T>
 size_t CircularQueue<T>::size(void) {
-    if      (head <  tail) return tail - head;
-    else if (head >  tail) return (end-start)-(head-tail);
-    else                   return 0;
+    if(head < tail)
+        return tail - head;
+    else if(head > tail)
+        return (end - start) - (head - tail);
+    else
+        return 0;
 }
 
 template<typename T>
@@ -114,7 +113,7 @@ void CircularQueue<T>::clear(void) {
 }
 
 template<typename T>
-T const& CircularQueue<T>::at(size_t idx) {
+T const &CircularQueue<T>::at(size_t idx) {
     if(size() <= idx) {
         throw std::invalid_argument("idx must be less than size");
     }
@@ -122,11 +121,11 @@ T const& CircularQueue<T>::at(size_t idx) {
 }
 
 template<typename T>
-void CircularQueue<T>::replace(size_t idx, T const& elem) {
+void CircularQueue<T>::replace(size_t idx, T const &elem) {
     if(size() <= idx) {
         throw std::invalid_argument("idx must be less than size");
     }
-    T* pos = _get_pos(idx);
+    T *pos = _get_pos(idx);
 
     *pos = elem;
 }

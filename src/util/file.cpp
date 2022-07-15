@@ -1,37 +1,72 @@
-#include <nowide/iostream.hpp>
-
 #include "util/file.hpp"
+
+#include <nowide/iostream.hpp>
 
 #include "util/crc.hpp"
 #include "util/util.hpp"
 
 namespace Silver {
 
+//------------------------------------------------------------------------------
+// File Iterator
+//------------------------------------------------------------------------------
 FileIterator::FileIterator(File *f, u32 o): f(f), o(o) {}
 FileIterator::~FileIterator() {}
 
-FileIterator &FileIterator::operator ++()                           { o++; return *this; }
-FileIterator  FileIterator::operator ++(int)                        { return FileIterator(f, o++); }
-FileIterator  FileIterator::operator +(u32 i) const                 { return FileIterator(f, o + i); }
-FileIterator &FileIterator::operator --()                           { o--; return *this; }
-FileIterator  FileIterator::operator --(int)                        { return FileIterator(f, o--); }
-FileIterator  FileIterator::operator -(u32 i) const                 { return FileIterator(f, o - i); }
-u8            FileIterator::operator *()                            { return f->getByte(o); }
-bool          FileIterator::operator ==(FileIterator const&b) const { return f == b.f && o == b.o; }
-bool          FileIterator::operator !=(FileIterator const&b) const { return !(*this == b); }
+FileIterator &FileIterator::operator++() {
+    o++;
+    return *this;
+}
 
-File::File(std::string const& filename) :
-filename(filename) {}
+FileIterator FileIterator::operator++(int) {
+    return FileIterator(f, o++);
+}
+
+FileIterator FileIterator::operator+(u32 i) const {
+    return FileIterator(f, o + i);
+}
+
+FileIterator &FileIterator::operator--() {
+    o--;
+    return *this;
+}
+
+FileIterator FileIterator::operator--(int) {
+    return FileIterator(f, o--);
+}
+
+FileIterator FileIterator::operator-(u32 i) const {
+    return FileIterator(f, o - i);
+}
+
+u8 FileIterator::operator*() {
+    return f->getByte(o);
+}
+
+bool FileIterator::operator==(FileIterator const &b) const {
+    return f == b.f && o == b.o;
+}
+
+bool FileIterator::operator!=(FileIterator const &b) const {
+    return !(*this == b);
+}
+
+//------------------------------------------------------------------------------
+// File
+//------------------------------------------------------------------------------
+
+File::File(std::string const &filename): filename(filename) {}
 
 File::~File() {
     file.close();
 }
 
 File *File::createFile(std::string filename) {
-    if(nowide::ifstream(filename)) return nullptr; //don't create file if it exists
+    if(nowide::ifstream(filename))
+        return nullptr; // don't create file if it exists
 
-    //cast to void to avoid shadowing the function argument
-    (void)nowide::ofstream(filename); //create file
+    // cast to void to avoid shadowing the function argument
+    (void)nowide::ofstream(filename); // create file
     return openFile(filename, true);
 }
 
@@ -64,10 +99,11 @@ bool File::fileExists(std::string filename) {
 }
 
 u32 File::getCRC() {
-    const int buf_size = 1024;
+    constexpr int buf_size = 1024;
+
     u32 file_crc = 0, pos = 0;
     u16 retrieved;
-    u8 buf[buf_size];
+    u8  buf[buf_size];
 
     crc::begin();
     do {
@@ -120,9 +156,6 @@ std::string File::getFilename() {
     return filename;
 }
 
-/**
- * Private
- */
 void File::seekFile_g(u32 offset) {
     file.seekg(offset, std::ios_base::beg);
 }

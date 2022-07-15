@@ -144,20 +144,20 @@ private:
     };
     __VRAM_fetch_steps vram_fetch_step = IDLE;
 
-    u8   old_LY            = 0;
-    u8  old_LCDC;
-    u8  attr_byte;    // GBC attributes of bg_map_byte and wnd_map_byte
-    u8  bg_map_byte;  // byte from the current tile in the bg tile map
-    u8  wnd_map_byte; // byte from the current tile in the wnd tile map
-    u8  tile_byte_1;  // 1st byte from the current tile fetched
-    u8  tile_byte_2;  // 1st byte from the current tile fetched
-    u8  tile_y_line;  // GBC tile y pixel counter
-    u8  wnd_y_cntr;   // window y counter
-    u8  y_cntr;       // y counter
-    u8  x_cntr;       // x counter
-    u16 bg_map_addr;  // addr of the current tile in the bg  tile map
-    u16 wnd_map_addr; // addr of the current tile in the wnd tile map
-    u16 tile_addr;    // relative addr of the current tile data to fetch
+    u8   old_LY = 0;
+    u8   old_LCDC;
+    u8   attr_byte;    // GBC attributes of bg_map_byte and wnd_map_byte
+    u8   bg_map_byte;  // byte from the current tile in the bg tile map
+    u8   wnd_map_byte; // byte from the current tile in the wnd tile map
+    u8   tile_byte_1;  // 1st byte from the current tile fetched
+    u8   tile_byte_2;  // 1st byte from the current tile fetched
+    u8   tile_y_line;  // GBC tile y pixel counter
+    u8   wnd_y_cntr;   // window y counter
+    u8   y_cntr;       // y counter
+    u8   x_cntr;       // x counter
+    u16  bg_map_addr;  // addr of the current tile in the bg  tile map
+    u16  wnd_map_addr; // addr of the current tile in the wnd tile map
+    u16  tile_addr;    // relative addr of the current tile data to fetch
     bool coin_bit_signal   = false;
     bool pause_bg_fifo     = true;
     bool skip_sprite_clock = false;

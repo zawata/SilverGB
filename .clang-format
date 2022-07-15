@@ -95,11 +95,13 @@ IndentWidth:     4
 # JavaScriptQuotes: Leave
 # JavaScriptWrapImports: true
 KeepEmptyLinesAtTheStartOfBlocks: false
+PackConstructorInitializers: NextLine
 PPIndentWidth:   2
 ShortNamespaceLines: 0
 SortIncludes:    CaseInsensitive
 SpaceAfterTemplateKeyword: false
 SpaceBeforeParens: Never
+SpaceBeforeCtorInitializerColon: false
 SpacesInContainerLiterals: false
 ...
 

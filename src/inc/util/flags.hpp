@@ -1,11 +1,16 @@
 #pragma once
 
-#if defined(_MSC_VER)
-    #define __force_inline __forceinline
-#elif defined(__GNUC__)
-    #define __force_inline __attribute__((always_inline)) inline
+// macro            compiler     platform
+// _MSC_VER         msvc         windows
+// __GNUC__         clang/gcc    linux/macos
+// __EMSCRIPTEN__   emscripten   wasm
 
-    #define CHAR_BIT __CHAR_BIT__
+#if defined(_MSC_VER)
+  #define __force_inline __forceinline
+#elif defined(__GNUC__)
+  #define __force_inline __attribute__((always_inline)) inline
+
+  #define CHAR_BIT __CHAR_BIT__
 #endif
 
 [[noreturn]] __force_inline static void unreachable() {

@@ -2,10 +2,9 @@
 
 #include <cassert>
 #include <iterator>
-#include <vector>
-
 #include <nowide/fstream.hpp>
 #include <nowide/iostream.hpp>
+#include <vector>
 
 #include "util/ints.hpp"
 
@@ -14,35 +13,37 @@ namespace Silver {
 class File;
 
 class FileIterator {
-friend File;
-    File* f;
-    u32 o;
+    friend File;
+    File *f;
+    u32   o;
     FileIterator(File *f, u32 o);
+
 public:
     ~FileIterator();
 
-    FileIterator &operator ++();
-    FileIterator operator ++(int);
-    FileIterator operator +(u32 i) const;
+    FileIterator &operator++();
+    FileIterator  operator++(int);
+    FileIterator  operator+(u32 i) const;
 
-    FileIterator &operator --();
-    FileIterator operator --(int);
-    FileIterator operator -(u32 i) const;
+    FileIterator &operator--();
+    FileIterator  operator--(int);
+    FileIterator  operator-(u32 i) const;
 
-    u8 operator *();
+    u8 operator*();
 
-    bool operator ==(FileIterator const&b) const;
-    bool operator !=(FileIterator const&b) const;
+    bool operator==(FileIterator const &b) const;
+    bool operator!=(FileIterator const &b) const;
 };
 
 class File {
-friend FileIterator;
+    friend FileIterator;
+
 public:
     using iterator = FileIterator;
 
     ~File();
 
-    static File *openFile(std::string filename, bool write=false, bool trunc=false);
+    static File *openFile(std::string filename, bool write = false, bool trunc = false);
     static File *createFile(std::string filename);
 
     static bool fileExists(std::string);
@@ -51,12 +52,12 @@ public:
     void toVector(std::vector<T> &vec);
 
     template<typename T>
-    void fromVector(std::vector<T> const& vec);
+    void fromVector(std::vector<T> const &vec);
 
     u32 getCRC();
     u32 getSize();
 
-    u8 getByte(u32 offset);
+    u8     getByte(u32 offset);
     size_t getBuffer(u32 offset, void *buf, size_t len);
 
     void setByte(u32 offset, u8 data);
@@ -69,9 +70,9 @@ public:
 
 private:
     nowide::fstream file;
-    std::string filename;
+    std::string     filename;
 
-    explicit File(std::string const& filename);
+    explicit File(std::string const &filename);
 
     void seekFile_g(u32 offset);
     void seekFile_p(u32 offset);
@@ -92,13 +93,13 @@ void File::toVector(std::vector<T> &vec) {
 }
 
 template<typename T>
-void File::fromVector(std::vector<T> const& vec) {
+void File::fromVector(std::vector<T> const &vec) {
     static_assert(std::is_pod<T>::value, "");
 
     setBuffer(0, (void *)vec.data(), vec.size() * sizeof(T));
 
     // not sure why this doesn't work? the saved file is 4-bytes too small
-    //std::copy(vec.begin(), vec.end(), std::ostream_iterator<T>(file));
+    // std::copy(vec.begin(), vec.end(), std::ostream_iterator<T>(file));
 }
 
 } // namespace Silver
