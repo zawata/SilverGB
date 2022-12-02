@@ -8,6 +8,7 @@
 #common cmake build folders
 out/
 build/
+cmake-build-*/
 
 #vcpkg manifest installation directory
 vcpkg_installed
