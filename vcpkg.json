@@ -2,6 +2,7 @@
   "name": "silver-gb",
   "version": "0.2.1",
   "dependencies": [
+    "argparse",
     "zlib",
     "libnop",
     "nowide",
