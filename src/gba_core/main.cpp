@@ -6,7 +6,7 @@
 #include <cstdio>
 
 int main() {
-    Silver::File *file = Silver::File::openFile("../test_files/gba_tests/pokemon_ruby.gba");
+    Silver::File *file = Silver::File::openFile("../../test_files/gba_tests/pokemon_ruby.gba");
     Cartridge *cart = new Cartridge(file);
     IO_Bus *io = new IO_Bus(cart);
     CPU *cpu = new CPU(io);

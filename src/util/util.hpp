@@ -12,6 +12,8 @@
 
 #define as_hex(x) std::hex << (s64)(x) << std::dec
 
+#define array_length(x) sizeof(x)/sizeof(*x)
+
 __force_inline bool byteCompare(const u8 *a, const u8 *b, u64 l) { return ::memcmp(a, b, l) == 0; }
 
 /**
