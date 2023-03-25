@@ -77,10 +77,16 @@ namespace Bit {
         return test(s_old, bit) != test(s_new, bit);
     }
 
-    template<typename T> __force_inline
-    T sign_extend(T reg, u8 sign_bit) {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
-        return (reg ^ (1U << sign_bit)) - (1U << sign_bit);
+    template<typename S, typename U = typename std::make_unsigned<S>::type> __force_inline
+    U sign_compress(S reg, u8 sign_bit) {
+        auto m = (U)1 << sign_bit;
+        return ((as_unsigned(reg) - m) ^ m);
+    }
+
+    template<typename U, typename S = typename std::make_signed<U>::type> __force_inline
+    S sign_extend(U reg, u8 sign_bit) {
+        auto m = (U)1 << sign_bit;
+        return as_signed((reg ^ m) - m);
     }
 
     template<typename T> __force_inline

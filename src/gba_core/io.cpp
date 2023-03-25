@@ -18,7 +18,7 @@ void IO_Bus::tick() {
 }
 
 u32 IO_Bus::read(u32 offset, bool bypass) {
-    return cart->read(offset);
+    return (u32)cart->read(offset);
 }
 
 void IO_Bus::write(u16 offset, u8 data) {
