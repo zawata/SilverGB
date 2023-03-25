@@ -272,9 +272,15 @@ namespace Arm {
   private:
     friend struct Instruction;
 
-    __force_inline explicit Branch(u32 word) {
+    explicit Branch(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       link = (bool) read_and_shift(Mask::br_is_link, word);
-      offset = (bool) read_and_shift(Mask::br_offset, word);
+
+      u32 raw_offset = read(Mask::br_offset, word);
+
+      // The branch offset is left shifted by 2 then sign-extended.
+      // The offset is 0-23bits + 2 for the shift, making the sign bit 25
+      offset = Bit::sign_extend<s32>(raw_offset << 2, 25);
     }
 
     explicit Branch(const char *) {
@@ -285,15 +291,22 @@ namespace Arm {
       return link ? Mnemonic::BL : Mnemonic::B;
     }
 
-    __force_inline u32 Encode() const override {
-      return 0_u32 | (u8) condition << 28 | 0b101 << 25 | (link ? 1 : 0) << 24 |
-             (offset & Mask::br_offset);
+    u32 Encode() const override {
+      return 0_u32
+        | (u8) condition << 28
+        | 0b101 << 25
+        | (link ? 1 : 0) << 24
+        | Bit::sign_compress<u32>(offset & Mask::br_offset, 25) >> 2;
     }
 
     std::string Disassemble() const override {
       std::stringstream ss;
 
-      ss << to_string(Mnemonic()) << to_string(condition) << " " << as_hex(offset);
+      ss << to_string(Mnemonic()) << to_string(condition) << " ";
+      // From the ISA Doc:
+      // The branch offset must take account of the prefetch operation, which causes the PC to be 2 words (8 bytes) ahead of the current instruction.
+      // account for this visually
+      ss << (offset + 8);
       return ss.str();
     };
 
@@ -365,7 +378,8 @@ namespace Arm {
   private:
     friend struct Instruction;
     // Decode
-    __force_inline explicit DataProcessing(u32 word) {
+    explicit DataProcessing(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       operation_code = (OperationCode) read_and_shift(BitMask::OpCode, word);
       is_imm = read_and_shift(BitMask::isImmediate, word);
       set_flags = read_and_shift(BitMask::isSetFlags, word);
@@ -491,7 +505,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit PSRTransfer(u32 word) {
+    explicit PSRTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       //TODO
     }
 
@@ -557,7 +572,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit Multiply(u32 word) {
+    explicit Multiply(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       accumulate = read_and_shift(Mask::mul_accum, word);
 
       set_flags = read_and_shift(Mask::mul_accum, word);
@@ -609,6 +625,7 @@ namespace Arm {
     reg_t rDHi, rDLo, rS, rM;
 
     explicit MultiplyLong(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       accumulate = read_and_shift(Mask::mul_accum, word);
 
       set_flags = read_and_shift(Mask::mul_accum, word);
@@ -659,7 +676,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit SingleDataTransfer(u32 word) {
+    explicit SingleDataTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       load = read_and_shift(Mask::ls_is_load, word);
       // TODO
     }
@@ -698,7 +716,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit HalfwordDataTransfer(u32 word) {
+    explicit HalfwordDataTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       load = read_and_shift(Mask::ls_is_load, word);
       _signed = read_and_shift(Mask::lshs_s, word);
       halfwords = read_and_shift(Mask::lshs_h, word);
@@ -736,7 +755,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit BlockDataTransfer(u32 word) {
+    explicit BlockDataTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       load = read_and_shift(Mask::ls_is_load, word);
       // TODO
     }
@@ -774,7 +794,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit Swap(u32 word) {
+    explicit Swap(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       //TODO
     }
 
@@ -815,7 +836,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit SoftwareInterrupt(u32 word) {
+    explicit SoftwareInterrupt(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       comment = read_and_shift(Mask::swi_comment, word);
     }
 
@@ -853,7 +875,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit CoprocessorDataOperation(u32 word) {
+    explicit CoprocessorDataOperation(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       //TODO
     }
 
@@ -889,7 +912,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit CoprocessorDataTransfer(u32 word) {
+    explicit CoprocessorDataTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       //TODO
     }
 
@@ -925,7 +949,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit CoprocessorRegisterTransfer(u32 word) {
+    explicit CoprocessorRegisterTransfer(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       //TODO
     }
 
@@ -961,7 +986,8 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit Undefined(u32 word) {
+    explicit Undefined(u32 word) {
+      condition = (Condition) read_and_shift(Mask::condition, word);
       word = word;
     }
 
