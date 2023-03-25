@@ -1,5 +1,7 @@
 #pragma once
 
+#include "util/flags.hpp"
+
 #ifdef __cplusplus
 extern "C" {
 
@@ -29,5 +31,8 @@ inline constexpr s8  operator "" _s8 (unsigned long long value) { return static_
 inline constexpr s16 operator "" _s16(unsigned long long value) { return static_cast<s16>(value); }
 inline constexpr s32 operator "" _s32(unsigned long long value) { return static_cast<s32>(value); }
 inline constexpr s64 operator "" _s64(unsigned long long value) { return static_cast<s64>(value); }
+
+__force_inline s32 as_signed(u32 v) { return *reinterpret_cast<s32 *>(&v); }
+__force_inline u32 as_unsigned(s32 v) { return *reinterpret_cast<u32 *>(&v); }
 
 #endif
