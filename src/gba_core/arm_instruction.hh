@@ -15,22 +15,21 @@ namespace Arm {
     u8 v;
 
     reg_t() : v(0) {}
-
     reg_t(u8 v) : v(v) {}
 
     operator u8() const { return v; }
 
-    [[nodiscard]] std::string to_string() const { return "R" + std::to_string(v); }
+    std::string to_string() const { return "R" + std::to_string(v); }
   };
 
-  std::ostream &operator<<(std::ostream &o, reg_t r) {
+  inline std::ostream &operator<<(std::ostream &o, reg_t r) {
     return o << r.to_string();
   }
 
   namespace {
-    __force_inline u32 read(u32 m, u32 w) { return w & m; }
+    inline u32 read(u32 m, u32 w) { return w & m; }
 
-    __force_inline u32 read_and_shift(u32 m, u32 w) {
+    inline u32 read_and_shift(u32 m, u32 w) {
       return read(m, w) >> Bit::count_trailing_zeros(m);
     }
   }// namespace
@@ -121,15 +120,15 @@ namespace Arm {
     TEQ, // Test bitwise equality
     TST, // Test bits
     Undefined,
-  } type;
-  const char *mnemonic_strings[] = {
-      "ADC", "ADD", "AND", "B", "BIC", "BL", "BX", "CDP", "CMN", "CMP",
-      "EOR", "LDC", "LDM", "LDR", "MCR", "MLA", "MLAL", "MOV", "MRC", "MRS",
-      "MSR", "MUL", "MLAL", "MVN", "ORR", "RSB", "RSC", "SBC", "STC", "STM",
-      "STR", "SUB", "SWI", "SWP", "TEQ", "TST", "---"};
-  static_assert(array_length(mnemonic_strings) == (int) Mnemonic::Undefined + 1);
+  };
 
-  std::string to_string(Mnemonic mnemonic) {
+  inline std::string to_string(Mnemonic mnemonic) {
+    static const char *mnemonic_strings[] = {
+        "ADC", "ADD", "AND", "B", "BIC", "BL", "BX", "CDP", "CMN", "CMP",
+        "EOR", "LDC", "LDM", "LDR", "MCR", "MLA", "MLAL", "MOV", "MRC", "MRS",
+        "MSR", "MUL", "MLAL", "MVN", "ORR", "RSB", "RSC", "SBC", "STC", "STM",
+        "STR", "SUB", "SWI", "SWP", "TEQ", "TST", "---"};
+    static_assert(array_length(mnemonic_strings) == (int) Mnemonic::Undefined + 1);
     return mnemonic_strings[(int) mnemonic];
   }
 
@@ -168,26 +167,11 @@ namespace Arm {
     Never = NV
   };
 
-  const char *condition_strings[] = {
-      "EQ",
-      "NE",
-      "CS",
-      "CC",
-      "MI",
-      "PL",
-      "VS",
-      "VC",
-      "HI",
-      "LS",
-      "GE",
-      "LT",
-      "GT",
-      "LE",
-      "AL",
-      "NV",
-  };
-
-  std::string to_string(Condition condition) {
+  inline std::string to_string(Condition condition) {
+    static const char *condition_strings[] = {
+      "EQ", "NE", "CS", "CC", "MI", "PL", "VS", "VC",
+      "HI", "LS", "GE", "LT","GT","LE", "",  "NV",
+    };
     return condition_strings[(u8) condition];
   }
 
@@ -219,22 +203,22 @@ namespace Arm {
   struct Instruction;
   class InstructionDataBase {
     friend struct Instruction;
-    [[nodiscard]] virtual Mnemonic Mnemonic() const = 0;
-    [[nodiscard]] virtual u32 Encode() const = 0;
-    [[nodiscard]] virtual std::string Disassemble() const = 0;
+    virtual enum Mnemonic Mnemonic() const = 0;
+    virtual u32 Encode() const = 0;
+    virtual std::string Disassemble() const = 0;
   };
 
   /**
- * Branch And Exchange
- * BX
- */
+   * Branch And Exchange
+   * BX
+   */
   struct BranchAndExchange : private InstructionDataBase {
     Condition condition;
     reg_t rN;
 
   private:
     friend struct Instruction;
-    __force_inline explicit BranchAndExchange(u32 word) {
+    explicit BranchAndExchange(u32 word) {
       condition = (Condition) read_and_shift(Mask::condition, word);
       rN = (u8) read_and_shift(Mask::bex_reg_N, word);
     }
@@ -243,12 +227,12 @@ namespace Arm {
       // TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return Mnemonic::BX;
     }
     static constexpr enum InstructionType Type() { return InstructionType::BranchAndExchange; }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       return 0_u32 | (u8) condition << 28 | Literal::BEX_CONSTANT << 4 | (rN & Mask::bex_reg_N);
     }
 
@@ -261,13 +245,13 @@ namespace Arm {
   };
 
   /**
- * Branch
- * B, BL
- */
+   * Branch
+   * B, BL
+   */
   struct Branch : private InstructionDataBase {
     Condition condition;
     bool link;
-    u32 offset;
+    s32 offset;
 
   private:
     friend struct Instruction;
@@ -287,7 +271,7 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return link ? Mnemonic::BL : Mnemonic::B;
     }
 
@@ -316,8 +300,8 @@ namespace Arm {
   };
 
   /**
- * Data Processing
- */
+   * Data Processing
+   */
   struct DataProcessing : private InstructionDataBase {
     Condition condition;
     struct BitMask {
@@ -405,10 +389,10 @@ namespace Arm {
 
     // Assemble
     explicit DataProcessing(const char *) {
-      //TODO
+      // TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       using I = enum Mnemonic;
       static const enum Mnemonic instr_tbl[] = {
           I::AND, I::EOR, I::SUB, I::RSB, I::ADD, I::ADC, I::SBC, I::RSC,
@@ -417,7 +401,7 @@ namespace Arm {
       return instr_tbl[(int) operation_code];
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       u16 op2 = 0;
       if (is_imm) {
         op2 = ImmediateOperand.rotate << 8 | ImmediateOperand.immediate;
@@ -466,14 +450,14 @@ namespace Arm {
       return ss.str();
     };
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::DataProcessing;
     }
   };
 
   /**
- * PSR Transfer
- */
+   * PSR Transfer
+   */
   struct PSRTransfer : private InstructionDataBase {
     Condition condition;
     bool use_spsr;
@@ -514,11 +498,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return type == Type::PSRToRegister ? Mnemonic::MRS : Mnemonic::MSR;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       bool imm_bit = type == Type::RegisterToPSRF && RegisterToPSRF.is_imm;
       static u32 type_const_tbl[] = {
           Literal::MRS_CONSTANT, Literal::MRS_CONSTANT,
@@ -556,14 +540,14 @@ namespace Arm {
       return ss.str();
     };
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::PSRTransfer;
     }
   };
 
   /**
- * Multiply and Multiply and Accumulate
- */
+   * Multiply and Multiply and Accumulate
+   */
   struct Multiply : private InstructionDataBase {
     Condition condition;
     bool accumulate;
@@ -587,14 +571,20 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return accumulate ? Mnemonic::MLA : Mnemonic::MUL;
     }
 
-    __force_inline u32 Encode() const override {
-      return 0_u32 | (u8) condition << 28 | bool_to_bit(accumulate) << 21 |
-             bool_to_bit(set_flags) << 20 | (u8) rD << 16 | (u8) rN << 12 |
-             (u8) rS << 8 | (u8) Literal::MUL_CONSTANT << 4 | (u8) rD;
+    u32 Encode() const override {
+      return 0_u32
+          | (u8) condition << 28
+          | bool_to_bit(accumulate) << 21
+          | bool_to_bit(set_flags) << 20
+          | (u8) rD << 16
+          | (u8) rN << 12
+          | (u8) rS << 8
+          | (u8) Literal::MUL_CONSTANT << 4
+          | (u8) rD;
     }
 
     std::string Disassemble() const override {
@@ -609,14 +599,14 @@ namespace Arm {
       return ss.str();
     };
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::Multiply;
     }
   };
 
   /**
- * Multiply Long and Multiply Long and Accumulate
- */
+   * Multiply Long and Multiply Long and Accumulate
+   */
   struct MultiplyLong : private InstructionDataBase {
     Condition condition;
     bool _signed;
@@ -637,19 +627,26 @@ namespace Arm {
 
   private:
     friend struct Instruction;
-    __force_inline explicit MultiplyLong(const char *) {
+    explicit MultiplyLong(const char *) {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return accumulate ? Mnemonic::MLAL : Mnemonic::MULL;
     }
 
-    __force_inline u32 Encode() const override {
-      return 0_u32 | (u8) condition << 28 | 1 << 23 | bool_to_bit(_signed) << 22 |
-             bool_to_bit(accumulate) << 21 | bool_to_bit(set_flags) << 20 |
-             (u8) rDHi << 16 | (u8) rDLo << 12 | (u8) rS << 8 |
-             (u8) Literal::MUL_CONSTANT << 4 | (u8) rM;
+    u32 Encode() const override {
+      return 0_u32
+          | (u8) condition << 28
+          | 1 << 23
+          | bool_to_bit(_signed) << 22
+          | bool_to_bit(accumulate) << 21
+          | bool_to_bit(set_flags) << 20
+          | (u8) rDHi << 16
+          | (u8) rDLo << 12
+          | (u8) rS << 8
+          | (u8) Literal::MUL_CONSTANT << 4
+          | (u8) rM;
     }
 
     std::string Disassemble() const override {
@@ -662,14 +659,14 @@ namespace Arm {
       return ss.str();
     };
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::MultiplyLong;
     }
   };
 
   /**
- * Single Data Transfer
- */
+   * Single Data Transfer
+   */
   struct SingleDataTransfer : private InstructionDataBase {
     Condition condition;
     bool load;
@@ -686,11 +683,11 @@ namespace Arm {
       // TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return load ? Mnemonic::LDR : Mnemonic::STR;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -700,14 +697,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::SingleDataTransfer;
     }
   };
 
   /**
- * Halfword and Signed Data Transfer
- */
+   * Halfword and Signed Data Transfer
+   */
   struct HalfwordDataTransfer : private InstructionDataBase {
     Condition condition;
     bool load;
@@ -727,11 +724,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return load ? Mnemonic::LDR : Mnemonic::STR;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -741,14 +738,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::HalfwordDataTransfer;
     }
   };
 
   /**
- * Block Data Transfer
- */
+   * Block Data Transfer
+   */
   struct BlockDataTransfer : private InstructionDataBase {
     Condition condition;
     bool load;
@@ -765,11 +762,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return load ? Mnemonic::LDM : Mnemonic::STM;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -779,14 +776,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::BlockDataTransfer;
     }
   };
 
   /**
- * Swap
- */
+   * Swap
+   */
   struct Swap : private InstructionDataBase {
     Condition condition;
     bool byte;
@@ -803,11 +800,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return Mnemonic::SWP;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       return 0_u32 | (u8) condition << 28 | 1 << 24 | (byte ? 1 : 0) << 22 |
              rN << 16 | rD << 12 | 0b1001 << 4 | rM;
     }
@@ -822,14 +819,14 @@ namespace Arm {
       return ss.str();
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::Swap;
     }
   };
 
   /**
- * Software Interrupt
- */
+   * Software Interrupt
+   */
   struct SoftwareInterrupt : private InstructionDataBase {
     Condition condition;
     u32 comment;
@@ -845,11 +842,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return Mnemonic::SWI;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       return 0_u32 | (u8) condition << 28 | 0xF << 24 |
              comment & Mask::swi_comment;
     }
@@ -862,14 +859,14 @@ namespace Arm {
       return ss.str();
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::SoftwareInterrupt;
     }
   };
 
   /**
- * Coprocessor Data Operation
- */
+   * Coprocessor Data Operation
+   */
   struct CoprocessorDataOperation : private InstructionDataBase {
     Condition condition;
 
@@ -884,11 +881,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return Mnemonic::CDP;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -898,14 +895,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::CoprocessorDataOperation;
     }
   };
 
   /**
- * Coprocessor Data Transfer
- */
+   * Coprocessor Data Transfer
+   */
   struct CoprocessorDataTransfer : private InstructionDataBase {
     Condition condition;
     bool is_load;
@@ -921,11 +918,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return is_load ? Mnemonic::LDC : Mnemonic::STC;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -935,14 +932,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::CoprocessorDataTransfer;
     }
   };
 
   /**
- * Coprocessor Register Transfer
- */
+   * Coprocessor Register Transfer
+   */
   struct CoprocessorRegisterTransfer : private InstructionDataBase {
     Condition condition;
     bool is_load;
@@ -958,11 +955,11 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return is_load ? Mnemonic::MRC : Mnemonic::MCR;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       // TODO
       return 0;
     }
@@ -972,14 +969,14 @@ namespace Arm {
       return "";
     }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::CoprocessorRegisterTransfer;
     }
   };
 
   /**
- * Undefined
- */
+   * Undefined
+   */
   struct Undefined : private InstructionDataBase {
     Condition condition;
     u32 word;
@@ -995,17 +992,17 @@ namespace Arm {
       //TODO
     }
 
-    __force_inline enum Mnemonic Mnemonic() const override {
+    enum Mnemonic Mnemonic() const override {
       return Mnemonic::Undefined;
     }
 
-    __force_inline u32 Encode() const override {
+    u32 Encode() const override {
       //TODO
     }
 
     std::string Disassemble() const override { return "Undefined Instruction"; }
 
-    __force_inline static constexpr InstructionType GetInstructionType() {
+    static constexpr InstructionType GetInstructionType() {
       return InstructionType::Undefined;
     }
   };
@@ -1014,26 +1011,26 @@ namespace Arm {
    * Unified Instruction Class
    */
   struct Instruction {
-    __force_inline static Instruction Decode(u32 word) {
+    static Instruction Decode(u32 word) {
       return Instruction(word);
     }
-    __force_inline InstructionType Type() const { return type; }
+    InstructionType Type() const { return type; }
 
-    __force_inline Mnemonic Mnemonic() const {
+    enum Mnemonic Mnemonic() const {
       ptr_preamble();
       return get_variant_data_ptr()->Mnemonic();
     }
-    __force_inline u32 Encode() const {
+    u32 Encode() const {
       ptr_preamble();
       return get_variant_data_ptr()->Encode();
     }
-    __force_inline std::string Disassemble() const {
+    std::string Disassemble() const {
       ptr_preamble();
       return get_variant_data_ptr()->Disassemble();
     }
 
     template<typename T>
-    __force_inline const T &InstructionData() {
+    const T &InstructionData() {
       return std::get<T>(data);
     }
 
@@ -1056,8 +1053,8 @@ namespace Arm {
         SoftwareInterrupt,
         CoprocessorDataOperation,
         CoprocessorDataTransfer,
-        CoprocessorRegisterTransfer>
-        data;
+        CoprocessorRegisterTransfer
+    > data;
     // sure, /technically/ taking a pointer to variant data "bypasses its type-safety protections" and "defeats its entire purpose", but it's so much cooler this way
     // plus we get easy function calls for Encode(), Disassemble(), and Mnemonic()
     InstructionDataBase *data_ptr=  nullptr;

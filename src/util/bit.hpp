@@ -91,7 +91,7 @@ namespace Bit {
 
     template<typename T> __force_inline
     u8 count_leading_zeros(T x) {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
 
         u8 c;
         c = CHAR_BIT * sizeof(T);
@@ -106,7 +106,7 @@ namespace Bit {
 
     template<typename T> __force_inline
     u8 count_trailing_zeros(T x) {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
 
         u8 c;
         if (x & 0x1) c = 0;
@@ -142,7 +142,7 @@ namespace Bit {
 
     template<typename T>
     struct shift_with_carry {
-        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value, "");
+        static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
         static constexpr u8 bit_count = CHAR_BIT * sizeof(T);
 
         static __force_inline
@@ -174,7 +174,7 @@ namespace Bit {
 
         static __force_inline
         T rotate_right(T in, u8 rotate_amt, bool *carry_out) {
-            // if we hit this at any ppoint, then we'll need a safer implementation
+            // if we hit this at any point, then we'll need a safer implementation
             assert (rotate_amt < bit_count);
             if(carry_out != nullptr) {
                 if(rotate_amt) *carry_out = Bit::test(in, rotate_amt - 1);
