@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string_view>
 #include <sys/types.h>
 #include <type_traits>
 #include <variant>
@@ -11,62 +12,42 @@
 #include "util/util.hpp"
 
 namespace Arm {
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "google-explicit-constructor"
   struct reg_t {
     u8 v;
 
     reg_t() : v(0) {}
-    reg_t(u8 v) : v(v) {}
+    [[maybe_unused]] reg_t(u8 v) : v(v) {}
+
 
     operator u8() const { return v; }
 
     std::string to_string() const { return "R" + std::to_string(v); }
   };
+#pragma clang diagnostic pop
 
   inline std::ostream &operator<<(std::ostream &o, reg_t r) {
     return o << r.to_string();
   }
 
-  namespace {
-    inline u32 read(u32 m, u32 w) { return w & m; }
-
-    inline u32 read_and_shift(u32 m, u32 w) {
-      return read(m, w) >> Bit::count_trailing_zeros(m);
-    }
-  }// namespace
-
   namespace Mask {
     using namespace Bit::Mask;
+
     // all
-    const static u32 condition = Inclusive::between<u32>(28, 31);
-    const static u32 instr_class = Inclusive::between<u32>(26, 27);
+    const static u32 condition = between_inc<u32>(28, 31);
     // branch and exchange
-    const static u32 bex_const = Inclusive::between<u32>(4, 27);
-    const static u32 bex_reg_N = Inclusive::until<u32>(3);
+    const static u32 bex_const = between_inc<u32>(4, 27);
+    const static u32 bex_reg_N = until_inc<u32>(3);
     // branch
     const static u32 br_is_link = bit<u32>(24);
-    const static u32 br_offset = Inclusive::until<u32>(23);
-    // PSR transfer
-    const static u32 psr_const = 0x01FF0000;
+    const static u32 br_offset = until_inc<u32>(23);
     // multiply
-    const static u32 mul_is_long = bit<u32>(23);
-    const static u32 mul_signed = bit<u32>(23);
     const static u32 mul_accum = bit<u32>(21);
-    const static u32 mul_set_flags = bit<u32>(20);
-    const static u32 mul_reg_D = Inclusive::between<u32>(16, 19);
-    const static u32 mul_reg_N = Inclusive::between<u32>(12, 15);
-    const static u32 mul_reg_S = Inclusive::between<u32>(8, 11);
-    const static u32 mul_const = Inclusive::between<u32>(4, 7);
-    const static u32 mul_reg_M = Inclusive::between<u32>(0, 3);
-    // Load/Store
-    const static u32 ls_is_pre_idx = bit<u32>(24);
-    const static u32 ls_is_up = bit<u32>(23);
-    const static u32 ls_is_word = bit<u32>(22);
-    const static u32 ls_write_back = bit<u32>(21);
-    const static u32 ls_is_load = bit<u32>(20);
-    const static u32 ls_reg_N = 0x000F0000;
-    const static u32 ls_reg_D = 0x0000F000;
-    const static u32 lshs_s = bit<u32>(6);
-    const static u32 lshs_h = bit<u32>(5);
+    const static u32 mul_reg_D = between_inc<u32>(16, 19);
+    const static u32 mul_reg_N = between_inc<u32>(12, 15);
+    const static u32 mul_reg_S = between_inc<u32>(8, 11);
+    const static u32 mul_reg_M = between_inc<u32>(0, 3);
     // software interrupt
     const static u32 swi_comment = 0x00FFFFFF;
     // Coprocessor
@@ -170,7 +151,7 @@ namespace Arm {
   inline std::string to_string(Condition condition) {
     static const char *condition_strings[] = {
       "EQ", "NE", "CS", "CC", "MI", "PL", "VS", "VC",
-      "HI", "LS", "GE", "LT","GT","LE", "",  "NV",
+      "HI", "LS", "GE", "LT", "GT", "LE", "", "NV"
     };
     return condition_strings[(u8) condition];
   }
@@ -219,11 +200,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit BranchAndExchange(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      rN = (u8) read_and_shift(Mask::bex_reg_N, word);
+      condition = (Condition) Bit::range<u32>(Mask::condition, word);
+      rN = (u8) Bit::range(Mask::bex_reg_N, word);
     }
 
-    explicit BranchAndExchange(const char *instr) {
+    explicit BranchAndExchange(const std::string_view &s) {
       // TODO
     }
 
@@ -257,18 +238,18 @@ namespace Arm {
     friend struct Instruction;
 
     explicit Branch(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      link = (bool) read_and_shift(Mask::br_is_link, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
+      link = (bool) Bit::range(Mask::br_is_link, word);
 
-      u32 raw_offset = read(Mask::br_offset, word);
+      u32 raw_offset = Bit::mask(Mask::br_offset, word);
 
       // The branch offset is left shifted by 2 then sign-extended.
       // The offset is 0-23bits + 2 for the shift, making the sign bit 25
-      offset = Bit::sign_extend<s32>(raw_offset << 2, 25);
+      offset = Bit::sign_extend(raw_offset << 2, 25);
     }
 
-    explicit Branch(const char *) {
-      //TODO
+    explicit Branch(const std::string_view &s) {
+      // TODO
     }
 
     enum Mnemonic Mnemonic() const override {
@@ -276,11 +257,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      return 0_u32
-        | (u8) condition << 28
-        | 0b101 << 25
-        | (link ? 1 : 0) << 24
-        | Bit::sign_compress<u32>(offset & Mask::br_offset, 25) >> 2;
+      return 0_u32 | (u8) condition << 28 | 0b101 << 25 | (link ? 1 : 0) << 24 | Bit::sign_compress<u32>(offset & Mask::br_offset, 25) >> 2;
     }
 
     std::string Disassemble() const override {
@@ -363,32 +340,32 @@ namespace Arm {
     friend struct Instruction;
     // Decode
     explicit DataProcessing(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      operation_code = (OperationCode) read_and_shift(BitMask::OpCode, word);
-      is_imm = read_and_shift(BitMask::isImmediate, word);
-      set_flags = read_and_shift(BitMask::isSetFlags, word);
-      rN = read_and_shift(BitMask::Reg_N, word);
-      rD = read_and_shift(BitMask::Reg_D, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
+      operation_code = (OperationCode) Bit::range(BitMask::OpCode, word);
+      is_imm = Bit::range(BitMask::isImmediate, word);
+      set_flags = Bit::range(BitMask::isSetFlags, word);
+      rN = Bit::range(BitMask::Reg_N, word);
+      rD = Bit::range(BitMask::Reg_D, word);
 
       if (is_imm) {
-        ImmediateOperand.rotate = read_and_shift(BitMask::ImmediateRotation, word);
-        ImmediateOperand.immediate = read_and_shift(BitMask::ImmediateValue, word);
+        ImmediateOperand.rotate = Bit::range(BitMask::ImmediateRotation, word);
+        ImmediateOperand.immediate = Bit::range(BitMask::ImmediateValue, word);
       } else {
-        ShiftedRegisterOperand.is_reg = read_and_shift(BitMask::RegisterShiftValue, word);
+        ShiftedRegisterOperand.is_reg = Bit::range(BitMask::RegisterShiftValue, word);
         ShiftedRegisterOperand.shift_type =
-            (ShiftType) read_and_shift(BitMask::RegisterShiftType, word);
+            (ShiftType) Bit::range(BitMask::RegisterShiftType, word);
         if (ShiftedRegisterOperand.is_reg) {
-          ShiftedRegisterOperand.rS = read_and_shift(BitMask::Reg_S, word);
+          ShiftedRegisterOperand.rS = Bit::range(BitMask::Reg_S, word);
         } else {
           ShiftedRegisterOperand.shift_amount =
-              read_and_shift(BitMask::RegisterShiftImmediate, word);
+              Bit::range(BitMask::RegisterShiftImmediate, word);
         }
-        ShiftedRegisterOperand.rM = read_and_shift(BitMask::Reg_M, word);
+        ShiftedRegisterOperand.rM = Bit::range(BitMask::Reg_M, word);
       }
     }
 
     // Assemble
-    explicit DataProcessing(const char *) {
+    explicit DataProcessing(const std::string_view &s) {
       // TODO
     }
 
@@ -416,8 +393,8 @@ namespace Arm {
         op2 |= ShiftedRegisterOperand.rM;
       }
 
-      return 0_u32 | (u8) condition << 28 | bool_to_bit(is_imm) << 25 |
-             (u8) operation_code << 21 | bool_to_bit(set_flags) << 20 |
+      return 0_u32 | (u8) condition << 28 | Bit::from_bool(is_imm) << 25 |
+             (u8) operation_code << 21 | Bit::from_bool(set_flags) << 20 |
              (u8) rN << 16 | (u8) rN << 12 | op2;
     }
 
@@ -490,11 +467,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit PSRTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       //TODO
     }
 
-    explicit PSRTransfer(const char *) {
+    explicit PSRTransfer(const std::string_view &s) {
       //TODO
     }
 
@@ -505,7 +482,7 @@ namespace Arm {
     u32 Encode() const override {
       bool imm_bit = type == Type::RegisterToPSRF && RegisterToPSRF.is_imm;
       static u32 type_const_tbl[] = {
-          Literal::MRS_CONSTANT, Literal::MRS_CONSTANT,
+          Literal::MRS_CONSTANT, Literal::MSR_CONSTANT,
           Literal::MSRF_CONSTANT};
 
       u16 lower_half = 0;
@@ -527,9 +504,7 @@ namespace Arm {
         break;
       }
 
-      return 0_u32 | (u8) condition << 28 | bool_to_bit(imm_bit) << 25 | 1 << 24 |
-             bool_to_bit(use_spsr) << 22 | type_const_tbl[(int) type] << 16 |
-             lower_half;
+      return 0_u32 | (u8) condition << 28 | Bit::from_bool(imm_bit) << 25 | 1 << 24 | Bit::from_bool(use_spsr) << 22 | type_const_tbl[(int) type] << 16 | lower_half;
     }
 
     std::string Disassemble() const override {
@@ -552,22 +527,22 @@ namespace Arm {
     Condition condition;
     bool accumulate;
     bool set_flags;
-    reg_t rD {}, rN {}, rS {}, rM;
+    reg_t rD {}, rN {}, rS {}, rM {};
 
   private:
     friend struct Instruction;
     explicit Multiply(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      accumulate = read_and_shift(Mask::mul_accum, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
+      accumulate = Bit::range(Mask::mul_accum, word);
 
-      set_flags = read_and_shift(Mask::mul_accum, word);
-      rD = read_and_shift(Mask::mul_reg_D, word);
-      rN = read_and_shift(Mask::mul_reg_N, word);
-      rS = read_and_shift(Mask::mul_reg_S, word);
-      rM = read_and_shift(Mask::mul_reg_M, word);
+      set_flags = Bit::range(Mask::mul_accum, word);
+      rD = Bit::range(Mask::mul_reg_D, word);
+      rN = Bit::range(Mask::mul_reg_N, word);
+      rS = Bit::range(Mask::mul_reg_S, word);
+      rM = Bit::range(Mask::mul_reg_M, word);
     }
 
-    explicit Multiply(const char *) {
+    explicit Multiply(const std::string_view &s) {
       //TODO
     }
 
@@ -576,15 +551,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      return 0_u32
-          | (u8) condition << 28
-          | bool_to_bit(accumulate) << 21
-          | bool_to_bit(set_flags) << 20
-          | (u8) rD << 16
-          | (u8) rN << 12
-          | (u8) rS << 8
-          | (u8) Literal::MUL_CONSTANT << 4
-          | (u8) rD;
+      return 0_u32 | (u8) condition << 28 | Bit::from_bool(accumulate) << 21 | Bit::from_bool(set_flags) << 20 | (u8) rD << 16 | (u8) rN << 12 | (u8) rS << 8 | (u8) Literal::MUL_CONSTANT << 4 | (u8) rD;
     }
 
     std::string Disassemble() const override {
@@ -614,20 +581,20 @@ namespace Arm {
     bool set_flags;
     reg_t rDHi, rDLo, rS, rM;
 
-    explicit MultiplyLong(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      accumulate = read_and_shift(Mask::mul_accum, word);
-
-      set_flags = read_and_shift(Mask::mul_accum, word);
-      rDHi = read_and_shift(Mask::mul_reg_D, word);
-      rDLo = read_and_shift(Mask::mul_reg_N, word);
-      rS = read_and_shift(Mask::mul_reg_S, word);
-      rM = read_and_shift(Mask::mul_reg_M, word);
-    }
-
   private:
     friend struct Instruction;
-    explicit MultiplyLong(const char *) {
+    explicit MultiplyLong(u32 word) {
+      condition = (Condition) Bit::range(Mask::condition, word);
+      _signed = Bit::test(word, 22);
+      accumulate = Bit::test(word, 21);
+      set_flags = Bit::test(word, 20);
+      rDHi = Bit::range(Mask::mul_reg_D, word);
+      rDLo = Bit::range(Mask::mul_reg_N, word);
+      rS = Bit::range(Mask::mul_reg_S, word);
+      rM = Bit::range(Mask::mul_reg_M, word);
+    }
+
+    explicit MultiplyLong(const std::string_view &s) {
       //TODO
     }
 
@@ -636,17 +603,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      return 0_u32
-          | (u8) condition << 28
-          | 1 << 23
-          | bool_to_bit(_signed) << 22
-          | bool_to_bit(accumulate) << 21
-          | bool_to_bit(set_flags) << 20
-          | (u8) rDHi << 16
-          | (u8) rDLo << 12
-          | (u8) rS << 8
-          | (u8) Literal::MUL_CONSTANT << 4
-          | (u8) rM;
+      return 0_u32 | (u8) condition << 28 | 1 << 23 | Bit::from_bool(_signed) << 22 | Bit::from_bool(accumulate) << 21 | Bit::from_bool(set_flags) << 20 | (u8) rDHi << 16 | (u8) rDLo << 12 | (u8) rS << 8 | (u8) Literal::MUL_CONSTANT << 4 | (u8) rM;
     }
 
     std::string Disassemble() const override {
@@ -674,12 +631,12 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit SingleDataTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       load = read_and_shift(Mask::ls_is_load, word);
       // TODO
     }
 
-    explicit SingleDataTransfer(const char *) {
+    explicit SingleDataTransfer(const std::string_view &s) {
       // TODO
     }
 
@@ -714,13 +671,13 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit HalfwordDataTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       load = read_and_shift(Mask::ls_is_load, word);
       _signed = read_and_shift(Mask::lshs_s, word);
       halfwords = read_and_shift(Mask::lshs_h, word);
     }
 
-    explicit HalfwordDataTransfer(const char *) {
+    explicit HalfwordDataTransfer(const std::string_view &s) {
       //TODO
     }
 
@@ -758,7 +715,7 @@ namespace Arm {
       // TODO
     }
 
-    explicit BlockDataTransfer(const char *) {
+    explicit BlockDataTransfer(const std::string_view &s) {
       //TODO
     }
 
@@ -792,11 +749,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit Swap(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       //TODO
     }
 
-    explicit Swap(const char *) {
+    explicit Swap(const std::string_view &s) {
       //TODO
     }
 
@@ -805,8 +762,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      return 0_u32 | (u8) condition << 28 | 1 << 24 | (byte ? 1 : 0) << 22 |
-             rN << 16 | rD << 12 | 0b1001 << 4 | rM;
+      return 0_u32 | (u8) condition << 28 | 1 << 24 | (byte ? 1 : 0) << 22 | rN << 16 | rD << 12 | 0b1001 << 4 | rM;
     }
 
     std::string Disassemble() const override {
@@ -834,11 +790,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit SoftwareInterrupt(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      comment = read_and_shift(Mask::swi_comment, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
+      comment = Bit::range(Mask::swi_comment, word);
     }
 
-    explicit SoftwareInterrupt(const char *) {
+    explicit SoftwareInterrupt(const std::string_view &s) {
       //TODO
     }
 
@@ -847,8 +803,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      return 0_u32 | (u8) condition << 28 | 0xF << 24 |
-             comment & Mask::swi_comment;
+      return 0_u32 | (u8) condition << 28 | 0xF << 24 | comment & Mask::swi_comment;
     }
 
     std::string Disassemble() const override {
@@ -873,11 +828,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit CoprocessorDataOperation(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       //TODO
     }
 
-    explicit CoprocessorDataOperation(const char *) {
+    explicit CoprocessorDataOperation(const std::string_view &s) {
       //TODO
     }
 
@@ -910,11 +865,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit CoprocessorDataTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       //TODO
     }
 
-    explicit CoprocessorDataTransfer(const char *) {
+    explicit CoprocessorDataTransfer(const std::string_view &s) {
       //TODO
     }
 
@@ -947,11 +902,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit CoprocessorRegisterTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
+      condition = (Condition) Bit::range(Mask::condition, word);
       //TODO
     }
 
-    explicit CoprocessorRegisterTransfer(const char *) {
+    explicit CoprocessorRegisterTransfer(const std::string_view &s) {
       //TODO
     }
 
@@ -984,11 +939,11 @@ namespace Arm {
   private:
     friend struct Instruction;
     explicit Undefined(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      word = word;
+      condition = (Condition) Bit::range(Mask::condition, word);
+      this->word = word;
     }
 
-    explicit Undefined(const char *) {
+    explicit Undefined(const std::string_view &s) {
       //TODO
     }
 
@@ -1077,10 +1032,13 @@ namespace Arm {
       assert(!std::holds_alternative<std::monostate>(data));
     }
 
-    explicit Instruction(u32 word) {
-      switch (read_and_shift(Bit::Mask::Inclusive::between<u32>(24, 27), word)) {
+    explicit Instruction(u32 word) : type(InstructionType::Undefined) {
+      switch (Bit::range(Bit::Mask::between_inc<u32>(24, 27), word)) {
       // Class 1 instructions
-      case 0x0: case 0x1: case 0x2: case 0x3: {
+      case 0x0:
+      case 0x1:
+      case 0x2:
+      case 0x3: {
         //        31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
         // dp     [Cond     ] 0  0  I  [OpCode   ] S  [Rn       ] [Rd       ] [Operand 2                        ]
         // psr    [Cond     ] 0  0  I  1  0  P  D  0  [ID       ] [Rm       ] [Operand 2                        ]
@@ -1093,7 +1051,7 @@ namespace Arm {
         // if 25 is set, it can only be DP
         if (!Bit::test(word, 25)) {
           // check bex early since it doesn't fit smoothly with everything else
-          if (read_and_shift(Mask::bex_const, word) == Literal::BEX_CONSTANT) {
+          if (Bit::range(Mask::bex_const, word) == Literal::BEX_CONSTANT) {
             set_variant_data<Branch>(word);
             break;
           }
@@ -1127,10 +1085,10 @@ namespace Arm {
 
         using DPI = DataProcessing;
         bool is_psr = bounded(
-                          read_and_shift(DPI::BitMask::OpCode, word),
+                          Bit::range(DPI::BitMask::OpCode, word),
                           (uint) DPI::OperationCode::TST,
                           (uint) DPI::OperationCode::CMN) &&
-                      (bool) read(word, DPI::BitMask::isSetFlags);
+                      (bool) Bit::mask(word, DPI::BitMask::isSetFlags);
 
         if (is_psr) {
           set_variant_data<PSRTransfer>(word);
@@ -1148,8 +1106,7 @@ namespace Arm {
         break;
       case 0x6:
       case 0x7: {
-        // TODO: mask constant
-        if (read_and_shift(Bit::Mask::bit<u32>(4), word)) {
+        if (Bit::range(Bit::Mask::bit<u32>(4), word)) {
           set_variant_data<Undefined>(word);
         } else {
           set_variant_data<SingleDataTransfer>(word);
@@ -1169,7 +1126,7 @@ namespace Arm {
         set_variant_data<CoprocessorDataTransfer>(word);
         break;
       case 0xE: {
-        bool is_crt = read_and_shift(Mask::cp_is_crt, word);
+        bool is_crt = Bit::range(Mask::cp_is_crt, word);
 
         if (is_crt) {
           set_variant_data<CoprocessorRegisterTransfer>(word);
