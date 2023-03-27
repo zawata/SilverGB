@@ -25,21 +25,14 @@ u32 psr_regs[6]; // CPSR + SPSR*5
 
 #define CPSR 0
 
-#define REG_CPSR (REG(CPSR))
-
-#define BOOL(x) (!(!(x)))
-#define BitTest(arg,posn)       BOOL((arg) & (1L << (posn)))
-#define BitSet(arg,posn)        ((arg) | (1L << (posn)))
-#define BitChange(arg,posn,stt) (((arg) & ~(1UL << (posn))) | ((stt) << (posn)))
-#define BitReset(arg,posn)      ((arg) & ~(1L << (posn)))
-#define BitFlip(arg,posn)       ((arg) ^ (1L << (posn)))
+#define REG_CPSR (PSR(CPSR))
 
 #define make_reg_funcs(name, bit) \
-  __force_inline bool get_##name()              { return BitTest(REG_CPSR, bit); } \
-  __force_inline void set_##name()              { REG_CPSR = BitSet(REG_CPSR, bit); } \
-  __force_inline void change_##name(bool state) { REG_CPSR = BitChange(REG_CPSR, bit, (u8)state);} \
-  __force_inline void reset_##name()            { REG_CPSR = BitReset(REG_CPSR, bit); } \
-  __force_inline void flip_##name()             { REG_CPSR = BitFlip(REG_CPSR, bit); };
+  [[maybe_unused]] __force_inline bool get_##name()              { return Bit::test(REG_CPSR, bit); } \
+  [[maybe_unused]] __force_inline void set_##name()              { Bit::set(&PSR(CPSR), bit); } \
+  [[maybe_unused]] __force_inline void change_##name(bool state) { Bit::set_cond(REG_CPSR, bit, Bit::from_bool(state));} \
+  [[maybe_unused]] __force_inline void reset_##name()            { Bit::reset(&PSR(CPSR), bit); } \
+  [[maybe_unused]] __force_inline void flip_##name()             { Bit::toggle(REG_CPSR, bit); };
 
 make_reg_funcs(cpsr_N, 31);
 make_reg_funcs(cpsr_Z, 30);
@@ -154,27 +147,19 @@ void CPU::prefetch32() {
 }
 
 void CPU::prefetch32(u32 dest) {
-    nowide::cout << "prefetch(u32) " << getchar() << std::endl;
+    nowide::cout << "prefetch32(u32) " << getchar() << std::endl;
     op2 = op1;
     op1 = io->read(dest);
 }
 
 void CPU::execute() {
-    #define MUL_CONSTANT 0b1001
-    #define BEX_CONSTANT 0b000100101111111111110001
+    using Instr = Arm::InstructionType;
 
-    #define MRS_C_CONSTANT  0b100001111
-    #define MRS_P_CONSTANT  0b101001111
-    #define MSR_C_CONSTANT  0b100101001
-    #define MSR_P_CONSTANT  0b101101001
-    #define MSRF_C_CONSTANT 0b100101000
-    #define MSRF_P_CONSTANT 0b101101000
-
+    // we prefetch 2 instructions ahead
     u32 word = op2;
 
-   Arm::Instruction instr = Arm::Instruction::Decode(word);
+    Arm::Instruction instr = Arm::Instruction::Decode(word);
 
-    using Instr = Arm::InstructionType;
     std::cout << instr.Disassemble() << std::endl;
     switch(instr.Type()) {
     case Instr::Branch: {
@@ -186,7 +171,6 @@ void CPU::execute() {
        break;
     }
     case Instr::DataProcessing: {
-       std::cout << instr.Disassemble();
        auto &i = instr.InstructionData<Arm::DataProcessing>();
        if(i.is_imm) {
          data_proc_immediate(instr);
@@ -200,7 +184,6 @@ void CPU::execute() {
        break;
     }
     case Instr::PSRTransfer: {
-       auto &i = instr.InstructionData<Arm::PSRTransfer>();
        psr_transfer(instr);
        break;
     }
@@ -217,22 +200,29 @@ void CPU::execute() {
        break;
     }
     case Instr::HalfwordDataTransfer: {
+//       halfword_data_transfer(instr);
        break;
     }
     case Instr::BlockDataTransfer: {
+//       halfword_data_transfer(instr);
        break;
     }
     case Instr::Swap: {
+       swap(instr);
        break;
     }
-    case Instr::SoftwareInterrupt:
+    case Instr::SoftwareInterrupt: {
+       std::cout << "Software Interrupt";
+       break;
+    }
     case Instr::Undefined: {
-       std::cout << instr.Disassemble();
+       std::cout << "Undefined Instruction";
+       break;
     }
     case Instr::CoprocessorDataOperation:
     case Instr::CoprocessorDataTransfer:
     case Instr::CoprocessorRegisterTransfer: {
-       std::cout << instr.Disassemble();
+       std::cout << "Coprocessor Instructions Not Implemented";
        break;
     }
     default:
@@ -423,7 +413,7 @@ void CPU::data_proc_immediate(Arm::Instruction instr) {
     prefetch32();
     if(EvaluateCondition(i.condition)) {
         bool shift_carry_out;
-        u32 shift_operand = Bit::shift_with_carry<u32>::rotate_right(i.ImmediateOperand.immediate, 1 << i.ImmediateOperand.rotate, &shift_carry_out);
+        u32 shift_operand = Bit::ShiftWithCarry::rotate_right<u32>(i.ImmediateOperand.immediate, 1 << i.ImmediateOperand.rotate, &shift_carry_out);
         exec_dp_op(instr, shift_operand, shift_carry_out);
 
         if(i.rD == PC) {
@@ -463,7 +453,7 @@ void CPU::psr_transfer(Arm::Instruction instr) {
           u32 operand;
           if(i.RegisterToPSRF.is_imm) {
            bool shift_carry_out;
-           operand = Bit::shift_with_carry<u32>::rotate_right(
+           operand = Bit::ShiftWithCarry::rotate_right<u32>(
                i.RegisterToPSRF.ImmediateOperand.value,
                1 << i.RegisterToPSRF.ImmediateOperand.rotation,
                &shift_carry_out);
@@ -575,13 +565,13 @@ void CPU::load_store_immediate(Arm::Instruction instr) {
 inline u32 CPU::calc_shift_operand(Arm::ShiftType shift_type, u8 amount, u8 reg_M, bool *carry_out) {
     switch(shift_type) {
     case Arm::ShiftType::LogicalLeft:
-        return Bit::shift_with_carry<u32>::shift_left(REG(reg_M), amount, get_cpsr_C(), carry_out);
+        return Bit::ShiftWithCarry::logical_left<u32>(REG(reg_M), amount, get_cpsr_C(), carry_out);
     case Arm::ShiftType::LogicalRight:
-        return Bit::shift_with_carry<u32>::shift_right(REG(reg_M), amount, carry_out);
+        return Bit::ShiftWithCarry::logical_right<u32>(REG(reg_M), amount, carry_out);
     case Arm::ShiftType::ArithmeticRight:
-        return Bit::shift_with_carry<u32>::arithmetic_shift_right(REG(reg_M), amount, carry_out);
+        return Bit::ShiftWithCarry::arithmetic_right<u32>(REG(reg_M), amount, carry_out);
     case Arm::ShiftType::RotateRight:
-        return Bit::shift_with_carry<u32>::rotate_right(REG(reg_M), amount, carry_out);
+        return Bit::ShiftWithCarry::rotate_right<u32>(REG(reg_M), amount, carry_out);
     default:
         assert(false);
     }
