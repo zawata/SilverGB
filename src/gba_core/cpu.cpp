@@ -494,15 +494,15 @@ void CPU::load_store_shifted_reg(Arm::Instruction instr) {
         // internal cycle, no prefetch
 
         //this will perform cycle 3
-//        execute_load_store_command(
-//            true,
-//            pre_index,
-//            add,
-//            word,
-//            write,
-//            reg_N,
-//            reg_D,
-//            calc_shift_operand(shift_type, shift_amount, reg_M, nullptr));
+        execute_load_store_command(
+            true,
+            pre_index,
+            add,
+            word,
+            write,
+            reg_N,
+            reg_D,
+            calc_shift_operand(shift_type, shift_amount, reg_M, nullptr));
 
         if(i.rD == PC) {
             //cycle 4
@@ -771,18 +771,68 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
 }
 
 inline void CPU::exec_ls_op(
-  bool load,
-  bool pre_index,
-  bool add,
-  bool word,
-  bool write,
-  u8 reg_N,
-  u8 reg_D,
-  u32 offset
+//    Arm::Instruction instr,
+    bool load,
+    bool pre_index,
+    bool add,
+    bool word,
+    bool write,
+    u8 reg_N,
+    u8 reg_D,
+    u32 offset
 ) {
 #define calc_sub_idx(reg, offset) (REG(reg_N) - offset)
 #define calc_add_idx(reg, offset) (REG(reg_N) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+
+    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
+
+    u32 index;
+    if(pre_index) {
+        index = calc_auto_idx(reg_N, offset, add);
+        if(word && (index % 4) != 0) {
+            throw_data_abort();
+        }
+        if(write) {
+            REG(reg_N) = index;
+        }
+    } else {
+        index = REG(reg_N);
+    }
+
+    //cycle 3
+    io->tick();
+    prefetch32();
+    REG(reg_D) = io->read(index) & (word ? 0xFFFFFFFF : 0xFF);
+
+    if(!pre_index) {
+        index = calc_auto_idx(reg_N, offset, add);
+
+        // base reg is always written on a post-idx?
+        REG(reg_N) = index;
+    }
+
+#undef calc_auto_idx
+#undef calc_add_idx
+#undef calc_sub_idx
+}
+
+inline void CPU::exec_hwsd_op(
+    //    Arm::Instruction instr,
+    bool load,
+    bool pre_index,
+    bool add,
+    bool word,
+    bool write,
+    u8 reg_N,
+    u8 reg_D,
+    u32 offset
+) {
+#define calc_sub_idx(reg, offset) (REG(reg_N) - offset)
+#define calc_add_idx(reg, offset) (REG(reg_N) + offset)
+#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+
+    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
     u32 index;
     if(pre_index) {
