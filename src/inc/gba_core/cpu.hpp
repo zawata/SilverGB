@@ -44,4 +44,14 @@ private:
     void load_store_immediate(Arm::Instruction instr);
 
     void exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shift_carry_out);
+    void exec_ls_op(
+      bool load,
+      bool pre_index,
+      bool add,
+      bool word,
+      bool write,
+      u8 reg_N,
+      u8 reg_D,
+      u32 offset
+    );
 };

@@ -163,6 +163,12 @@ namespace Arm {
     RotateRight
   };
 
+  inline std::string to_string(ShiftType shiftType) {
+    static const char *shift_strings[] = {
+        "LSL", "LSR", "ASR", "ROR"};
+    return shift_strings[(u8) shiftType];
+  }
+
   enum struct InstructionType {
     Undefined,
     Branch,
@@ -643,14 +649,42 @@ namespace Arm {
    */
   struct SingleDataTransfer : private InstructionDataBase {
     Condition condition;
+    bool is_imm;
+    bool is_pre_idx;
+    bool is_inc;
+    bool is_byte;
+    bool write_back;
     bool load;
+    reg_t rN {}, rD {};
+    union {
+      struct {
+        ShiftType shift;
+        reg_t rM;
+      } ShiftedRegisterOperand;
+      struct {
+        u16 offset;
+      } ImmediateOperand {};
+    };
+
 
   private:
     friend struct Instruction;
     explicit SingleDataTransfer(u32 word) {
       condition = (Condition) Bit::range(Mask::condition, word);
-      load = read_and_shift(Mask::ls_is_load, word);
-      // TODO
+      is_imm = Bit::test(word, 25);
+      is_pre_idx = Bit::test(word, 24);
+      is_inc = Bit::test(word, 23);
+      is_byte = Bit::test(word, 22);
+      write_back = Bit::test(word, 21);
+      load = Bit::test(word, 20);
+      rN = Bit::range(Bit::Mask::between_inc<u32>(16, 19), word);
+      rD = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+      if (is_imm) {
+        ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
+      } else {
+        ShiftedRegisterOperand.shift = (ShiftType) Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
+        ShiftedRegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+      }
     }
 
     explicit SingleDataTransfer(const std::string_view &s) {
@@ -667,8 +701,31 @@ namespace Arm {
     }
 
     std::string Disassemble() const override {
-      // TODO
-      return "";
+      std::stringstream ss;
+      ss << to_string(Mnemonic()) << to_string(condition) << (is_byte ? "B" : "") << (!is_pre_idx && write_back ? "T" : "")
+         << " ";
+      ss << rD.to_string() << ", ";
+
+      ss << "[" << rN.to_string();
+      if (!is_pre_idx) {
+        ss << ']';
+      }
+
+      if (is_imm) {
+        if (ImmediateOperand.offset == 0) {
+          ss << (u32) ImmediateOperand.offset;
+        } else {
+          ss << "]";
+        }
+      } else {
+        ss << (is_inc ? "+" : "-") << ShiftedRegisterOperand.rM.to_string() << to_string(ShiftedRegisterOperand.shift);
+      }
+
+      if (is_pre_idx) {
+        ss << ']';
+      }
+
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
@@ -681,17 +738,43 @@ namespace Arm {
    */
   struct HalfwordDataTransfer : private InstructionDataBase {
     Condition condition;
+    bool is_pre_idx;
+    bool is_inc;
+    bool is_imm;
+    bool write_back;
     bool load;
-    bool _signed;
+    reg_t rN, rD;
+    bool signed_data;
     bool halfwords;
+    union {
+      struct {
+        reg_t rM;
+      } RegisterOperand;
+      struct {
+        u8 offset;
+      } ImmediateOperand {};
+    };
+    reg_t rM;
 
   private:
     friend struct Instruction;
     explicit HalfwordDataTransfer(u32 word) {
       condition = (Condition) Bit::range(Mask::condition, word);
-      load = read_and_shift(Mask::ls_is_load, word);
-      _signed = read_and_shift(Mask::lshs_s, word);
-      halfwords = read_and_shift(Mask::lshs_h, word);
+      is_pre_idx = Bit::test(word, 24);
+      is_inc = Bit::test(word, 23);
+      is_imm = Bit::test(word, 22);
+      write_back = Bit::test(word, 21);
+      load = Bit::test(word, 20);
+      rN = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
+      rD = Bit::range(Bit::Mask::between_inc<u32>(15, 12), word);
+      assert(Bit::range(Bit::Mask::between_inc<u32>(5, 6), word) != 0);
+      signed_data = Bit::test(word, 6);
+      halfwords = Bit::test(word, 5);
+      if (is_imm) {
+        ImmediateOperand.offset = (Bit::range(Bit::Mask::between_inc<u32>(11, 8), word) << 4) | Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+      } else {
+        rM = Bit::range(Bit::Mask::until_inc<u32>(3), word);
+      }
     }
 
     explicit HalfwordDataTransfer(const std::string_view &s) {
@@ -703,13 +786,34 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      // TODO
-      return 0;
+      return 0_u32 | (u8) condition << 28 | Bit::from_bool(is_pre_idx) << 24 | Bit::from_bool(is_inc) << 23 | Bit::from_bool(write_back) << 21 | Bit::from_bool(load) << 20 | (u8) rN << 16 | (u8) rD << 12 | Bit::Mask::bit<u32>(7) | Bit::from_bool(signed_data) | Bit::from_bool(halfwords) | Bit::Mask::bit<u32>(4) | (u8) rM;
     }
 
     std::string Disassemble() const override {
-      // TODO
-      return "";
+      std::stringstream ss;
+      ss << to_string(Mnemonic()) << to_string(condition) << (signed_data ? "S" : "") << (halfwords ? "H" : "B")
+         << " ";
+      ss << rD.to_string() << ", ";
+
+      ss << "[" << rN.to_string();
+      if (!is_pre_idx) {
+        ss << ']';
+      }
+
+      if (is_imm) {
+        if (ImmediateOperand.offset == 0) {
+          ss << (u32) ImmediateOperand.offset;
+        } else {
+          ss << "]";
+        }
+      } else {
+        ss << (is_inc ? "+" : "-") << RegisterOperand.rM.to_string();
+      }
+
+      if (is_pre_idx) {
+        ss << ']';
+      }
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
@@ -722,14 +826,25 @@ namespace Arm {
    */
   struct BlockDataTransfer : private InstructionDataBase {
     Condition condition;
+    bool is_pre_idx;
+    bool is_inc;
+    bool load_psr;
+    bool write_back;
     bool load;
+    reg_t rN;
+    u16 registers;
 
   private:
     friend struct Instruction;
     explicit BlockDataTransfer(u32 word) {
-      condition = (Condition) read_and_shift(Mask::condition, word);
-      load = read_and_shift(Mask::ls_is_load, word);
-      // TODO
+      condition = (Condition) Bit::range(Mask::condition, word);
+      is_pre_idx = Bit::test(word, 24);
+      is_inc = Bit::test(word, 23);
+      load_psr = Bit::test(word, 22);
+      write_back = Bit::test(word, 21);
+      load = Bit::test(word, 20);
+      rN = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
+      registers = Bit::mask(Bit::Mask::until_inc<u32>(15), word);
     }
 
     explicit BlockDataTransfer(const std::string_view &s) {
@@ -741,8 +856,7 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      // TODO
-      return 0;
+      return 0_u32 | (u8) condition << 28 | Bit::Mask::bit<u32>(27) | Bit::from_bool(is_pre_idx) << 24 | Bit::from_bool(is_inc) << 23 | Bit::from_bool(load_psr) | Bit::from_bool(write_back) << 21 | Bit::from_bool(load) << 20 | (u8) rN << 16 | registers;
     }
 
     std::string Disassemble() const override {
