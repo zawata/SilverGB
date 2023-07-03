@@ -468,7 +468,24 @@ namespace Arm {
     friend struct Instruction;
     explicit PSRTransfer(u32 word) {
       condition = (Condition) Bit::range(Mask::condition, word);
-      //TODO
+      use_spsr = Bit::test(word, 22);
+      u32 psr_type = Bit::range(Bit::Mask::between_inc<u32>(16, 21), word);
+      if (psr_type == Literal::MRS_CONSTANT) {
+        type = Type::PSRToRegister;
+        PSRToRegister.rD = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+      } else if (psr_type == Literal::MSR_CONSTANT) {
+        type = Type::RegisterToPSR;
+        PSRToRegister.rD = Bit::mask(Bit::Mask::until<u32>(3), word);
+      } else if (psr_type == Literal::MSRF_CONSTANT) {
+        type = Type::RegisterToPSRF;
+        RegisterToPSRF.is_imm = Bit::test(word, 25);
+        if (RegisterToPSRF.is_imm) {
+          RegisterToPSRF.ImmediateOperand.rotation = Bit::range(Bit::Mask::between_inc<u32>(8, 11), word);
+          RegisterToPSRF.ImmediateOperand.value = Bit::mask(Bit::Mask::until_inc<u32>(7), word);
+        } else {
+          RegisterToPSRF.RegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+        }
+      }
     }
 
     explicit PSRTransfer(const std::string_view &s) {
