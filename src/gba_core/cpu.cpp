@@ -562,6 +562,36 @@ void CPU::load_store_immediate(Arm::Instruction instr) {
     }
 }
 
+void CPU::swap(Arm::Instruction instr) {
+    // normal    1  pc+8  i  0  (pc+2L) N 0 c
+    //           2  Rn    s  0  (alu)   I 1 d
+    //           3  Rn    i  0  -       S 1 c
+    //           4  pc+12
+    //              pc+12
+
+    auto &i = instr.InstructionData<Arm::Swap>();
+
+    //cycle 1
+    io->tick();
+    prefetch32();
+    if(EvaluateCondition(i.condition)) {
+
+        //cycle 2
+        io->tick();
+        // internal cycle, no prefetch
+
+        if(i.rD == PC) {
+            //cycle 4
+            io->tick();
+            prefetch32();
+
+            //cycle 5
+            io->tick();
+            prefetch32();
+        }
+    }
+}
+
 inline u32 CPU::calc_shift_operand(Arm::ShiftType shift_type, u8 amount, u8 reg_M, bool *carry_out) {
     switch(shift_type) {
     case Arm::ShiftType::LogicalLeft:

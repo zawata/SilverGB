@@ -881,7 +881,10 @@ namespace Arm {
     friend struct Instruction;
     explicit Swap(u32 word) {
       condition = (Condition) Bit::range(Mask::condition, word);
-      //TODO
+      byte = Bit::test(word, 22);
+      rN = Bit::range(word, Bit::Mask::between<u32>(16,19));
+      rD = Bit::range(word, Bit::Mask::between<u32>(16,19));
+      rM = Bit::range(word, Bit::Mask::between<u32>(16,19));
     }
 
     explicit Swap(const std::string_view &s) {
