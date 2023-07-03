@@ -969,10 +969,16 @@ namespace Arm {
     }
 
     u32 Encode() const override {
-      //TODO
+      return word;
     }
 
-    std::string Disassemble() const override { return "Undefined Instruction"; }
+    std::string Disassemble() const override {
+      std::stringstream ss;
+
+      ss << "Undefined(" << as_hex(word) << ")" << to_string(condition);
+
+      return ss.str();
+    }
 
     static constexpr InstructionType GetInstructionType() {
       return InstructionType::Undefined;
