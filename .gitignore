@@ -1,7 +1,6 @@
 # ide files
 .vscode/
-
-#specifically visual studio
+.idea/
 .vs/
 .cache/
 

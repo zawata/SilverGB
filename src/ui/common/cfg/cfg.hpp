@@ -19,6 +19,10 @@
     #undef None
 #endif
 
+#if defined(_OBJC_OBJC_H_)
+    #undef Nil
+#endif
+
 #include <nop/serializer.h>
 #include <nop/status.h>
 #include <nop/structure.h>

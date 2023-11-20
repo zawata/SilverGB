@@ -1,10 +1,7 @@
 #pragma once
 
-#include "GL/gl3w.h"
-#include <SDL2/SDL.h>
-
 #include "imgui/imgui.h"
-#include "imgui/ImGuiFileBrowser.h"
+// #include "imgui/ImGuiFileBrowser.h"
 
 #include "gb_core/core.hpp"
 #include "cfg/cfg.hpp"
@@ -22,7 +19,7 @@ public:
     };
 
     static bool preInitialize();
-    static GUI *createGUI(Configuration *config);
+    static GUI *createGUI(Config *config);
 
     void open_file(std::string file);
 
@@ -30,17 +27,7 @@ public:
 
     loop_return_code_t mainLoop();
 private:
-    struct {
-        bool loop_finish      = false;
-        bool open_rom         = false;
-        bool open_bios        = false;
-        bool open_ctxt_menu   = false;
-        bool game_loaded      = false;
-        bool game_running     = false;
-        bool debug_mode       = false;
-    } state_flags;
-
-    GUI(SDL_Window *w, SDL_GLContext g, Configuration *config);
+    GUI(Config *config);
 
     void MainOptionsWindow();
 
@@ -50,18 +37,12 @@ private:
     void buildBreakpointWindow();
     //void buildMemoryViewWindow();
 
-    SDL_Window* window;
-    SDL_GLContext gl_context;
-
-    File *rom_file;
-    File *bios_file;
-    GB_Core *core;
-    Configuration *config;
-
-    GLuint screen_texture;
-    GLuint screen_texture_fbo;
+    Silver::File *rom_file;
+    Silver::File *bios_file;
+    Silver::Core *core;
+    Config *config;
 
     // file dialog handlers.
-    imgui_addons::ImGuiFileBrowser rom_dialog;
-    imgui_addons::ImGuiFileBrowser bios_dialog;
+    // imgui_addons::ImGuiFileBrowser rom_dialog;
+    // imgui_addons::ImGuiFileBrowser bios_dialog;
 };

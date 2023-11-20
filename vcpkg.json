@@ -5,10 +5,8 @@
   "dependencies": [
     "zlib",
     "libnop",
-    "portaudio",
-    "gl3w",
     "nowide",
-    "sdl2",
+    "argparse",
     {
       "name":"magnum",
       "default-features": false,

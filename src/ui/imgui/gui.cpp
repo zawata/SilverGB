@@ -1,139 +1,33 @@
 #include "gui.hpp"
 
-#include "GL/gl3w.h"
-#include "SDL_video.h"
-#include "imgui/imgui_impl_sdl.h"
-#include "imgui/imgui_impl_opengl3.h"
-#include "imgui/ImGuiFileBrowser.h"
-
-#include "imgui_shortcut_handler.hpp"
-
 #include "util/bit.hpp"
 
-namespace ImGui {
-    IMGUI_API void SetNextWindowRelativePos(const ImGuiViewport *viewport, const ImVec2& pos, ImGuiCond cond = 0, const ImVec2& pivot = ImVec2(0, 0)) {
-        SetNextWindowPos({viewport->Pos.x + pos.x,viewport->Pos.y + pos.y});
-    }
-}
-
-std::pair<ImVec2, ImVec2> get_screen_area(ImVec2 &win_bounds) {
-    //auto screen sizing and placement code
-    ImVec2 img_bottom_left;
-    ImVec2 img_top_right;
-
-    float scaling_factor = min(win_bounds.x/GB_S_W, win_bounds.y/GB_S_H);
-
-    //calculate img size
-    img_top_right.x = scaling_factor * GB_S_W;
-    img_top_right.y = scaling_factor * GB_S_H;
-
-    img_bottom_left.x = (win_bounds.x - img_top_right.x) / 2;
-    img_bottom_left.y = (win_bounds.y - img_top_right.y) / 2;
-
-    img_top_right.x += img_bottom_left.x;
-    img_top_right.y += img_bottom_left.y;
-
-    return std::make_pair(img_bottom_left, img_top_right);
-}
-
-GUI::GUI(SDL_Window *w, SDL_GLContext g, Configuration *config) :
-window(w),
-gl_context(g),
+GUI::GUI(Config *config) :
 rom_file(nullptr),
 bios_file(nullptr),
 core(nullptr),
 config(config) {
-    //Build Screen Texture, leave unpopulated right now  so we can do partial updates later
-    glGenTextures(1, &screen_texture);                                check_gl_error();
-    glBindTexture(GL_TEXTURE_2D, screen_texture);                     check_gl_error();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); check_gl_error();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); check_gl_error();
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, GB_S_W, GB_S_H);        check_gl_error();
-    glBindTexture(GL_TEXTURE_2D, 0);                                  check_gl_error();
-
-    glGenFramebuffers(1, &screen_texture_fbo);                        check_gl_error();
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_texture_fbo);       check_gl_error();
-    glFramebufferTexture2D(
-            GL_READ_FRAMEBUFFER,
-            GL_COLOR_ATTACHMENT0,
-            GL_TEXTURE_2D,
-            screen_texture,
-            0);                                                       check_gl_error();
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 }
 
 GUI::~GUI() {
-    //Save Configuration
-    config->saveConfigFile("config.cfg"); //TODO: demagic
-
     delete config;
     if(rom_file) delete rom_file;
     if(core)     delete core;
-
-    //delete custom GL constructs
-    glDeleteTextures(1, &screen_texture);
-    glDeleteFramebuffers(1, &screen_texture_fbo);
-
-    //shutdown ImGUI
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL2_Shutdown();
-    ImGui::DestroyContext();
-
-    //shutdown SDL
-    SDL_GL_DeleteContext(gl_context);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
 }
 
-bool GUI::preInitialize() {
-    if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) return false;
-
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
-
-    SDL_GL_SetSwapInterval(1);
-
-    IMGUI_CHECKVERSION();
-
-    return true;
-}
-
-GUI *GUI::createGUI(Configuration *config) {
-    SDL_Window *window = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, GB_S_W, GB_S_H, SDL_WINDOW_OPENGL);
-    SDL_SetWindowResizable(window, SDL_TRUE);
-    SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-
-    gl3wInit();
-
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-
-    ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-    ImGui_ImplOpenGL3_Init();
-
-    return new GUI(window, gl_context, config);
+GUI *GUI::createGUI(Config *config) {
+    return new GUI(config);
 }
 
 void GUI::open_file(std::string file) {
     std::cout << "Starting Core" <<std::endl;
 
-    if (config->BIOS.get_bios_loaded()) {
-        bios_file = File::openFile(config->BIOS.get_bios_filepath());
-        config->BIOS.set_bios_loaded(bios_file != nullptr);
+    if (!config->emulationSettings.bios_file.empty()) {
+        bios_file = Silver::File::openFile(config->emulationSettings.bios_file);
     }
 
-    rom_file = File::openFile(file);
-    core = new GB_Core(rom_file, bios_file);
+    rom_file = Silver::File::openFile(file);
+    core = new Silver::Core(rom_file, bios_file);
     //core->start_thread(true);
     // state_flags.game_loaded = true;
     //core->set_bp(0x02a5, true);
@@ -142,183 +36,101 @@ void GUI::open_file(std::string file) {
 GUI::loop_return_code_t GUI::mainLoop() {
     namespace im = ImGui;
 
-    SDL_Event event;
-    while (SDL_PollEvent(&event))
-    {
-        ImGui_ImplSDL2_ProcessEvent(&event);
-        switch(event.type) {
-        case SDL_QUIT:
-            state_flags.loop_finish = true;
-            break;
-        case SDL_WINDOWEVENT:
-            if(event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
-                state_flags.loop_finish = true;
-            }
-            break;
-        case SDL_KEYDOWN:
-        case SDL_KEYUP:
-            if(!im::GetIO().WantCaptureKeyboard
-            && !im::BuildShortcut(&event.key)) {
-                //do other stuff with the key event
-            }
-            break;
-        }
-    }
-
-    // Start the ImGui frame
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL2_NewFrame(window);
-    im::NewFrame();
-
-    //Build out the window
-    // im::SetNextWindowViewport(im::GetMainViewport()->ID);
-    // im::SetNextWindowRelativePos(im::GetMainViewport(), {0.0f, 0.0f});
-    // im::SetNextWindowSize(im::GetIO().DisplaySize);
-    // im::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    // im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    // im::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
-    // im::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-    // im::Begin("##Game", nullptr,
-    //         ImGuiWindowFlags_NoDecoration      |
-    //         ImGuiWindowFlags_NoMove            |
-    //         ImGuiWindowFlags_NoScrollWithMouse );
-
-    // im::ShowDemoWindow();
-
     MainOptionsWindow();
-
-    if(state_flags.open_rom) {
-        im::OpenPopup("Open ROM File");
-        state_flags.open_rom = false;
-    }
-
-    if(state_flags.open_ctxt_menu) {
-        state_flags.open_ctxt_menu = false;
-    }
 
     // im::End();
     // im::PopStyleVar(4);
 
-    if(rom_dialog.showFileDialog("Open ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".gb,.bin")) {
-        this->open_file(rom_dialog.selected_path);
-    }
-    if(bios_dialog.showFileDialog("Open BIOS ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".*,.bin")) {
-        std::string file = bios_dialog.selected_path;
-        File *bios = File::openFile(file);
+    // if(rom_dialog.showFileDialog("Open ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".gb,.bin")) {
+    //     this->open_file(rom_dialog.selected_path);
+    // }
+    // if(bios_dialog.showFileDialog("Open BIOS ROM File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".*,.bin")) {
+    //     std::string file = bios_dialog.selected_path;
+    //     Silver::File *bios = Silver::File::openFile(file);
 
-        if(!bios)
-            std::cerr << "bios file could not be opened" << std::endl;
-        else {
-            if(bios->getCRC() != DMG_BIOS_CRC) {
-                std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
-                SDL_ShowSimpleMessageBox(
-                        SDL_MESSAGEBOX_ERROR ,
-                        "CRC Mismatch",
-                        "CRC does not match known DMG CRC. File will not be loaded.",
-                        nullptr);
-            } else {
-                if(file.size() <= 255) {
-                    std::cout << "File loaded" << std::endl;
-                    config->BIOS.set_bios_loaded(true);
-                    config->BIOS.set_bios_filepath(file.c_str());
-                } else {
-                    SDL_ShowSimpleMessageBox(
-                        SDL_MESSAGEBOX_ERROR,
-                        "File path is too long",
-                        "File path is too long...Maybe the developer should bump up the limit?",
-                        nullptr);
-                }
-            }
-        }
-        //the bios is opened here to check and save it.
-        // the actual loading and reading is done by the core.
-        delete bios;
-    }
+    //     if(!bios)
+    //         std::cerr << "bios file could not be opened" << std::endl;
+    //     else {
+    //         if(bios->getCRC() != DMG_BIOS_CRC) {
+    //             std::cerr << std::hex << "bios CRC: " << bios->getCRC() << " != " << DMG_BIOS_CRC << std::dec << std::endl;
+    //             SDL_ShowSimpleMessageBox(
+    //                     SDL_MESSAGEBOX_ERROR ,
+    //                     "CRC Mismatch",
+    //                     "CRC does not match known DMG CRC. File will not be loaded.",
+    //                     nullptr);
+    //         } else {
+    //             if(file.size() <= 255) {
+    //                 std::cout << "File loaded" << std::endl;
+    //                 config->emulationSettings.bios_file = file.c_str();
+    //             } else {
+    //                 SDL_ShowSimpleMessageBox(
+    //                     SDL_MESSAGEBOX_ERROR,
+    //                     "File path is too long",
+    //                     "File path is too long...Maybe the developer should bump up the limit?",
+    //                     nullptr);
+    //             }
+    //         }
+    //     }
+    //     //the bios is opened here to check and save it.
+    //     // the actual loading and reading is done by the core.
+    //     delete bios;
+    // }
 
     /**
      * Game Stuff
      */
-    if(core) {
-        // try {
-        //     if(state_flags.run_game) core->tick_frame();
-        // }
-        // catch(breakpoint_exception &e) {
-        //     state_flags.run_game = false;
-        // }
+    // if(core) {
+    //     glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+    //     glTexSubImage2D(
+    //             GL_TEXTURE_2D,            // target
+    //             0,                        // level
+    //             0,                        // xoffset
+    //             0,                        // yoffset
+    //             GB_S_W,                   // width
+    //             GB_S_H,                   // height
+    //             GL_RGB,                   // format
+    //             GL_UNSIGNED_BYTE,         // type
+    //             core->getScreenBuffer());                             check_gl_error();
+    //     glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
+    // }
+    // else {
+    //     u8 tsc[160 * 144] = {0};
+    //     u8 *ptr = tsc;
+    //     int x = 0, y = 0, p = 0;
+    //     for(int i = 0; i < (160 * 144); i++) {
+    //         switch(i % 3) {
+    //         case 0:
+    //             *ptr++ = 0xE0;
+    //             break;
+    //         case 1:
+    //             *ptr++ = 0x1C;
+    //             break;
+    //         case 2:
+    //             *ptr++ = 0x02;
+    //             break;
+    //         }
+    //     }
+    //     ptr = tsc;
+    //     glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
+    //     glTexSubImage2D(
+    //             GL_TEXTURE_2D,            // target
+    //             0,                        // level
+    //             0,                        // xoffset
+    //             0,                        // yoffset
+    //             GB_S_W,                   // width
+    //             GB_S_H,                   // height
+    //             GL_RGB,                   // format
+    //             GL_UNSIGNED_BYTE_3_3_2,   // type
+    //             ptr);                                                 check_gl_error();
+    //     glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
+    // }
 
-        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
-        glTexSubImage2D(
-                GL_TEXTURE_2D,            // target
-                0,                        // level
-                0,                        // xoffset
-                0,                        // yoffset
-                GB_S_W,                   // width
-                GB_S_H,                   // height
-                GL_RGB,                   // format
-                GL_UNSIGNED_BYTE,         // type
-                core->getScreenBuffer());                             check_gl_error();
-        glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
-    }
-    else {
-        u8 tsc[160 * 144] = {0};
-        u8 *ptr = tsc;
-        int x = 0, y = 0, p = 0;
-        for(int i = 0; i < (160 * 144); i++) {
-            switch(i % 3) {
-            case 0:
-                *ptr++ = 0xE0;
-                break;
-            case 1:
-                *ptr++ = 0x1C;
-                break;
-            case 2:
-                *ptr++ = 0x02;
-                break;
-            }
-        }
-        ptr = tsc;
-        glBindTexture(GL_TEXTURE_2D, screen_texture);                 check_gl_error();
-        glTexSubImage2D(
-                GL_TEXTURE_2D,            // target
-                0,                        // level
-                0,                        // xoffset
-                0,                        // yoffset
-                GB_S_W,                   // width
-                GB_S_H,                   // height
-                GL_RGB,                   // format
-                GL_UNSIGNED_BYTE_3_3_2,   // type
-                ptr);                                                 check_gl_error();
-        glBindTexture(GL_TEXTURE_2D, 0);                              check_gl_error();
-    }
-
-    im::ClearShortcut();
-
-    SDL_GL_MakeCurrent(window, gl_context);
-    glViewport(0, 0, (int)im::GetIO().DisplaySize.x, (int)im::GetIO().DisplaySize.y);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    auto area = get_screen_area(im::GetIO().DisplaySize);
-    std::cout << area.first.x << " " << area.first.y << " " << area.second.x << " " << area.second.y << std::endl;
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_texture_fbo);       check_gl_error();
-    glBlitFramebuffer(
-            0, 0, GB_S_W, GB_S_H,
-            area.first.x, area.first.y, area.second.x, area.second.y,
-            GL_COLOR_BUFFER_BIT, GL_LINEAR);                          check_gl_error();
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);                        check_gl_error();
-
-    // Rendering
-    im::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(im::GetDrawData());
-
-    SDL_GL_SwapWindow(window);
-
-    if (im::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-        im::UpdatePlatformWindows();
-        im::RenderPlatformWindowsDefault();
-    }
-
-    if(state_flags.loop_finish) return loop_return_code_t::LOOP_FINISH;
-    else                        return loop_return_code_t::LOOP_CONTINUE;
+    // glBindFramebuffer(GL_READ_FRAMEBUFFER, screen_texture_fbo);       check_gl_error();
+    // glBlitFramebuffer(
+    //         0, 0, GB_S_W, GB_S_H,
+    //         area.first.x, area.first.y, area.second.x, area.second.y,
+    //         GL_COLOR_BUFFER_BIT, GL_LINEAR);                          check_gl_error();
+    // glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);                        check_gl_error();
 }
 
 void GUI::MainOptionsWindow() {
@@ -339,57 +151,7 @@ void GUI::MainOptionsWindow() {
     // im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     // im::PushStyleVar(ImGuiStyleVar_WindowPadding, {0,0});
     // im::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
-    if(im::Begin("Main Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-
-        if(im::Button("Open ROM")) {
-            state_flags.open_rom = true;
-        }
-
-        if(im::CollapsingHeader("Emulation Settings")) {
-            if(state_flags.game_running) {
-                if(im::Button("Pause"))
-                    state_flags.game_running = false;
-            }
-            else {
-                if(im::Button("Unpause"))
-                    state_flags.game_running = true;
-            }
-            if(im::Button("tick"))
-                core->tick_once();
-            if(im::Button("Next Instruction"))
-                core->tick_instr();
-            if(im::Button("Next Frame"))
-                core->tick_frame();
-        }
-
-        if(im::CollapsingHeader("Options")) {
-            bool bios_loaded = config->BIOS.get_bios_loaded();
-            bool bios_enabled = config->BIOS.get_bios_enabled();
-            im::MenuItem("BIOS Loaded", nullptr, &bios_loaded, false); // should never need to modify directly so we don't care about writing it back
-            im::MenuItem("BIOS Enabled", nullptr, &bios_enabled);
-            im::MenuItem("Open BIOS File", NULL, &state_flags.open_bios);
-            // im::MenuItem("Debug Mode", NULL, &state_flags.set_debug_mode);
-            im::EndMenu();
-
-            config->BIOS.set_bios_enabled(bios_enabled);
-        }
-
-        if(state_flags.debug_mode) {
-            if(im::BeginMenu("Debug")) {
-                im::MenuItem("CPU Register Window", nullptr, &window_flags.cpu_register_window);
-                im::MenuItem("IO Register Window", nullptr, &window_flags.io_register_window);
-                im::MenuItem("Hide Disassembly Window", nullptr, &window_flags.disassemble_window);
-                im::MenuItem("Breakpoint Window",nullptr, &window_flags.breakpoint_window);
-
-                im::EndMenu();
-            }
-        }
-        ImGui::End();
-    }
     // im::PopStyleVar(2);
-
-    // process shortcuts
-    state_flags.open_rom = state_flags.open_rom || im::ShortcutPressed({ im::CTRL_MOD },'f');
 
     //TODO: better check for game running
     // if(core) {

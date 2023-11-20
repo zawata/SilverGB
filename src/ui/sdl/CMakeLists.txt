@@ -30,7 +30,7 @@ target_link_libraries(gb_main_opengl
 
 # Fix for wayland>=1.20 and SDL2 < 2.0.20, remove once sdl fixes this
 find_package(PkgConfig)
-if(SDL2_VERSION VERSION_LESS "2.0.20" AND PKG_CONFIG_FOUND)
+if(SDL2_VERSION VERSION_LESS "2.0.20" AND PKG_CONFIG_FOUND AND UNIX AND NOT APPLE)
 	pkg_check_modules(WAYLAND_CLIENT wayland-client>=1.20.0)
 	if(WAYLAND_CLIENT_FOUND)
 		target_link_libraries(gb_main_sdl
