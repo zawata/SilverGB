@@ -88,8 +88,7 @@
     id<MTLCommandBuffer> commandBuffer = [self.commandQueue commandBuffer];
 
     MTLRenderPassDescriptor* renderPassDescriptor = view.currentRenderPassDescriptor;
-    if (renderPassDescriptor == nil)
-    {
+    if (renderPassDescriptor == nil) {
         [commandBuffer commit];
 		return;
     }

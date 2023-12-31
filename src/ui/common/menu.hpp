@@ -1,28 +1,36 @@
 #pragma once
 
-#include <list>
+#include <functional>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <utility>
 
 #define ID_COUNTER_START 40500
 
-namespace NUI {
+namespace Silver {
     struct Menu;
 
     struct [[maybe_unused]] MenuItem {
-        virtual ~MenuItem() = default;
+        enum Type {
+            None,
+            Text,
+            SubMenu,
+            Separator,
+            Callback,
+            Toggle,
+            Radio
+        };
 
-        [[maybe_unused]] virtual bool is_SubMenuItem()       { return false; }
-        [[maybe_unused]] virtual bool is_TextMenuItem()      { return false; }
-        [[maybe_unused]] virtual bool is_ToggleMenuItem()    { return false; }
-        [[maybe_unused]] virtual bool is_CallbackMenuItem()  { return false; }
-        [[maybe_unused]] virtual bool is_SeparatorMenuItem() { return false; }
+        virtual ~MenuItem() = default;
 
         virtual bool operator==(MenuItem &n) const { return get_id() == n.get_id(); }
         virtual bool operator!=(MenuItem &n) const { return !operator==(n); }
 
         [[nodiscard]] int get_id() const { return item_id; }
+        [[nodiscard]] virtual MenuItem::Type get_type() const {
+            return MenuItem::Type::None;
+        }
 
     protected:
         MenuItem() :
@@ -45,12 +53,15 @@ namespace NUI {
         explicit TextMenuItem(const char *label) :
                 label(label) {}
 
-        bool is_TextMenuItem() override { return true; }
+        virtual MenuItem::Type get_type() const override {
+            return MenuItem::Type::Text;
+        }
 
         bool operator==(MenuItem &n) const override {
-            if(n.is_TextMenuItem()) {
-                return ((TextMenuItem &)n).label == this->label;
+            if(n.get_type() == MenuItem::Type::Text) {
+                return dynamic_cast<TextMenuItem &>(n).label == this->label;
             }
+
             return false;
          }
 
@@ -60,7 +71,9 @@ namespace NUI {
     struct [[maybe_unused]] SeparatorMenuItem : public MenuItem {
         SeparatorMenuItem() = default;
 
-        bool is_SeparatorMenuItem() override { return true; }
+        virtual MenuItem::Type get_type() const override {
+            return MenuItem::Type::Separator;
+        }
     };
 
     struct [[maybe_unused]] ToggleMenuItem : public TextMenuItem {
@@ -95,7 +108,9 @@ namespace NUI {
             return default_state;
         }
 
-        bool is_ToggleMenuItem() override { return true; }
+        virtual MenuItem::Type get_type() const override {
+            return MenuItem::Type::Toggle;
+        }
     private:
         std::function<void(ToggleMenuItem &, bool, void *us_Data)> cb;
         bool callback_mode,
@@ -116,7 +131,9 @@ namespace NUI {
             cb(*this, us_data);
         }
 
-        bool is_CallbackMenuItem() override { return true; }
+        virtual MenuItem::Type get_type() const override {
+            return MenuItem::Type::Callback;
+        }
     private:
         std::function<void(CallbackMenuItem &, void *us_Data)> cb;
         void *us_data;
@@ -166,6 +183,9 @@ namespace NUI {
 
         ~SubMenuItem() override = default;
 
-        bool is_SubMenuItem() override { return true; }
+
+        virtual MenuItem::Type get_type() const override {
+            return MenuItem::Type::SubMenu;
+        }
     };
-} // namespace NUI;
+} // namespace Silver;

@@ -34,10 +34,20 @@ if(APPLE)
         "-framework GameController"
         "-framework AppKit"
         objc)
+elseif (UNIX)
+    target_sources(gb_main_imgui PRIVATE
+        "platform/gtk/main.cpp"
+        "platform/gtk/gtk_application.cpp"
+        "platform/gtk/imgui_impl_gtkmm.cpp"
+        "imgui/backends/imgui_impl_opengl3.cpp"
+    )
+    find_package(PkgConfig)
+    pkg_check_modules(GTKMM_VARS REQUIRED IMPORTED_TARGET gtkmm-4.0)
+
+    target_link_libraries(gb_main_imgui PRIVATE PkgConfig::GTKMM_VARS)
 elseif (WIN32)
     target_sources(gb_main_imgui
         PRIVATE main_win32.cpp)
-elseif (UNIX)
 endif()
 
 find_package(argparse CONFIG REQUIRED)

@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
   "name": "silver-gb",
   "version": "0.2.1",
   "dependencies": [
@@ -34,6 +33,10 @@
       "name": "sdl2",
       "default-features": false,
       "features": ["x11"],
+      "platform": "linux"
+    },
+    {
+      "name": "gtkmm",
       "platform": "linux"
     }
   ]

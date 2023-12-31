@@ -1,6 +1,8 @@
 #include <iostream>
 #include <deque>
 
+#include <crt_externs.h>
+
 #import "cocoa/callback_list.hh"
 #import "cocoa/app_delegate.hh"
 #import "cocoa/app_view_controller.hh"
@@ -27,7 +29,7 @@
         [self->window makeKeyAndOrderFront:self];
 
         self->app = new Silver::Application();
-        self->app->onInit();
+        self->app->onInit(_NSGetArgc(), _NSGetArgv());
     }
     return self;
 
