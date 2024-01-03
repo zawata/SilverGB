@@ -1,3 +1,5 @@
+#pragma once
+
 #include <functional>
 
 #include <argparse/argparse.hpp>
@@ -41,6 +43,6 @@ namespace Silver {
     void onDraw();
     void onClose();
 
-    File *rom_file, *bootrom_file;
+    Silver::File *rom_file, *bootrom_file;
   };
 }

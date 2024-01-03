@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "util/file.hpp"
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 
 // Turns out win32 isn't the only OS to give me a headache 🙃
 #if defined(_X11_XLIB_H_)

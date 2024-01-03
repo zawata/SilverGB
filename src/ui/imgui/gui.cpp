@@ -1,5 +1,3 @@
-#include <math.h>
-
 #include "gui.hpp"
 
 #include "gb_core/apu.hpp"
@@ -45,7 +43,7 @@ void buildFpsWindow(float fps) {
 void buildOptionsWindow() {
     namespace im = ImGui;
 
-    im::SetNextWindowSize({GB_S_W, GB_S_H});
+    im::SetNextWindowSize({Silver::Core::native_width, Silver::Core::native_height});
     im::SetNextWindowPos({0, 0});
     im::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
         im::Begin("Options", nullptr,

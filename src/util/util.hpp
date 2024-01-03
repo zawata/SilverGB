@@ -4,14 +4,13 @@
 #include <iomanip>
 #include <string>
 #include <sstream>
-
-#include <nowide/iostream.hpp>
 #include <type_traits>
 
-#include "ints.hpp"
-#include "flags.hpp"
-#include "vector.hpp"
+#include <nowide/iostream.hpp>
 
+#include "types/primitives.hpp"
+#include "types/vector.hpp"
+#include "flags.hpp"
 
 #define as_hex(x) std::hex << (s64)(x) << std::dec
 

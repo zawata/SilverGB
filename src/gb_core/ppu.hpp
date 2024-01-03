@@ -6,13 +6,13 @@
 #include <vector>
 #include <deque>
 
-#include "gb_core/cart.hpp"
-#include "gb_core/defs.hpp"
-#include "gb_core/mem.hpp"
+#include "cart.hpp"
+#include "defs.hpp"
+#include "mem.hpp"
 
 #include "util/bit.hpp"
-#include "util/ints.hpp"
-#include "util/circular_queue.hpp"
+#include "util/types/primitives.hpp"
+#include "util/types/circular_queue.hpp"
 #include "util/util.hpp"
 
 constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b);

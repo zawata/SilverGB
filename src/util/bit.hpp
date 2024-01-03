@@ -5,7 +5,7 @@
 #include <type_traits>
 #include <unordered_map>
 
-#include "ints.hpp"
+#include "types/primitives.hpp"
 #include "flags.hpp"
 
 namespace Bit {

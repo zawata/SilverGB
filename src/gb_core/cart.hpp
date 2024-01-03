@@ -1,8 +1,8 @@
 #pragma once
 
 #include "util/file.hpp"
-#include "util/ints.hpp"
-#include "util/vector.hpp"
+#include "util/types/primitives.hpp"
+#include "util/types/vector.hpp"
 
 #include <string>
 
@@ -210,8 +210,8 @@ public:
     explicit Cartridge(Silver::File *f);
     ~Cartridge();
 
-    bool loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer);
-    bool saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer);
+    bool loadRAMFile(const std::string& ram_file_name, std::vector<u8> &ram_buffer);
+    bool saveRAMFile(const std::string& ram_file_name, std::vector<u8> const& ram_buffer);
 
     bool checkMagicNumber() const;
 

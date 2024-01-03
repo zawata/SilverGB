@@ -5,7 +5,7 @@
 
 #include <nowide/iostream.hpp>
 
-#include "util/ints.hpp"
+#include "primitives.hpp"
 
 template<typename T>
 class CircularQueue {

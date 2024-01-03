@@ -1,12 +1,14 @@
 #include <chrono>
+#include <ratio>
 #include <vector>
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/core.hpp"
-#include "gb_core/defs.hpp"
-#include "gb_core/joy.hpp"
-#include "gb_core/ppu.hpp"
+#include "core.hpp"
+#include "defs.hpp"
+#include "joy.hpp"
+#include "util/types/pixel_buffer.hpp"
+#include "ppu.hpp"
 #include "util/bit.hpp"
 #include "util/util.hpp"
 
@@ -79,7 +81,7 @@ void Core::tick_once() {
     // can't check breakpoints on single tick functions
     cpu->tick();
     apu->tick();
-    ppu->tick();
+    this->frame_ready = ppu->tick();
 }
 
 void Core::tick_instr() {
@@ -95,12 +97,12 @@ void Core::tick_instr() {
 
 void Core::tick_frame() {
     u8 tick_cntr = 0;
-    bool instr_completed, frame_completed;
+    bool instr_completed;
 
     do {
         instr_completed = cpu->tick();
         apu->tick();
-        frame_completed = ppu->tick();
+        this->frame_ready = ppu->tick();
 
 
         if(bp_active && instr_completed && cpu->getRegisters().PC == breakpoint) {
@@ -117,12 +119,42 @@ void Core::tick_frame() {
             tick_cntr = 0;
         }
 
-        if(audio_vector.size() == 2048) { //TODO: make constant
+        if(audio_vector.size() == 2048) { // TODO: make constant
             audio_queue->insert(audio_vector);
             audio_vector.clear();
         }
 
-    } while(!frame_completed);
+    } while(!this->frame_ready);
+}
+
+// TODO: check this implementation later
+void Core::tick_delta_or_frame() {
+    using Clock = std::chrono::high_resolution_clock;
+    static Clock::time_point last_invocation;
+
+    u64 nsDelta = (Clock::now() - last_invocation).count();
+    u64 totalTicks;
+
+    if (dev_is_SGB(this->device)) {
+        // 4.194304 MHz = 238.42 ns(p);
+        totalTicks = nsDelta * 238.42f;
+    } else if (dev_is_GBC(this->device)) {
+        // 8.388688 MHz = 119.21 ns(p);
+        totalTicks = nsDelta * 119.21f;
+    } else {
+        // 4.295454 MHz = 232.80 ns(p);
+        totalTicks = nsDelta * 232.8f;
+    }
+
+    for(u64 i; i < totalTicks || !this->frame_ready; i++) {
+        this->tick_once();
+    }
+
+    last_invocation = Clock::now();
+}
+
+bool Core::is_frame_ready() {
+  return this->frame_ready;
 }
 
 /**
@@ -143,7 +175,6 @@ void Core::do_audio_callback(float *buff, int copy_cnt) {
         assert(copy_cnt == audio_buffer.size());
 
         int type_sz = sizeof(decltype(audio_buffer)::value_type);
-
         memcpy(buff, audio_buffer.data(), audio_buffer.size() * type_sz);
     }
 }

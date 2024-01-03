@@ -1,9 +1,9 @@
 #pragma once
 
-#include "util/file.hpp"
-#include "util/ints.hpp"
 #include <cstddef>
 #include <vector>
+
+#include "primitives.hpp"
 
 namespace Silver {
     template<typename T, typename A = std::allocator<T>>

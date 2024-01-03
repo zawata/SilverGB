@@ -2,7 +2,7 @@
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/io.hpp"
+#include "io.hpp"
 #include "util/util.hpp"
 
 #define DIV_MAX 1024

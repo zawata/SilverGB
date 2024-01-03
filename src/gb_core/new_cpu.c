@@ -1,5 +1,5 @@
 #if 0
-#include "util/ints.hpp"
+#include "util/primitives.hpp"
 
 #define C_FLAG (Bit::test(AF.b_AF.i_F, 3))
 #define H_FLAG (Bit::test(AF.b_AF.i_F, 2))

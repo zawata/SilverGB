@@ -4,25 +4,21 @@
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cart.hpp"
+#include "cart.hpp"
 
-#include "util/file.hpp"
 #include "util/util.hpp"
-#include "util/ints.hpp"
 #include "util/bit.hpp"
 
-#include "gb_core/defs.hpp"
-
-#include "gb_core/carts/rom.hpp"
-#include "gb_core/carts/mbc1.hpp"
-#include "gb_core/carts/mbc2.hpp"
-#include "gb_core/carts/mbc3.hpp"
-#include "gb_core/carts/mbc5.hpp"
+#include "carts/rom.hpp"
+#include "carts/mbc1.hpp"
+#include "carts/mbc2.hpp"
+#include "carts/mbc3.hpp"
+#include "carts/mbc5.hpp"
 
 /**
  * Cartridge Data
  */
-std::string get_ram_file_name(std::string rom_file_name) {
+std::string get_ram_file_name(const std::string& rom_file_name) {
     std::string ram_file_name = rom_file_name;
     auto ext = rom_file_name.find_last_of('.') + 1;
 
@@ -32,7 +28,7 @@ std::string get_ram_file_name(std::string rom_file_name) {
     return ram_file_name;
 }
 
-bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buffer) {
+bool Cartridge::loadRAMFile(const std::string& ram_file_name, std::vector<u8> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
         nowide::cerr << "SAV File: does not exist" << std::endl;
         return false;
@@ -56,7 +52,7 @@ bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u8> &ram_buff
     return true;
 }
 
-bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u8> const& ram_buffer) {
+bool Cartridge::saveRAMFile(const std::string& ram_file_name, std::vector<u8> const& ram_buffer) {
     Silver::File *ram_file;
     if(Silver::File::fileExists(ram_file_name)) {
         ram_file = Silver::File::openFile(ram_file_name, true, true);
@@ -133,14 +129,11 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
 }
 
 Cartridge::~Cartridge() {
-    if(cart_type.BATTERY) {
+    if (cart_type.BATTERY) {
         saveRAMFile(get_ram_file_name(rom_file->getFilename()), controller->ram_data);
     }
 
-    if(controller) {
-        delete controller;
-    }
-
+    delete controller;
 };
 
 bool Cartridge::checkMagicNumber() const {
@@ -152,7 +145,7 @@ bool Cartridge::checkMagicNumber() const {
 std::string Cartridge::getCartTitle() const {
     u8 buf[Cartridge_Constants::GB_TITLE_LENGTH + 1] = { 0 };
     rom_file->getBuffer(Cartridge_Constants::TITLE_OFFSET, buf, isCGBCart() ? Cartridge_Constants::CGB_TITLE_LENGTH : Cartridge_Constants::GB_TITLE_LENGTH);
-    return std::string((char *)buf);
+    return {(char *)buf};
 }
 
 u8 Cartridge::getCartVersion() const {

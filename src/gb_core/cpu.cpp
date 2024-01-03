@@ -1,8 +1,8 @@
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cpu.hpp"
-#include "gb_core/defs.hpp"
-#include "gb_core/mem.hpp"
+#include "cpu.hpp"
+#include "defs.hpp"
+#include "mem.hpp"
 
 #include "util/bit.hpp"
 #include "util/flags.hpp"

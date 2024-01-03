@@ -2,10 +2,9 @@
 
 #include <zlib.h>
 
-#include "util/ints.hpp"
+#include "types/primitives.hpp"
 
 struct crc {
-
     static u32 begin() {
         return crc32(0, 0, 0);
     }

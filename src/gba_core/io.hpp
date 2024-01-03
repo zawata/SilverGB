@@ -4,7 +4,7 @@
 
 #include "gba_core/cart.hpp"
 
-#include "util/ints.hpp"
+#include "util/primitives.hpp"
 
 class IO_Bus {
 public:

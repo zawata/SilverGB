@@ -2,8 +2,8 @@
 
 #include <vector>
 
-#include "gb_core/defs.hpp"
-#include "util/ints.hpp"
+#include "defs.hpp"
+#include "util/types/primitives.hpp"
 
 #define HIGH_RAM_SIZE 0x7f
 

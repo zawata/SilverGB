@@ -1,8 +1,10 @@
 #pragma once
 
+#include <vector>
+
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cart.hpp"
+#include "cart.hpp"
 
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -46,7 +48,6 @@ struct MBC1_Controller : public MBC1_Base {
         else if(bounded(offset, 0x6000_u16, 0x7FFF_u16)) {
             bool set = Bit::test(data, 0);
 
-            using namespace Cartridge_Constants;
             if(rom_data.size() >= Cartridge_Constants::ROM_SZ_1M) {
                 set_rom_0_bank((set) ? (addl_bank_num << 6) : 0);
             } else if(ram_data.size() > Cartridge_Constants::RAM_SZ_8K) {

@@ -1,9 +1,9 @@
 #include <nowide/iostream.hpp>
 
-#include "util/file.hpp"
+#include "file.hpp"
 
-#include "util/crc.hpp"
-#include "util/util.hpp"
+#include "crc.hpp"
+#include "util.hpp"
 
 namespace Silver {
 

@@ -1,4 +1,4 @@
-#include "gb_core/cpu.hpp"
+#include "cpu.hpp"
 
 #include "util/util.hpp"
 

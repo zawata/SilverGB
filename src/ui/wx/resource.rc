@@ -1,4 +1,0 @@
-//define before wx.rc to ensure ours is used.
-wxicon icon "icons/icon.ico"
-
-#include "wx/msw/wx.rc"

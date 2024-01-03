@@ -7,7 +7,7 @@
 #include <nowide/fstream.hpp>
 #include <nowide/iostream.hpp>
 
-#include "util/ints.hpp"
+#include "types/primitives.hpp"
 
 namespace Silver {
 

@@ -5,8 +5,8 @@
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/defs.hpp"
-#include "gb_core/apu.hpp"
+#include "defs.hpp"
+#include "apu.hpp"
 
 #include "util/bit.hpp"
 #include "util/util.hpp"

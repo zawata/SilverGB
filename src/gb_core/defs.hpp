@@ -1,14 +1,7 @@
 #pragma once
 
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 #include "util/flags.hpp"
-
-#define IMAGE_FORMAT_SIZE 3 //rgb
-
-#define GB_S_W    160                          // screen width
-#define GB_S_H    144                          // screen height
-#define GB_S_P    (GB_S_W * GB_S_H)            // screen pixel count
-#define GB_S_P_SZ (GB_S_P * IMAGE_FORMAT_SIZE) // screen pixel buffer size
 
 #define GB_BOOTROM_SZ 0x0100
 #define GBC_BOOTROM_SZ 0x0900
@@ -309,17 +302,17 @@ extern const u8 work_ram_CGB_initial_state[];
 
 // LCDC Y-Coordinate
 #define LY_REG           0x44
-#define LY_WRITE_MASK     0x00
+#define LY_WRITE_MASK    0x00
 #define LY_READ_MASK     0xFF
 
 // LY Compare
 #define LYC_REG          0x45
-#define LYC_WRITE_MASK    0xFF
+#define LYC_WRITE_MASK   0xFF
 #define LYC_READ_MASK    LYC_WRITE_MASK
 
 // DMA Transfer and Start Address
 #define DMA_REG          0x46
-#define DMA_WRITE_MASK    0xFF
+#define DMA_WRITE_MASK   0xFF
 #define DMA_READ_MASK    DMA_WRITE_MASK
 
 // BG Palette Data
@@ -329,12 +322,12 @@ extern const u8 work_ram_CGB_initial_state[];
 
 // Object Palette 0 Data
 #define OBP0_REG         0x48
-#define OBP0_WRITE_MASK   0xFF
+#define OBP0_WRITE_MASK  0xFF
 #define OBP0_READ_MASK   OBP0_WRITE_MASK
 
 // Object Palette 1 Data
 #define OBP1_REG         0x49
-#define OBP1_WRITE_MASK   0xFF
+#define OBP1_WRITE_MASK  0xFF
 #define OBP1_READ_MASK   OBP1_WRITE_MASK
 
 // Window Y
@@ -372,25 +365,25 @@ extern const u8 work_ram_CGB_initial_state[];
 #define HDMA1_REG        0x51
 #define HDMA1_WRITE_MASK 0xFF
 #define HDMA1_READ_MASK  HDMA1_WRITE_MASK
-#define HDMA1_DEFAULTS    0xFF
+#define HDMA1_DEFAULTS   0xFF
 
 // GBC: HDMA Source Low
 #define HDMA2_REG        0x52
 #define HDMA2_WRITE_MASK 0xF0
 #define HDMA2_READ_MASK  HDMA2_WRITE_MASK
-#define HDMA2_DEFAULTS    0xFF
+#define HDMA2_DEFAULTS   0xFF
 
 // GBC: HDMA Destination High
 #define HDMA3_REG        0x53
 #define HDMA3_WRITE_MASK 0xFF
 #define HDMA3_READ_MASK  HDMA3_WRITE_MASK
-#define HDMA3_DEFAULTS    0xFF
+#define HDMA3_DEFAULTS   0xFF
 
 // GBC: HDMA Destination Low
 #define HDMA4_REG        0x54
 #define HDMA4_WRITE_MASK 0xF0
 #define HDMA4_READ_MASK  HDMA4_WRITE_MASK
-#define HDMA4_DEFAULTS    0xFF
+#define HDMA4_DEFAULTS   0xFF
 
 // GBC: HDMA Control
 #define HDMA5_REG        0x55
@@ -411,7 +404,6 @@ extern const u8 work_ram_CGB_initial_state[];
 #define BCPD_REG         0x69
 #define BCPD_WRITE_MASK  0x3FFF
 #define BCPD_READ_MASK   BCPD_WRITE_MASK
-#define BCPD_DAT         _ARR(BCPD)
 
 // GBC: Object Color Palette Specification
 #define OCPS_REG         0x6A
@@ -422,7 +414,6 @@ extern const u8 work_ram_CGB_initial_state[];
 #define OCPD_REG         0x6B
 #define OCPD_WRITE_MASK  0xFF
 #define OCPD_READ_MASK   OCPD_WRITE_MASK
-#define OCPD_DAT         _ARR(OCPD)
 
 // GBC: Object Priority Mode
 #define OPRI_REG         0x6C
@@ -438,4 +429,3 @@ extern const u8 work_ram_CGB_initial_state[];
 #define IE_REG           0xFF
 #define IE_WRITE_MASK    0x1F
 #define IE_READ_MASK     IE_WRITE_MASK
-#define IE_DAT           _ARR(IE)

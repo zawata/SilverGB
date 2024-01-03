@@ -7,9 +7,9 @@ void _audio_callback(void* userdata, uint8_t* stream, int len) {
     static_cast<Silver::Core *>(userdata)->do_audio_callback((float *)stream, len / 4);
 }
 
-GB_Audio::GB_Audio(void *audio_dev): audio_dev(audio_dev) {}
+Silver::AudioManager::AudioManager(void *audio_dev): audio_dev(audio_dev) {}
 
-GB_Audio *GB_Audio::init_audio(Silver::Core *core) {
+Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
 
     SDL_AudioSpec desired = { 0 };
     SDL_AudioDeviceID *audio_dev = new SDL_AudioDeviceID;
@@ -27,20 +27,20 @@ GB_Audio *GB_Audio::init_audio(Silver::Core *core) {
         return nullptr;
     }
 
-    return new GB_Audio(audio_dev);
+    return new AudioManager(audio_dev);
 }
 
-GB_Audio::~GB_Audio() {
+Silver::AudioManager::~AudioManager() {
     SDL_CloseAudioDevice(*(SDL_AudioDeviceID *)audio_dev);
     SDL_CloseAudio();
     delete static_cast<SDL_AudioDeviceID *>(this->audio_dev);
 }
 
 
-void GB_Audio::start_audio() {
+void Silver::AudioManager::start_audio() {
     SDL_PauseAudioDevice(*static_cast<SDL_AudioDeviceID *>(this->audio_dev), 0);
 }
 
-void GB_Audio::stop_audio() {
+void Silver::AudioManager::stop_audio() {
     SDL_PauseAudioDevice(*static_cast<SDL_AudioDeviceID *>(this->audio_dev), 1);
 }

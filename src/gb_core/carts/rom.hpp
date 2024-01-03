@@ -2,8 +2,8 @@
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cart.hpp"
-#include "gb_core/defs.hpp"
+#include "cart.hpp"
+#include "defs.hpp"
 
 #include "util/util.hpp"
 

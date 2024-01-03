@@ -3,11 +3,12 @@
 
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cart.hpp"
-#include "gb_core/defs.hpp"
-#include "gb_core/mem.hpp"
-#include "gb_core/ppu.hpp"
+#include "cart.hpp"
+#include "defs.hpp"
+#include "mem.hpp"
+#include "ppu.hpp"
 
+#include "util/types/primitives.hpp"
 #include "util/bit.hpp"
 #include "util/util.hpp"
 

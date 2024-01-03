@@ -1,6 +1,6 @@
 #include <nowide/iostream.hpp>
 
-#include "gb_core/joy.hpp"
+#include "joy.hpp"
 
 #include "util/bit.hpp"
 

@@ -11,7 +11,8 @@ add_library(gb_core
         "ppu.cpp")
 
 target_include_directories(gb_core
-        PUBLIC "../inc")
+        PRIVATE "."
+        PUBLIC "../")
 
 if(BUILD_WITH_ASAN)
         target_compile_options(gb_core

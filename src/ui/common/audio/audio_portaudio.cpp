@@ -16,9 +16,9 @@ int _audio_callback(
     return 0;
 }
 
-GB_Audio::GB_Audio(void *audio_dev): audio_dev(audio_dev) {}
+Silver::AudioManager::AudioManager(void *audio_dev): audio_dev(audio_dev) {}
 
-GB_Audio *GB_Audio::init_audio(Silver::Core *core) {
+Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
     PaStream *stream;
 
     PaError err = Pa_Initialize();
@@ -29,23 +29,24 @@ GB_Audio *GB_Audio::init_audio(Silver::Core *core) {
 
     //TODO: input/output parameters with Pa_OpenStream
     err = Pa_OpenDefaultStream(
-            &stream,          // stream Device
-            0,          /* no input channels */
-            CHANNEL_CNT,          /* stereo output */
-            paFloat32,  /* 32 bit floating point output */
+            &stream,         // stream Device
+            0,               // no input channels
+            CHANNEL_CNT,     // stereo output
+            paFloat32,       // 32 bit floating point output
             SAMPLE_RATE,     // sampleRate
-            SAMPLE_CNT,    // TODO change this to paFramesPerBufferUnspecified
+            SAMPLE_CNT,      // TODO change this to paFramesPerBufferUnspecified
             _audio_callback, // callback
-            core);          // userData
+            core             // userData
+    );
     if(err != paNoError) {
         nowide::cerr << "Error Initializing: " << Pa_GetErrorText(err) << std::endl;
         return nullptr;
     }
 
-    return new GB_Audio(stream);
+    return new AudioManager(stream);
 }
 
-GB_Audio::~GB_Audio() {
+Silver::AudioManager::~AudioManager() {
     PaError err = Pa_CloseStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
         nowide::cerr << "Error Closing Stream: " << Pa_GetErrorText(err) << std::endl;
@@ -58,14 +59,14 @@ GB_Audio::~GB_Audio() {
 }
 
 
-void GB_Audio::start_audio() {
+void Silver::AudioManager::start_audio() {
     PaError err = Pa_StartStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
         nowide::cerr << "Error Starting Stream: " << Pa_GetErrorText(err) << std::endl;
     }
 }
 
-void GB_Audio::stop_audio() {
+void Silver::AudioManager::stop_audio() {
     PaError err = Pa_StopStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
         nowide::cerr << "Error Stopping Stream: " << Pa_GetErrorText(err) << std::endl;

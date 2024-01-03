@@ -1,8 +1,10 @@
 #pragma once
 
+#include <vector>
+
 #include <nowide/iostream.hpp>
 
-#include "gb_core/cart.hpp"
+#include "cart.hpp"
 
 /**
  * MBC5

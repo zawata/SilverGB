@@ -3,7 +3,7 @@
 #include "defs.hpp"
 
 #include "util/bit.hpp"
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 
 #define WAVRAM_LEN 16
 

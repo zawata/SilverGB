@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "gb_core/mem.hpp"
+#include "mem.hpp"
 
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 
 class Joypad {
 public:

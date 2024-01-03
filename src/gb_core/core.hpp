@@ -1,12 +1,12 @@
 #pragma once
 
-#include "gb_core/defs.hpp"
-#include "gb_core/cpu.hpp"
-#include "gb_core/io.hpp"
-#include "gb_core/ppu.hpp"
+#include "defs.hpp"
+#include "cpu.hpp"
+#include "io.hpp"
+#include "ppu.hpp"
 
 #include "util/file.hpp"
-#include "util/ringbuffer.hpp"
+#include "util/types/ringbuffer.hpp"
 
 struct breakpoint_exception {
     breakpoint_exception() {}
@@ -16,8 +16,9 @@ namespace Silver {
 
 class Core {
 public:
-    static constexpr u32 native_width = GB_S_W;
-    static constexpr u32 native_height = GB_S_H;
+    static constexpr u32 native_width = 160;
+    static constexpr u32 native_height = 144;
+    static constexpr u32 native_pixel_count = native_width * native_height;
 
     Core(Silver::File *rom, Silver::File *bootrom = nullptr, gb_device_t device = device_GBC);
     ~Core();
@@ -33,7 +34,10 @@ public:
     void tick_once();
     void tick_instr();
     void tick_frame();
-    void tick_audio_buffer(u8* buf, int buf_len);
+    void tick_delta_or_frame();
+//    void tick_audio_buffer(u8* buf, int buf_len);
+
+    bool is_frame_ready();
 
     void set_input_state(Joypad::button_states_t const& state);
     void do_audio_callback(float *buff, int copy_cnt);
@@ -64,6 +68,7 @@ private:
     gb_device_t device;
 
     u8 *screen_buffer = nullptr;
+    bool frame_ready = false;
     jnk0le::Ringbuffer<std::vector<float>,4> *audio_queue = nullptr;
     std::vector<float> audio_vector;
 

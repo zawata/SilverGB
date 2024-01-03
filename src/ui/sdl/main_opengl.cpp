@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
     Silver::File *bios_file = Silver::File::openFile("/home/johna/Documents/SilverGB/test_files/bootroms/cgb_boot.bin");
     Silver::File *rom_file = nullptr;
     Silver::Core *core = nullptr;
-    GB_Audio *audio = nullptr;
+    Silver::AudioManager *audio = nullptr;
     Joypad::button_states_t button_state;
 
     bool isRunning = true;
@@ -262,7 +262,7 @@ int main(int argc, char *argv[])
 
                 rom_file = Silver::File::openFile(event.drop.file);
                 core = new Silver::Core(rom_file, bios_file);
-                audio = GB_Audio::init_audio(core);
+                audio = Silver::AudioManager::init_audio(core);
                 audio->start_audio();
                 break;
             case SDL_QUIT:

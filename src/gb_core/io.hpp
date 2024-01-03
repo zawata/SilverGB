@@ -2,12 +2,12 @@
 
 #include <vector>
 
-#include "gb_core/apu.hpp"
-#include "gb_core/cart.hpp"
-#include "gb_core/ppu.hpp"
-#include "gb_core/joy.hpp"
+#include "apu.hpp"
+#include "cart.hpp"
+#include "ppu.hpp"
+#include "joy.hpp"
 
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 
 //Interupt Offsets
 #define VBLANK_INT_OFFSET   0x40

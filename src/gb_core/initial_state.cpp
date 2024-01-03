@@ -1,11 +1,11 @@
-#include "gb_core/mem.hpp"
-#include "util/ints.hpp"
-#include "gb_core/defs.hpp"
+#include "mem.hpp"
+#include "util/types/primitives.hpp"
+#include "defs.hpp"
 
 u8 get_default_idx(gb_device_t device) {
     if(device == device_GB_cpu_dmg0) {
         return 0_u8;
-    } else if(device == device_GB_cpu_dmg || device_MGB_cpu_mgb) {
+    } else if(device == device_GB_cpu_dmg || device == device_MGB_cpu_mgb) {
         return 1_u8;
     } else if(dev_is_SGB(device)) {
         return 2_u8;

@@ -2,7 +2,7 @@
 #include <string>
 
 #include "util/file.hpp"
-#include "util/ints.hpp"
+#include "util/primitives.hpp"
 
 class Cartridge {
 public:
