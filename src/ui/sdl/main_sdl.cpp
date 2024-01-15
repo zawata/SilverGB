@@ -10,6 +10,7 @@
 
 #include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
+#include "util/types/pixel.hpp"
 
 #include "audio.hpp"
 
@@ -54,9 +55,26 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-    SDL_Window* window_screen = SDL_CreateWindow("SilverGB", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 160 * default_zoom, 144 * default_zoom, SDL_WINDOW_RESIZABLE);
-    SDL_Renderer* renderer_screen = SDL_CreateRenderer(window_screen, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
-    SDL_Texture *screen_texture = SDL_CreateTexture(renderer_screen, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 160, 144);
+    SDL_Window* window_screen = SDL_CreateWindow(
+            "SilverGB",
+            SDL_WINDOWPOS_UNDEFINED,
+            SDL_WINDOWPOS_UNDEFINED,
+            Silver::Core::native_width,
+            Silver::Core::native_height,
+            SDL_WINDOW_RESIZABLE
+    );
+    SDL_Renderer* renderer_screen = SDL_CreateRenderer(
+            window_screen,
+            -1,
+            SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED
+    );
+    SDL_Texture *screen_texture = SDL_CreateTexture(
+            renderer_screen,
+            SDL_PIXELFORMAT_RGB24,
+            SDL_TEXTUREACCESS_STREAMING,
+            Silver::Core::native_width,
+            Silver::Core::native_height
+    );
 
     SDL_Window   *window_bg;
     SDL_Renderer *renderer_bg;
@@ -78,7 +96,7 @@ int main(int argc, char *argv[]) {
         wnd_texture  = SDL_CreateTexture(renderer_wnd, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 256, 256);
     }
 
-    Silver::File *bios_file = Silver::File::openFile("/home/johna/Documents/SilverGB/test_files/bootroms/cgb_boot.bin");
+    Silver::File *bios_file = nullptr;
     Silver::File *rom_file = nullptr;
     Silver::Core *core = nullptr;
     Silver::AudioManager *audio = nullptr;
@@ -132,10 +150,15 @@ int main(int argc, char *argv[]) {
 
             void *screen_dest;
             int screen_pitch;
-            SDL_LockTexture(screen_texture, NULL, &screen_dest, &screen_pitch);
-            memcpy(screen_dest, core->getScreenBuffer(), GB_S_P_SZ);
+            SDL_LockTexture(screen_texture, nullptr, &screen_dest, &screen_pitch);
+            Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGB>(
+                    (u8 *) screen_dest,
+                    Silver::Core::native_pixel_count * 4,
+                    core->getPixelBuffer()
+            );
+
             SDL_UnlockTexture(screen_texture);
-            SDL_RenderCopy(renderer_screen, screen_texture, NULL, NULL);
+            SDL_RenderCopy(renderer_screen, screen_texture, nullptr, nullptr);
         }
 
         SDL_RenderPresent(renderer_screen);
@@ -144,11 +167,11 @@ int main(int argc, char *argv[]) {
             if(core) {
                 void *bg_dest;
                 int bg_pitch;
-                SDL_LockTexture(bg_texture, NULL, &bg_dest, &bg_pitch);
+                SDL_LockTexture(bg_texture, nullptr, &bg_dest, &bg_pitch);
                 core->getBGBuffer(buf);
                 memcpy(bg_dest, buf, 256 * 256 * 3);
                 SDL_UnlockTexture(bg_texture);
-                SDL_RenderCopy(renderer_bg, bg_texture, NULL, NULL);
+                SDL_RenderCopy(renderer_bg, bg_texture, nullptr, nullptr);
             }
             SDL_RenderPresent(renderer_bg);
         }
@@ -157,11 +180,11 @@ int main(int argc, char *argv[]) {
             if(core) {
                 void *wnd_dest;
                 int wnd_pitch;
-                SDL_LockTexture(wnd_texture, NULL, &wnd_dest, &wnd_pitch);
+                SDL_LockTexture(wnd_texture, nullptr, &wnd_dest, &wnd_pitch);
                 core->getWNDBuffer(buf);
                 memcpy(wnd_dest, buf, 256 * 256 * 3);
                 SDL_UnlockTexture(wnd_texture);
-                SDL_RenderCopy(renderer_wnd, wnd_texture, NULL, NULL);
+                SDL_RenderCopy(renderer_wnd, wnd_texture, nullptr, nullptr);
             }
             SDL_RenderPresent(renderer_wnd);
         }

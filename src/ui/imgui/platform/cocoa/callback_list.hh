@@ -2,9 +2,9 @@
 
 #import <Cocoa/Cocoa.h>
 
-#include "common/menu.hpp"
+#include "menu.hpp"
 
-void add_menu_callback(int, std::pair<NUI::MenuItem *, std::function<void (NUI::MenuItem *)>>);
+void add_menu_callback(int, std::pair<Silver::MenuItem *, std::function<void (Silver::MenuItem *)>>);
 
 @interface MenuActionItem : NSObject {
     int menu_id;

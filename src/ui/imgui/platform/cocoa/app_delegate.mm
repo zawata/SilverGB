@@ -1,16 +1,21 @@
+#include <AppKit/AppKit.h>
 #include <iostream>
 #include <deque>
 
 #include <crt_externs.h>
+#include <memory>
 
+#include "app.hpp"
 #import "cocoa/callback_list.hh"
 #import "cocoa/app_delegate.hh"
 #import "cocoa/app_view_controller.hh"
 #import "cocoa/apple_menu.hh"
 
-#include "common/menu.hpp"
+#include "menu.hpp"
 
 #include "util.hh"
+
+Silver::Application *g_app;
 
 @implementation AppDelegate
 
@@ -18,21 +23,33 @@
     // self->windowDrawCallback = drawCallback;
     // self->windowDrawCallbackData = callbackData;
     if (self = [super init]) {
-        // bounds = NSMakeRect(0, 0, NUI::Window::DefaultWidth, NUI::Window::DefaultHeight);
-        NSViewController *rootViewController = [[AppViewController alloc] initWithNibName:nil bundle:nil];
+        g_app = new Silver::Application();
+        g_app->window_cb.openFileDialog = [self](
+                const std::string &title,
+                const std::string &filters,
+                const std::function<void(std::string)> &cb
+        ) {
+            [self openFileDialog:s_to_ns(title) filters:s_to_ns(filters) cb:cb];
+        };
+        g_app->window_cb.openMessageBox = [self](const std::string &title, const std::string &message) {
+            [self openMessageBox:s_to_ns(title) message:s_to_ns(message)];
+        };
+
+        // bounds = NSMakeRect(0, 0, Silver::Window::DefaultWidth, Silver::Window::DefaultHeight);
+        AppViewController *rootViewController = [[AppViewController alloc] initWithNibName:nil bundle:nil];
         self->window = [[NSWindow alloc] initWithContentRect:NSZeroRect
-                                                  styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
-                                                    backing:NSBackingStoreBuffered
-                                                      defer:NO];
+                styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
+                backing:NSBackingStoreBuffered
+                defer:NO];
         self->window.contentViewController = rootViewController;
         [self->window center];
         [self->window makeKeyAndOrderFront:self];
 
-        self->app = new Silver::Application();
-        self->app->onInit(_NSGetArgc(), _NSGetArgv());
+        int *argc = _NSGetArgc();
+        char ***argv = _NSGetArgv();
+        g_app->onInit(*argc, const_cast<const char **>(*argv));
     }
     return self;
-
 }
 
 - (void)applicationWillFinishLaunching:(NSNotification *)notification {
@@ -52,11 +69,11 @@
     NSMenu *appleMenu = createAppleMenu();
     [appleItem setSubmenu:appleMenu];
 
-    auto menubarTemplate = new NUI::Menu();
-    self->app->makeMenuBar(menubarTemplate);
+    auto menubarTemplate = new Silver::Menu();
+    g_app->makeMenuBar(menubarTemplate);
 
     //deque for a breadth-first tree traversal
-    std::deque<std::pair<NSMenu *, NUI::MenuItem *>> d;
+    std::deque<std::pair<NSMenu *, Silver::MenuItem *>> d;
 
     //addx menus to processing list
     for(auto &i : menubarTemplate->items) {
@@ -67,57 +84,75 @@
         //the current submenu item
         NSMenu *mac_menu = d.front().first;
         //the NUIMenuItem Instance
-        NUI::MenuItem *nui_m = d.front().second;
+        Silver::MenuItem *baseMenuItem = d.front().second;
         d.pop_front();
 
-        if(nui_m->is_SubMenuItem()) {
-            auto itemTemplate = dynamic_cast<NUI::SubMenuItem *>(nui_m);
-            std::string label = ((NUI::SubMenuItem *)nui_m)->label;
-            NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
-                    initWithTitle:s_to_ns(label)
-                           action:nil
-                    keyEquivalent:@""];
-            NSMenu *sub_menu = [[NSMenu alloc] initWithTitle:s_to_ns(label)];
+        switch(baseMenuItem->get_type()) {
+            case Silver::MenuItem::SubMenu: {
+                auto itemTemplate = dynamic_cast<Silver::SubMenuItem *>(baseMenuItem);
+                std::string label = ((Silver::SubMenuItem *)baseMenuItem)->label;
+                NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
+                        initWithTitle:s_to_ns(label)
+                            action:nil
+                        keyEquivalent:@""];
+                NSMenu *sub_menu = [[NSMenu alloc] initWithTitle:s_to_ns(label)];
 
-            [sub_menu_item setSubmenu:sub_menu];
+                [sub_menu_item setSubmenu:sub_menu];
 
-            if(mac_menu) {
+                if(mac_menu) {
+                    [mac_menu addItem:sub_menu_item];
+                }
+
+                for(auto &i : itemTemplate->menu->items) {
+                    d.push_back({sub_menu, i.get()});
+                }
+                break;
+            }
+
+            case Silver::MenuItem::Toggle: {
+                auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(baseMenuItem);
+                NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
+                        initWithTitle:s_to_ns(itemTemplate->label)
+                        action:@selector(onMenuCallback:)
+                        keyEquivalent:@""];
+                [sub_menu_item setTarget:[[MenuActionItem alloc] init:itemTemplate->get_id()]];
+
                 [mac_menu addItem:sub_menu_item];
+
+                add_menu_callback(itemTemplate->get_id(), std::make_pair(baseMenuItem, [=](Silver::MenuItem *baseMenuItem) {
+                    bool current_state = sub_menu_item.state == NSControlStateValueOn;
+                    (*(Silver::ToggleMenuItem *)baseMenuItem)(!current_state);
+                    sub_menu_item.state = (!current_state) ? NSControlStateValueOn : NSControlStateValueOff;
+                }));
+                break;
             }
 
-            for(auto &i : itemTemplate->menu->items) {
-                d.push_back({sub_menu, i.get()});
+            case Silver::MenuItem::Callback: {
+                auto itemTemplate = dynamic_cast<Silver::CallbackMenuItem *>(baseMenuItem);
+                NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
+                        initWithTitle:s_to_ns(itemTemplate->label)
+                            action:@selector(onMenuCallback:)
+                        keyEquivalent:@""];
+                [sub_menu_item setTarget:[[MenuActionItem alloc] init:itemTemplate->get_id()]];
+
+                [mac_menu addItem:sub_menu_item];
+
+                add_menu_callback(itemTemplate->get_id(), std::make_pair(baseMenuItem, [](Silver::MenuItem *baseMenuItem){
+                    (*(Silver::CallbackMenuItem *)baseMenuItem)();
+                }));
+                break;
             }
-        } else if(nui_m->is_ToggleMenuItem()) {
-            auto itemTemplate = dynamic_cast<NUI::ToggleMenuItem *>(nui_m);
-            NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
-                    initWithTitle:s_to_ns(itemTemplate->label)
-                           action:@selector(onMenuCallback:)
-                    keyEquivalent:@""];
-            [sub_menu_item setTarget:[[MenuActionItem alloc] init:itemTemplate->get_id()]];
 
-            [mac_menu addItem:sub_menu_item];
+            case Silver::MenuItem::Separator: {
+                [mac_menu addItem:[NSMenuItem separatorItem]];
+                break;
+            }
 
-            add_menu_callback(itemTemplate->get_id(), std::make_pair(nui_m, [=](NUI::MenuItem *nui_m) {
-                bool current_state = sub_menu_item.state == NSControlStateValueOn;
-                (*(NUI::ToggleMenuItem *)nui_m)(!current_state);
-                sub_menu_item.state = (!current_state) ? NSControlStateValueOn : NSControlStateValueOff;
-            }));
-        } else if(nui_m->is_CallbackMenuItem()) {
-            auto itemTemplate = dynamic_cast<NUI::CallbackMenuItem *>(nui_m);
-            NSMenuItem *sub_menu_item = [[NSMenuItem alloc]
-                    initWithTitle:s_to_ns(itemTemplate->label)
-                           action:@selector(onMenuCallback:)
-                    keyEquivalent:@""];
-            [sub_menu_item setTarget:[[MenuActionItem alloc] init:itemTemplate->get_id()]];
-
-            [mac_menu addItem:sub_menu_item];
-
-            add_menu_callback(itemTemplate->get_id(), std::make_pair(nui_m, [](NUI::MenuItem *nui_m){
-                (*(NUI::CallbackMenuItem *)nui_m)();
-            }));
-        } else if(nui_m->is_SeparatorMenuItem()) {
-            [mac_menu addItem:[NSMenuItem separatorItem]];
+            case Silver::MenuItem::None:
+            case Silver::MenuItem::Text:
+            case Silver::MenuItem::Radio:
+            default:
+                break;
         }
     }
 
@@ -146,13 +181,40 @@
     return nil;
 }
 
-- (void)didSelectMySection {
-    std::cout << "didSelectMySection" << std::endl;
+- (void) openFileDialog:(NSString *)title
+        filters:(NSString *)filters
+        cb:(const std::function<void(std::string)> &)cb  {
+    NSOpenPanel* openPanel = [NSOpenPanel openPanel];
+
+    openPanel.title = title;
+    openPanel.showsResizeIndicator = YES;
+    openPanel.showsHiddenFiles = NO;
+    openPanel.canChooseDirectories = NO;
+    openPanel.canCreateDirectories = YES;
+    openPanel.allowsMultipleSelection = NO;
+    openPanel.allowedFileTypes = @[@"gb"];
+
+    std::string path;
+    if ([openPanel runModal] == NSModalResponseOK) {
+        //get the selected file URLs
+        NSURL *selection = openPanel.URLs[0];
+        path = ns_to_s([[selection path] stringByResolvingSymlinksInPath]);
+    }
+
+    cb(path);
 }
 
-- (void)didSelectClickMe {
-    std::cout << "didSelectClickMe" << std::endl;
+- (void) openMessageBox:(NSString *)title message:(NSString *)message  {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = title;
+    alert.informativeText = message;
+    [alert addButtonWithTitle: @"Save"];
+    [alert addButtonWithTitle: @"Cancel"];
+    [alert addButtonWithTitle: @"Don't Save"];
+
+    if([alert runModal] == NSModalResponseOK) {
+        // TODO
+    }
 }
 
 @end
-

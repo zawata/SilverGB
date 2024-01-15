@@ -8,14 +8,18 @@
 #include "gb_core/core.hpp"
 #include "menu.hpp"
 
+#include "audio/audio.hpp"
+#include "ois/OIS.h"
+
 namespace Silver {
   // TODO: rename or namespace Silver::Core
   using GBCore = Silver::Core;
 
   struct Application {
-    GUI *g;
-    Config *config;
-    GBCore* core;
+    std::shared_ptr<Config> config;
+    std::shared_ptr<GBCore> core;
+    std::shared_ptr<AudioManager> audio;
+    std::shared_ptr<OIS::InputManager> input;
 
     ImTextureID screen_texture_id;
 

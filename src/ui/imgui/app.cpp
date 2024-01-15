@@ -1,5 +1,6 @@
 #include <chrono>
 #include <argparse/argparse.hpp>
+#include <memory>
 
 #include "app.hpp"
 #include "gb_core/joy.hpp"
@@ -36,7 +37,7 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
     exit(0);
   }
 
-  this->config = new Config();
+  this->config = std::make_shared<Config>();
 
   // config->BIOS.set_bios_enabled(!program.get<bool>("--emu-bios"));
   auto filename = program.get<std::string>("--file");
@@ -65,8 +66,7 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
   auto emulationMenu = Menu();
   emulationMenu.addItem<CallbackMenuItem>("Reset", [this](const CallbackMenuItem &, void *){
     // TODO: not sure this is safe
-    delete core;
-    this->core = new Core(this->rom_file, this->bootrom_file);
+    this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
   }, nullptr);
   emulationMenu.addItem<ToggleMenuItem>("Paused", [this](const ToggleMenuItem &, bool new_state, void *){
     this->app_state.game_running = !new_state;
@@ -86,7 +86,7 @@ void Silver::Application::onLoadRomFile(const std::string &filePath) {
   }
 
   this->rom_file = Silver::File::openFile(filePath);
-  this->core = new Silver::GBCore(this->rom_file, this->bootrom_file);
+  this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
   this->app_state.game_running = true;
 }
 
@@ -114,9 +114,9 @@ float get_calc_fps() {
 
 void get_screen_area(const ImVec2 &win_bounds, ImVec2 &top_left, ImVec2 &bottom_right) {
     //auto screen sizing and placement code
-    float scaling_factor = ::fmin(win_bounds.x/GB_S_W, win_bounds.y/GB_S_H);
-    float width = scaling_factor * GB_S_W;
-    float height = scaling_factor * GB_S_H;
+    float scaling_factor = std::fmin(win_bounds.x/Silver::Core::native_width, win_bounds.y/Silver::Core::native_height);
+    float width = scaling_factor * Silver::Core::native_width;
+    float height = scaling_factor * Silver::Core::native_height;
     float wRemainder = win_bounds.x - width;
     float hRemainder = win_bounds.y - height;
 

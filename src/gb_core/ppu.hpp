@@ -13,14 +13,15 @@
 #include "util/bit.hpp"
 #include "util/types/primitives.hpp"
 #include "util/types/circular_queue.hpp"
+#include "util/types/pixel.hpp"
 #include "util/util.hpp"
-
-constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b);
-void rgb15_to_rgb555(u8 *loc, u16 color);
-void rgb15_to_rgb888(u8 *loc, u16 color);
 
 class PPU {
 public:
+    static constexpr u32 native_width = 160;
+    static constexpr u32 native_height = 144;
+    static constexpr u32 native_pixel_count = native_width * native_height;
+
     enum {
         SCANLINE_OAM  = 2,
         SCANLINE_VRAM = 3,
@@ -44,13 +45,12 @@ public:
         }
 
         std::string to_rgb24_string() {
-            u8 cc[3];
             std::stringstream ss;
             ss << std::hex;
             for(int i = 0; i < 4; i++) {
                 if(i != 0) ss << ", ";
-                rgb15_to_rgb888(cc, colors[i]);
-                ss << "#" << itoh(cc[0], 2, true, false) << itoh(cc[1], 2, true, false) << itoh(cc[2], 2, true, false);
+                auto p = Silver::Pixel::makeFromRGB15(colors[i]);
+                ss << "#" << itoh(p.r, 2, true, false) << itoh(p.g, 2, true, false) << itoh(p.b, 2, true, false);
             }
             return ss.str();
         }
@@ -79,7 +79,12 @@ public:
         0x1081, // black
     };
 
-    PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled);
+    PPU(
+        Cartridge *cart,
+        Memory *mem,
+        gb_device_t device,
+        bool bootrom_enabled
+    );
     ~PPU();
 
     bool tick();
@@ -98,6 +103,8 @@ public:
 
     void set_obj_priority(bool obj_has_priority);
 
+    const std::vector<Silver::Pixel> &getPixelBuffer();
+
     //public because core needs access //TODO: befriend core maybe?
     palette_t bg_palettes[8];
     palette_t obj_palettes[8];
@@ -110,7 +117,7 @@ private:
     Memory *mem;
 
     gb_device_t device;
-    u8 *screen_buffer = NULL; //buffer for the screen, passed from core
+    std::vector<Silver::Pixel> pixBuf;
 
     int curr_mode;
 
@@ -190,7 +197,7 @@ private:
     std::vector<obj_sprite_t> active_sprites;
     std::deque<obj_sprite_t> displayed_sprites;
 
-    u32 current_byte = 0;
+    u32 current_pixel = 0;
 
     bool
         vblank_int_requested = false,

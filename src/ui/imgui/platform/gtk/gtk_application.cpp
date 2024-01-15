@@ -20,12 +20,13 @@
 #include <sigc++/functors/ptr_fun.h>
 #include <sigc++/sigc++.h>
 
+#include "gb_core/core.hpp"
 #include "gb_core/defs.hpp"
-#include "imgui/imgui.h"
-#include "imgui/backends/imgui_impl_opengl3.h"
-#include "imgui_impl_gtkmm.hpp"
-
 #include "gtk_application.hpp"
+#include "imgui/backends/imgui_impl_opengl3.h"
+#include "imgui/imgui.h"
+#include "imgui_impl_gtkmm.hpp"
+#include "input_device.hpp"
 #include "menu.hpp"
 
 static const std::string class_name = "org.zawata.silver";
@@ -116,7 +117,7 @@ void GtkApp::on_activate() {
 
   this->window = new Gtk::Window();
   // this->window->set_resizable(false);
-  this->window->set_size_request(GB_S_W, GB_S_H);
+  this->window->set_size_request(Silver::Core::native_width, Silver::Core::native_height);
 
   this->gl_area = new Gtk::GLArea();
   this->gl_area->set_auto_render();
@@ -146,7 +147,6 @@ void GtkApp::on_activate() {
               Joypad::button_states_t button_states;
               this->keyboardBindings->getButtonStates(button_states);
               this->app->onUpdateInputs(button_states);
-              forward_event = !this->app->app_state.game_capture_input;
             }
 
             break;
@@ -169,8 +169,8 @@ void GtkApp::on_activate() {
   // we need to force continous re-renders of the glArea
   window->add_tick_callback(
       [this](const Glib::RefPtr<Gdk::FrameClock>&) -> bool {
-          this->gl_area->queue_render();
-          return true;
+        this->gl_area->queue_render();
+        return true;
       }
   );
 
@@ -203,7 +203,7 @@ void GtkApp::create_screen_texture() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     check_gl_error();
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, GB_S_W, GB_S_H);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, Silver::Core::native_width, Silver::Core::native_height);
     check_gl_error();
     glBindTexture(GL_TEXTURE_2D, 0);
     check_gl_error();
@@ -319,11 +319,21 @@ void GtkApp::unrealize() {
   }
 }
 
+u8 screen_buffer[Silver::Core::native_pixel_count * 4] = { 0 };
+
+// serves as our run-loop
 bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext>& /* context */) {
   try {
     this->gl_area->throw_if_error();
 
     if(this->app->core) {
+      // this type and format must match the texture pixel format
+      Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGB>(
+          screen_buffer,
+          Silver::Core::native_pixel_count * 4,
+          this->app->core->getPixelBuffer()
+      );
+
       // draw screen to texture
       glBindTexture(GL_TEXTURE_2D, screen_texture);
       glTexSubImage2D(
@@ -331,11 +341,11 @@ bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext>& /* context */) {
           0,
           0,
           0,
-          GB_S_W,
-          GB_S_H,
+          Silver::Core::native_width,
+          Silver::Core::native_height,
           GL_RGB,
           GL_UNSIGNED_BYTE,
-          this->app->core->getScreenBuffer()
+          screen_buffer
       );
       glBindTexture(GL_TEXTURE_2D, 0);
     }

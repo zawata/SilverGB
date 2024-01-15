@@ -2,9 +2,9 @@
 
 #include <unordered_map>
 
-static std::unordered_map<int, std::pair<NUI::MenuItem *, std::function<void (NUI::MenuItem *)>>> callback_map;
+static std::unordered_map<int, std::pair<Silver::MenuItem *, std::function<void (Silver::MenuItem *)>>> callback_map;
 
-void add_menu_callback(int menu_id, std::pair<NUI::MenuItem *, std::function<void (NUI::MenuItem *)>> p) {
+void add_menu_callback(int menu_id, std::pair<Silver::MenuItem *, std::function<void (Silver::MenuItem *)>> p) {
     callback_map.insert({menu_id, p});
 }
 

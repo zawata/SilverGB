@@ -1,4 +1,5 @@
 #include <chrono>
+#include <memory>
 #include <ratio>
 #include <vector>
 
@@ -7,7 +8,7 @@
 #include "core.hpp"
 #include "defs.hpp"
 #include "joy.hpp"
-#include "util/types/pixel_buffer.hpp"
+#include "util/types/pixel.hpp"
 #include "ppu.hpp"
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -18,8 +19,6 @@ namespace Silver {
 
 Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device):
 device(device) {
-    screen_buffer = new u8[GB_S_P_SZ];
-
     // the Audio buffering system is threaded because it's simpler
     // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
     // so we use an SPSC queue to buffer entire audio buffers at a time
@@ -54,7 +53,7 @@ device(device) {
     mem = new Memory(device, bootrom != nullptr);
 
     apu = new APU(bootrom != nullptr);
-    ppu = new PPU(cart, mem, screen_buffer, device, bootrom != nullptr);
+    ppu = new PPU(cart, mem, device, bootrom != nullptr);
     joy = new Joypad(mem);
 
     io = new IO_Bus(mem, apu, ppu, joy, cart, device, bootrom);
@@ -70,8 +69,6 @@ Core::~Core() {
     delete mem;
     delete cart;
     delete audio_queue;
-
-    delete[] screen_buffer;
 }
 
 /**
@@ -109,7 +106,8 @@ void Core::tick_frame() {
             bp_active = false;
             throw breakpoint_exception();
         }
-        //TODO: this should be dynamic. probably adjusting the live sampling rate ot keep the buffer from over or underflowing.
+
+        //TODO: this should be dynamic. probably adjusting the live sampling rate to keep the buffer from over or underflowing.
         // 90 tends to underflow every couple frames, while 85 keeps buffer sizes at 2-3x higher than the callback copy size.
         // the ideal rate right now seems to be 87, it will underflow every couple seconds
         if(tick_cntr++ == 87) {
@@ -179,6 +177,10 @@ void Core::do_audio_callback(float *buff, int copy_cnt) {
     }
 }
 
+const std::vector<Silver::Pixel> &Core::getPixelBuffer() {
+    return this->ppu->getPixelBuffer();
+}
+
 /**
  * Util Functions
  */
@@ -197,10 +199,6 @@ Memory::io_registers_t Core::getregistersfromIO() {
 }
 
 u8 Core::getByteFromIO(u16 addr) { return 0; }
-
-u8 const* Core::getScreenBuffer() {
-    return screen_buffer;
-}
 
 std::vector<u8> Core::getOAMEntry(int index) {
     if(index >= 40 ) { return {}; }
@@ -308,7 +306,11 @@ void Core::getBGBuffer(u8 *buf) {
                     palette_idx = 0;
                 }
 
-                rgb15_to_rgb888(&buf[((y*256) + (x * 8) + tile_x) * 3], ppu->bg_palettes[palette_idx].colors[color_idx]);
+                auto p = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
+                PixelBufferEncoder<u8>::WritePixel<PixelFormat::RGB>::write(
+                    &buf[((y*256) + (x * 8) + tile_x) * 3], 
+                    p
+                );
             }
         }
     }
@@ -367,7 +369,11 @@ void Core::getWNDBuffer(u8 *buf) {
                     palette_idx = 0;
                 }
 
-                rgb15_to_rgb888(&buf[((y*256) + (x * 8) + tile_x) * 3], ppu->bg_palettes[palette_idx].colors[color_idx]);
+                auto p = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
+                PixelBufferEncoder<u8>::WritePixel<PixelFormat::RGB>::write(
+                    &buf[((y*256) + (x * 8) + tile_x) * 3], 
+                    p
+                );
             }
         }
     }

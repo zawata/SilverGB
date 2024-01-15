@@ -2,12 +2,14 @@
 #include <cstring>
 
 #include <nowide/iostream.hpp>
+#include <vector>
 
 #include "cart.hpp"
 #include "defs.hpp"
 #include "mem.hpp"
 #include "ppu.hpp"
 
+#include "util/types/pixel.hpp"
 #include "util/types/primitives.hpp"
 #include "util/bit.hpp"
 #include "util/util.hpp"
@@ -59,25 +61,6 @@
 #define BG_X_FLIP(attr)         (Bit::test((attr), X_FLIP_BIT))
 #define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
 #define BG_PALETTE(attr)       ((attr) & GBC_PALETTE_MASK)
-
-constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b) {
-    return r | (((u16)g) << 5) | (((u16)b) << 10);
-}
-
-void rgb15_to_rgb555(u8 *loc, u16 color) {
-    *loc++ = ((color >> 0)  & 0x001F);
-    *loc++ = ((color >> 5)  & 0x001F);
-    *loc++ = ((color >> 10) & 0x001F);
-}
-
-void rgb15_to_rgb888(u8 *loc, u16 color) {
-    u8 r = ((color >> 0)  & 0x001F);
-    *loc++ = (r << 3) | (r >> 2);
-    u8 g = ((color >> 5)  & 0x001F);
-    *loc++ = (g << 3) | (g >> 2);
-    u8 b = ((color >> 10) & 0x001F);
-    *loc++ = (b << 3) | (b >> 2);
-}
 
 constexpr u8 inverse_title_checksums[] = {
     0x00, 0x37, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x4d, 0x00, 0x00,
@@ -167,6 +150,10 @@ constexpr u8 triplet_palette_idxs[][3] = {
     {  4,   28,   29 }
 };
 
+constexpr u16 rgb555_to_rgb15(u8 r,u8 g, u8 b) {
+    return r | (((u16)g) << 5) | (((u16)b) << 10);
+}
+
 #define rgb(...) rgb555_to_rgb15(__VA_ARGS__)
 constexpr PPU::palette_t compat_palettes[] = {
 /* 00 */  { rgb(0x1F,0x1F,0x1F), rgb(0x1F,0x15,0x0C), rgb(0x10,0x06,0x00), rgb(0x00,0x00,0x00) },
@@ -208,11 +195,17 @@ constexpr PPU::palette_t compat_palettes[] = {
 };
 #undef rgb
 
-PPU::PPU(Cartridge *cart, Memory *mem, u8 *scrn_buf, gb_device_t device, bool bootrom_enabled = false) :
+PPU::PPU(
+    Cartridge *cart,
+    Memory *mem,
+    gb_device_t device,
+    bool bootrom_enabled = false
+) :
 cart(cart),
 mem(mem),
-device(device),
-screen_buffer(scrn_buf) {
+device(device) {
+    pixBuf = std::vector<Silver::Pixel>(PPU::native_pixel_count);
+
     //TODO: demagic
 
     // Set object priority defaults, GBC will flip this later for dmg-compat mode if applicable
@@ -404,6 +397,10 @@ void PPU::set_obj_priority(bool obj_has_priority) {
     // false on CGB
     //TODO: we don't currently use this flag. fix that
     obj_priority_mode = obj_has_priority;
+}
+
+const std::vector<Silver::Pixel> &PPU::getPixelBuffer() {
+    return this->pixBuf;
 }
 
 /**
@@ -725,8 +722,8 @@ void PPU::ppu_tick_vram() {
 
             // if frame is disabled, don't draw pixel data
             if (!frame_disable) {
-                rgb15_to_rgb888(screen_buffer + current_byte, bg_color.palette->colors[bg_color.color_idx]);
-                current_byte += 3;
+                auto pixel = Silver::Pixel::makeFromRGB15(bg_color.palette->colors[bg_color.color_idx]);
+                pixBuf.at(current_pixel++) = pixel;
             }
         }
 
@@ -806,12 +803,14 @@ bool PPU::tick() {
             first_frame = false;
             frame_disable = true;
 
-            memset(screen_buffer, 0xFF, GB_S_P_SZ); //TODO: use the white color
+            // clear the screen to white
+            auto pixel = Silver::Pixel::makeFromRGB15(gb_palette.colors[0]);
+            std::fill(pixBuf.begin(), pixBuf.end(), pixel);
         } else {
             frame_disable = false;
         }
 
-        current_byte = 0;
+        current_pixel = 0;
 
         wnd_y_cntr = 0;
         //this is incremented to zero at the start of the first line

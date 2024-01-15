@@ -1,16 +1,20 @@
-#import <Foundation/Foundation.h>
+#include <iostream>
 
 #import <Cocoa/Cocoa.h>
-
+#import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 
+#include "app.hpp"
 #include "imgui.h"
 #include "imgui_impl_metal.h"
 #include "imgui_impl_osx.h"
 #import "cocoa/app_view_controller.hh"
 
-#include <iostream>
+#include "util/types/pixel.hpp"
+
+// TODO: find a better place for this
+extern Silver::Application *g_app;
 
 @implementation AppViewController
 
@@ -20,8 +24,7 @@
     _device = MTLCreateSystemDefaultDevice();
     _commandQueue = [_device newCommandQueue];
 
-    if (!self.device)
-    {
+    if (!self.device) {
         NSLog(@"Metal is not supported");
         abort();
     }
@@ -36,7 +39,6 @@
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
 
     // Setup Renderer backend
     ImGui_ImplMetal_Init(_device);
@@ -56,6 +58,14 @@
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
+
+    MTLTextureDescriptor *descriptor = [MTLTextureDescriptor
+            texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+            width:Silver::Core::native_width
+            height:Silver::Core::native_height
+            mipmapped:FALSE
+    ];
+    g_app->screen_texture_id = self.screen_texture = [self.device newTextureWithDescriptor:descriptor];
 
     return self;
 }
@@ -77,6 +87,8 @@
     [NSApp activateIgnoringOtherApps:YES];
 }
 
+u8 screen_buffer[Silver::Core::native_pixel_count * 4] = { 0 };
+
 -(void)drawInMTKView:(MTKView*)view {
     ImGuiIO& io = ImGui::GetIO();
     io.DisplaySize.x = view.bounds.size.width;
@@ -96,6 +108,30 @@
     // Start the Dear ImGui frame
     ImGui_ImplMetal_NewFrame(renderPassDescriptor);
     ImGui::NewFrame();
+
+    // this will run the core logic
+    g_app->onDraw();
+
+    if (g_app->core) {
+        // this type and format must match the texture pixel format
+        Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGBA>(
+                screen_buffer,
+                Silver::Core::native_pixel_count * 4,
+                g_app->core->getPixelBuffer()
+        );
+
+        [self.screen_texture
+                replaceRegion:MTLRegionMake2D(
+                        0,
+                        0,
+                        (NSUInteger)Silver::Core::native_width,
+                        (NSUInteger)Silver::Core::native_height
+                )
+                mipmapLevel:0
+                withBytes:screen_buffer
+                bytesPerRow:(NSUInteger)Silver::Core::native_width * 4
+        ];
+    }
 
     // Rendering
     ImGui::Render();
@@ -119,7 +155,6 @@
 // Input processing
 //-----------------------------------------------------------------------------------
 - (void)viewWillAppear {
-    std::cout << "viewWillAppear" << std::endl;
     [super viewWillAppear];
     self.view.window.delegate = self;
 }
