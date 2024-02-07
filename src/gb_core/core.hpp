@@ -68,8 +68,11 @@ private:
 
     gb_device_t device;
 
+    static constexpr u32 audio_buffer_sz = 2048;
+    using AudioBuffer = std::array<float, audio_buffer_sz>;
+
     bool frame_ready = false;
-    jnk0le::Ringbuffer<std::vector<float>,4> *audio_queue = nullptr;
+    jnk0le::Ringbuffer<AudioBuffer, 4> *audio_queue = nullptr;
     std::vector<float> audio_vector;
 
     u16 breakpoint = 0;

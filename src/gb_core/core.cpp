@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <memory>
 #include <ratio>
@@ -22,7 +24,7 @@ device(device) {
     // the Audio buffering system is threaded because it's simpler
     // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
     // so we use an SPSC queue to buffer entire audio buffers at a time
-    audio_queue = new Ringbuffer<std::vector<float>,4>();
+    audio_queue = new Ringbuffer<std::array<float, 2048>, 4>();
     audio_vector = std::vector<float>();
     audio_vector.reserve(2048);
 
@@ -117,9 +119,12 @@ void Core::tick_frame() {
             tick_cntr = 0;
         }
 
-        if(audio_vector.size() == 2048) { // TODO: make constant
-            audio_queue->insert(audio_vector);
+        if(audio_vector.size() == audio_buffer_sz) {
+            AudioBuffer buf;
+            std::copy(audio_vector.begin(), audio_vector.end(), buf.begin());
             audio_vector.clear();
+
+            audio_queue->insert(buf);
         }
 
     } while(!this->frame_ready);
@@ -167,7 +172,8 @@ void Core::do_audio_callback(float *buff, int copy_cnt) {
         nowide::cerr << "audio buffer underflow" << std::endl;
         memset(buff, 0, copy_cnt * 4);
     } else {
-        std::vector<float> audio_buffer;
+        // TODO: don't want to do 2 copies of this data
+        AudioBuffer audio_buffer;
         audio_queue->remove(audio_buffer);
 
         assert(copy_cnt == audio_buffer.size());
