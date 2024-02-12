@@ -3,12 +3,14 @@
 #include <memory>
 
 #include "app.hpp"
+#include "binding.hpp"
 #include "gb_core/joy.hpp"
 #include "gb_core/mem.hpp"
 #include "gui.hpp"
 #include "gb_core/core.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "input/gamepad.hpp"
 
 void Silver::Application::onInit(int argc, const char *argv[]) {
   argparse::ArgumentParser program("SilverGB");
@@ -38,6 +40,8 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
   }
 
   this->config = std::make_shared<Config>();
+  this->binding = std::make_shared<Binding::Tracker>();
+  this->gamepadManager = std::make_shared<GamepadManager>();
 
   // config->BIOS.set_bios_enabled(!program.get<bool>("--emu-bios"));
   auto filename = program.get<std::string>("--file");
@@ -45,8 +49,9 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
 }
 
 void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
-  using namespace std::placeholders;
-
+  /**
+   * File
+   */
   auto fileMenu = Menu();
   fileMenu.addItem<CallbackMenuItem>("Open file", [this](const CallbackMenuItem &, void *){
     this->window_cb.openFileDialog(
@@ -63,21 +68,18 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
   });
   menubar->addItem<SubMenuItem>("File", fileMenu);
 
+  /**
+   * Emulation
+   */
   auto emulationMenu = Menu();
   emulationMenu.addItem<CallbackMenuItem>("Reset", [this](const CallbackMenuItem &, void *){
     // TODO: not sure this is safe
     this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
   }, nullptr);
   emulationMenu.addItem<ToggleMenuItem>("Paused", [this](const ToggleMenuItem &, bool new_state, void *){
-    this->app_state.game_running = !new_state;
+    this->app_state.game.running = !new_state;
   }, nullptr, false);
   menubar->addItem<Silver::SubMenuItem>("Emulation", emulationMenu);
-}
-
-void Silver::Application::onUpdateInputs(const Joypad::button_states_t &button_states) {
-  if (core) {
-    this->core->set_input_state(button_states);
-  }
 }
 
 void Silver::Application::onLoadRomFile(const std::string &filePath) {
@@ -87,7 +89,7 @@ void Silver::Application::onLoadRomFile(const std::string &filePath) {
 
   this->rom_file = Silver::File::openFile(filePath);
   this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
-  this->app_state.game_running = true;
+  this->app_state.game.running = true;
 }
 
 void Silver::Application::onLoadBootRomFile(const std::string &filePath) {
@@ -124,15 +126,25 @@ void get_screen_area(const ImVec2 &win_bounds, ImVec2 &top_left, ImVec2 &bottom_
   bottom_right = {top_left.x + width, top_left.y + height};
 }
 
-void Silver::Application::onDraw() {
+void Silver::Application::onUpdate() {
   float fps = get_calc_fps();
 
-  try {
-    if(this->core) {
-      this->core->tick_frame();
+  // run periodicUpdates
+  gamepadManager->updateGamepads(this->binding);
+
+  if (this->core) {
+    // update inputs
+    Joypad::button_states_t buttonsState{};
+    binding->getButtonStates(buttonsState);
+    this->core->set_input_state(buttonsState);
+
+    try {
+      if(this->app_state.game.running) {
+        this->core->tick_frame();
+      }
+    } catch(breakpoint_exception &e) {
+      this->app_state.game.running = false;
     }
-  } catch(breakpoint_exception &e) {
-    this->app_state.game_running = false;
   }
 
   // draw screen
@@ -142,6 +154,7 @@ void Silver::Application::onDraw() {
 
   ImGui::ShowDemoWindow();
   buildFpsWindow(fps);
+  buildOptionsWindow(this);
 }
 
 void Silver::Application::onClose() {

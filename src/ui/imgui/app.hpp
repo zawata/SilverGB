@@ -4,12 +4,14 @@
 
 #include <argparse/argparse.hpp>
 
+#include "cfg.hpp"
+#include "binding.hpp"
 #include "gui.hpp"
 #include "gb_core/core.hpp"
+#include "input/gamepad.hpp"
 #include "menu.hpp"
 
 #include "audio/audio.hpp"
-#include "ois/OIS.h"
 
 namespace Silver {
   // TODO: rename or namespace Silver::Core
@@ -19,15 +21,23 @@ namespace Silver {
     std::shared_ptr<Config> config;
     std::shared_ptr<GBCore> core;
     std::shared_ptr<AudioManager> audio;
-    std::shared_ptr<OIS::InputManager> input;
+    std::shared_ptr<Binding::Tracker> binding;
+    std::shared_ptr<GamepadManager> gamepadManager;
 
-    ImTextureID screen_texture_id;
+    void *screen_texture_id;
 
     struct {
-      bool game_running = false;
-      bool debug_mode = false;
-      bool show_fps = false;
-      bool game_capture_input = true;
+        struct {
+            bool running;
+        } game;
+        struct {
+            bool show_fps = false;
+            bool debug_mode = false;
+            bool show_options = false;
+        } ui;
+        struct {
+            bool game_wants_input = true;
+        } input;
     } app_state;
 
     struct {
@@ -41,10 +51,9 @@ namespace Silver {
 
     void onInit(int argc, const char **argv);
     void makeMenuBar(Silver::Menu *menubar);
-    void onUpdateInputs(const Joypad::button_states_t &button_states);
     void onLoadRomFile(const std::string &filePath);
     void onLoadBootRomFile(const std::string &filePath);
-    void onDraw();
+    void onUpdate();
     void onClose();
 
     Silver::File *rom_file, *bootrom_file;

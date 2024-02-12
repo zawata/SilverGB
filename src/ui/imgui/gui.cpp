@@ -1,11 +1,9 @@
 #include "gui.hpp"
 
-#include "gb_core/apu.hpp"
 #include "imgui.h"
-#include "util/bit.hpp"
 
 GUI::GUI(Config *config) :
-config(config) {
+        config(config) {
 }
 
 GUI::~GUI() {
@@ -19,14 +17,14 @@ void buildFpsWindow(float fps) {
     im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     im::PushStyleVar(ImGuiStyleVar_WindowMinSize, {20, 20});
     im::Begin("FPS", nullptr,
-            ImGuiWindowFlags_NoTitleBar        |
-            ImGuiWindowFlags_NoResize          |
-            ImGuiWindowFlags_NoMove            |
-            ImGuiWindowFlags_NoScrollbar       |
-            ImGuiWindowFlags_NoScrollWithMouse |
-            ImGuiWindowFlags_NoCollapse        |
-            ImGuiWindowFlags_NoSavedSettings   |
-            ImGuiWindowFlags_NoInputs
+              ImGuiWindowFlags_NoTitleBar |
+                      ImGuiWindowFlags_NoResize |
+                      ImGuiWindowFlags_NoMove |
+                      ImGuiWindowFlags_NoScrollbar |
+                      ImGuiWindowFlags_NoScrollWithMouse |
+                      ImGuiWindowFlags_NoCollapse |
+                      ImGuiWindowFlags_NoSavedSettings |
+                      ImGuiWindowFlags_NoInputs
     );
 
     im::Text("%0.1f", fps);
@@ -40,24 +38,64 @@ void buildFpsWindow(float fps) {
     im::PopStyleVar(3);
 }
 
-void buildOptionsWindow() {
+void buildOptionsWindow(Silver::Application *app) {
+    if (app->app_state.ui.show_options) {
+        return;
+    }
+
     namespace im = ImGui;
 
-    im::SetNextWindowSize({Silver::Core::native_width, Silver::Core::native_height});
+    im::SetNextWindowSize(im::GetMainViewport()->Size);
     im::SetNextWindowPos({0, 0});
     im::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-        im::Begin("Options", nullptr,
+    im::Begin("Options", nullptr, 0 |
             ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize   |
-            ImGuiWindowFlags_NoMove     |
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse
     );
+
+    if(im::CollapsingHeader("Input")) {
+        if(im::BeginTable("inputs", 3, ImGuiTableFlags_NoHostExtendX)) {
+            im::TableSetupColumn("Button", ImGuiTableColumnFlags_WidthFixed, 30);
+            im::TableSetupColumn("Input");
+            im::TableSetupColumn("Clear");
+
+            for(int button = Silver::Binding::Button::A; button < Silver::Binding::Button::_End; button++) {
+                im::TableNextRow();
+                // Button Name
+                im::TableSetColumnIndex(0);
+                im::Text("%s", Silver::Binding::getButtonName((Silver::Binding::Button) button));
+
+                // Button mapping
+                im::TableSetColumnIndex(1);
+
+                bool isRecording = app->binding->isRecordingForButton((Silver::Binding::Button) button);
+
+                auto maybeAction = app->binding->getInputForButton((Silver::Binding::Button) button);
+                std::string button_label;
+                if(isRecording) {
+                    button_label = "Recording";
+                } else if(maybeAction.has_value()) {
+                    button_label = Silver::Binding::getInputDescription(maybeAction.value());
+                } else {
+                    button_label = "Unmapped";
+                }
+
+                if(im::Button(button_label.c_str())) {
+                    app->binding->startRecording((Silver::Binding::Button) button);
+                }
+            }
+
+            im::EndTable();
+        }
+    }
 
     im::End();
     im::PopStyleVar();
 }
 
-void buildCPURegisterWindow(Silver::Core* core) {
+void buildCPURegisterWindow(Silver::Core *core) {
     using namespace ImGui;
 
     static struct {
@@ -68,12 +106,14 @@ void buildCPURegisterWindow(Silver::Core* core) {
         bool HL;
     } reg_flags;
 
-    CPU::registers_t regs = { 0 };
-    if(core) regs = core->getRegistersFromCPU();
-    else     regs = { 0 };
+    CPU::registers_t regs{};
+    if(core)
+        regs = core->getRegistersFromCPU();
+    else
+        regs = {0};
 
     //The Indentation on this window is very sensitive...
-    SetNextWindowSize({120,0});
+    SetNextWindowSize({120, 0});
     Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
     Unindent(10.0);
     Columns(2, nullptr, true);
@@ -191,12 +231,14 @@ void buildCPURegisterWindow(Silver::Core* core) {
 void buildIORegisterWindow(Silver::Core *core) {
     using namespace ImGui;
 
-    Memory::io_registers_t regs = { 0 };
-    if(core) regs = core->getregistersfromIO();
-    else     regs = { 0 };
+    Memory::io_registers_t regs{};
+    if(core)
+        regs = core->getregistersfromIO();
+    else
+        regs = {0};
 
     // The Indentation on this window is very sensitive...
-    SetNextWindowSize({120,0});
+    SetNextWindowSize({120, 0});
     Begin("IO Registers", nullptr, ImGuiWindowFlags_NoResize);
     Columns(2, nullptr, true);
     SetColumnWidth(-1, 60);
@@ -403,50 +445,45 @@ void GUI::buildDisassemblyWindow() {
 //     PopStyleColor(3);
 // }
 
-    //TODO: fix
+//TODO: fix
 void buildBreakpointWindow(Silver::Core *core) {
     using namespace ImGui;
 
     ImGuiInputTextCallback text_func =
-        [](ImGuiInputTextCallbackData *data) -> int {
-            switch(data->EventChar) {
-            case '0' ... '9':
-                break;
-            case 'a' ... 'f':
-                data->EventChar -= ('a' - 'A');
-                break;
-            case 'A' ... 'F':
-                break;
-            default:
-                return 1;
-                break;
-            }
-            return 0;
-        };
+            [](ImGuiInputTextCallbackData *data) -> int {
+                switch(data->EventChar) {
+                case '0' ... '9':break;
+                case 'a' ... 'f':data->EventChar -= ('a' - 'A');
+                    break;
+                case 'A' ... 'F':break;
+                default:return 1;
+                }
+
+                return 0;
+            };
 
     static char buf[5] = "";
 
     if(Begin("Breakpoint", nullptr, ImGuiWindowFlags_NoResize)) {
         Columns(2, nullptr, true);
-            SetColumnWidth(-1, 90);
-            Dummy({0,0.25});
-            Text("Breakpoint:");
-            Dummy({0,0.25});
-            Text("Enabled:");
+        SetColumnWidth(-1, 90);
+        Dummy({0, 0.25});
+        Text("Breakpoint:");
+        Dummy({0, 0.25});
+        Text("Enabled:");
         NextColumn();
-            PushItemWidth(50);
-            InputText("##", buf, 5, ImGuiInputTextFlags_CallbackCharFilter, text_func);
-            //SetItemDefaultFocus();
-            PopItemWidth();
+        PushItemWidth(50);
+        InputText("##", buf, 5, ImGuiInputTextFlags_CallbackCharFilter, text_func);
+        PopItemWidth();
 
-            bool breakpoint_enabled = false;
-            if(core) {
-                breakpoint_enabled = core->get_bp_active();
-            }
+        bool breakpoint_enabled = false;
+        if(core) {
+            breakpoint_enabled = core->get_bp_active();
+        }
 
-            if(Checkbox("##", &breakpoint_enabled)) {
-                core->set_bp_active(breakpoint_enabled);
-            }
+        if(Checkbox("##", &breakpoint_enabled) && core) {
+            core->set_bp_active(breakpoint_enabled);
+        }
     }
     End();
 }

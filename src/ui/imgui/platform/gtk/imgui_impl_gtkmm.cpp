@@ -100,13 +100,6 @@ void ImGui_ImplGtkmm_NewFrame() {
   std::chrono::duration<float, std::milli> delta = now - bd->last_frame_time;
   io.DeltaTime = delta.count();
   bd->last_frame_time = now;
-
-  // if (bd->PendingMouseLeaveFrame && bd->PendingMouseLeaveFrame >= ImGui::GetFrameCount() && bd->MouseButtonsDown == 0)
-  // {
-  //     bd->MouseWindowID = 0;
-  //     bd->PendingMouseLeaveFrame = 0;
-  //     io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
-  // }
 }
 
 bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
@@ -248,6 +241,36 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
       return true;
     }
 
+    case Gdk::Event::Type::SCROLL: {
+      double x,y;
+      switch(event->get_direction()) {
+      case Gdk::ScrollDirection::UP:
+        x = 0.0;
+        y = -1.0;
+        break;
+      case Gdk::ScrollDirection::DOWN:
+        x = 0.0;
+        y = 1.0;
+        break;
+      case Gdk::ScrollDirection::LEFT:
+        x = 1.0;
+        y = 0.0;
+        break;
+      case Gdk::ScrollDirection::RIGHT:
+        x = -1.0;
+        y = 0.0;
+        break;
+      case Gdk::ScrollDirection::SMOOTH:
+        event->get_deltas(x,y);
+        x *= -1;
+        y *= -1;
+        break;
+      }
+      io.AddMouseWheelEvent(x, y);
+
+      return true;
+    }
+
     case Gdk::Event::Type::BUTTON_PRESS:
     case Gdk::Event::Type::BUTTON_RELEASE: {
       bool pressed = event->get_event_type() == Gdk::Event::Type::BUTTON_PRESS;
@@ -281,13 +304,6 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
     //   deviceTool.use_count()
     //   auto axis = event->get_axis(Gdk::AxisUse::, val)
     //   io.AddKeyAnalogEvent(ImGuiKey key, bool down, float v)
-    // }
-    // case Gdk::Event::Type::PAD_BUTTON_PRESS:
-    // case Gdk::Event::Type::PAD_BUTTON_RELEASE: {
-    //   auto button = event->get_button();
-
-    //   io.Add(ImGuiMouseButton_Left, event->get_event_type() == Gdk::Event::Type::BUTTON_PRESS);
-    //   return true;
     // }
 
     default:

@@ -2,6 +2,7 @@ add_executable(gb_main_imgui)
 target_sources(gb_main_imgui PRIVATE
     "app.cpp"
     "gui.cpp"
+    "../common/binding.cpp"
     "imgui/imgui.cpp"
     "imgui/imgui_demo.cpp"
     "imgui/imgui_draw.cpp"
@@ -36,6 +37,7 @@ if(APPLE)
         objc)
 elseif (UNIX)
     target_sources(gb_main_imgui PRIVATE
+        "../common/input/gamepad_sdlinput.cpp"
         "platform/gtk/main.cpp"
         "platform/gtk/gtk_application.cpp"
         "platform/gtk/imgui_impl_gtkmm.cpp"
@@ -44,7 +46,12 @@ elseif (UNIX)
     find_package(PkgConfig)
     pkg_check_modules(GTKMM_VARS REQUIRED IMPORTED_TARGET gtkmm-4.0)
 
-    target_link_libraries(gb_main_imgui PRIVATE PkgConfig::GTKMM_VARS)
+    find_package(SDL2 CONFIG REQUIRED)
+
+    target_link_libraries(gb_main_imgui PRIVATE
+        PkgConfig::GTKMM_VARS
+        SDL2::SDL2
+    )
 elseif (WIN32)
     target_sources(gb_main_imgui
         PRIVATE main_win32.cpp)
