@@ -1,6 +1,7 @@
 #pragma once
 
 #include <gtkmm/application.h>
+#include <gtkmm/applicationwindow.h>
 
 #include <gtkmm/glarea.h>
 #include <iostream>
@@ -38,7 +39,7 @@ protected:
     void create_screen_texture();
 
 private:
-    Gtk::Window *window;
+    Gtk::ApplicationWindow *window;
     Gtk::GLArea *gl_area;
     u32 screen_texture;
     Silver::Application *app;

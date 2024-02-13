@@ -6,13 +6,14 @@
 #include <gdkmm/enums.h>
 #include <gdkmm/event.h>
 #include <gtkmm/glarea.h>
-#include <gtkmm/window.h>
+#include <gtkmm/applicationwindow.h>
 
 #include "imgui.h"
 #include "imgui_impl_gtkmm.hpp"
 #include "util/util.hpp"
 
 struct ImGui_ImplGtkmm_Data {
+    Gtk::ApplicationWindow *window;
     Gtk::GLArea *glArea;
     std::chrono::high_resolution_clock::time_point last_frame_time;
 };
@@ -51,7 +52,7 @@ static void ImGui_ImplGtkmm_SetPlatformImeData(ImGuiViewport *, ImGuiPlatformIme
   }
 }
 
-bool ImGui_ImplGtkmm_Init(Gtk::Window *window, Gtk::GLArea *glArea) {
+bool ImGui_ImplGtkmm_Init(Gtk::ApplicationWindow *window, Gtk::GLArea *glArea) {
   ImGuiIO &io = ImGui::GetIO();
   IM_ASSERT(io.BackendPlatformUserData == nullptr && "Already initialized a platform backend!");
 
@@ -60,6 +61,7 @@ bool ImGui_ImplGtkmm_Init(Gtk::Window *window, Gtk::GLArea *glArea) {
   io.BackendPlatformUserData = (void *) bd;
   io.BackendPlatformName = "imgui_impl_gtkmm";
 
+  bd->window = window;
   bd->glArea = glArea;
 
   io.SetClipboardTextFn = ImGui_ImplGtkmm_SetClipboardText;
@@ -237,7 +239,15 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
     case Gdk::Event::Type::MOTION_NOTIFY: {
       double x,y;
       event->get_position(x, y);
-      io.AddMousePosEvent(x,y);
+
+      double transX, transY;
+      // TODO: this is deprecated in a future version of gtkmm
+      bool translated = bd->window->translate_coordinates(*bd->glArea, x, y, transX, transY);
+      if (!translated && transX >= 0 && transY >= 0) {
+        return false;
+      }
+
+      io.AddMousePosEvent(transX, transY);
       return true;
     }
 
@@ -273,6 +283,10 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
 
     case Gdk::Event::Type::BUTTON_PRESS:
     case Gdk::Event::Type::BUTTON_RELEASE: {
+      if (!io.WantCaptureMouse) {
+        return false;
+      }
+
       bool pressed = event->get_event_type() == Gdk::Event::Type::BUTTON_PRESS;
       int button = event->get_button();
 
@@ -288,10 +302,6 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
           break;
         default:
           break;
-      }
-
-      if (io.WantCaptureMouse) {
-        return true;
       }
 
       return false;

@@ -1,5 +1,4 @@
 #include <cassert>
-#include <gdkmm/event.h>
 #include <iostream>
 #include <memory>
 #include <regex>
@@ -8,10 +7,12 @@
 
 #include <epoxy/gl.h>
 #include <gdkmm/enums.h>
+#include <gdkmm/event.h>
 #include <giomm/asyncresult.h>
 #include <giomm/liststore.h>
 #include <gtkmm.h>
 #include <gtkmm/application.h>
+#include <gtkmm/applicationwindow.h>
 #include <gtkmm/eventcontrollerlegacy.h>
 #include <gtkmm/filefilter.h>
 #include <gtkmm/glarea.h>
@@ -106,11 +107,11 @@ void GtkApp::openMessageBox(const std::string &title, const std::string &message
 void GtkApp::on_activate() {
     Gtk::Application::on_activate();
 
-    this->window = new Gtk::Window();
-    this->window->set_size_request(Silver::Core::native_width * 2, Silver::Core::native_height * 2);
+    this->window = new Gtk::ApplicationWindow();
 
     this->gl_area = new Gtk::GLArea();
     this->gl_area->set_auto_render();
+    this->gl_area->set_size_request(Silver::Core::native_width * 2, Silver::Core::native_height * 2);
 
     // Connect gl area signals
     this->gl_area->signal_realize().connect(sigc::mem_fun(*this, &GtkApp::realize));
@@ -118,7 +119,8 @@ void GtkApp::on_activate() {
     this->gl_area->signal_render().connect(sigc::mem_fun(*this, &GtkApp::render), false);
 
     this->window->set_child(*this->gl_area);
-    add_window(*window);
+    this->window->set_show_menubar();
+    this->add_window(*window);
 
     // we can't get generic "button press" events through gesture event controllers
     // and filling out 4-5 other event controllers for all the other event types
@@ -130,7 +132,7 @@ void GtkApp::on_activate() {
             },
             false
     );
-    window->add_controller(legacyEventController);
+    this->window->add_controller(legacyEventController);
 
     // we need to force continuous re-renders of the glArea
     window->add_tick_callback(
