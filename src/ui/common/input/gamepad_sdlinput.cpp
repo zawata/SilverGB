@@ -8,39 +8,38 @@
 #include "binding.hpp"
 #include "gamepad.hpp"
 
-Silver::HatDirection convertSDLDirection(u8 sdlDirection) {
+Silver::Binding::HatDirection convertSDLDirection(u8 sdlDirection) {
     switch(sdlDirection) {
-    case SDL_HAT_CENTERED: return Silver::HatDirection::Center;
-    case SDL_HAT_UP: return Silver::HatDirection::North;
-    case SDL_HAT_RIGHT: return Silver::HatDirection::East;
-    case SDL_HAT_DOWN: return Silver::HatDirection::South;
-    case SDL_HAT_LEFT: return Silver::HatDirection::West;
-    case SDL_HAT_RIGHTUP: return Silver::HatDirection::NorthEast;
-    case SDL_HAT_RIGHTDOWN: return Silver::HatDirection::SouthEast;
-    case SDL_HAT_LEFTUP: return Silver::HatDirection::NorthWest;
-    case SDL_HAT_LEFTDOWN: return Silver::HatDirection::SouthWest;
-    default:return Silver::HatDirection::Invalid;
+    case SDL_HAT_CENTERED: return Silver::Binding::HatDirection::Center;
+    case SDL_HAT_UP: return Silver::Binding::HatDirection::North;
+    case SDL_HAT_RIGHT: return Silver::Binding::HatDirection::East;
+    case SDL_HAT_DOWN: return Silver::Binding::HatDirection::South;
+    case SDL_HAT_LEFT: return Silver::Binding::HatDirection::West;
+    case SDL_HAT_RIGHTUP: return Silver::Binding::HatDirection::NorthEast;
+    case SDL_HAT_RIGHTDOWN: return Silver::Binding::HatDirection::SouthEast;
+    case SDL_HAT_LEFTUP: return Silver::Binding::HatDirection::NorthWest;
+    case SDL_HAT_LEFTDOWN: return Silver::Binding::HatDirection::SouthWest;
+    default:return Silver::Binding::HatDirection::Invalid;
     }
 }
 
-const char *directionStr[] = {
-        "None",
-        "A",
-        "B",
-        "Start",
-        "Select",
-        "Up",
-        "Down",
-        "Left",
-        "Right"
-};
+Silver::Binding::AxisDirection convertSDLAxisValue(s16 sdlValue) {
+    // TODO: make configurable
+    const u16 axisDeadZone = 13107_u16;// 40%
 
-const char *Silver::getHatDirectionName(Silver::HatDirection direction) {
-    if(direction >= Silver::HatDirection::_End) {
-        direction = Silver::HatDirection::Invalid;
+    Silver::Binding::AxisDirection dir;
+    u16 absoluteValue = ::abs(sdlValue);
+    if (absoluteValue > axisDeadZone) {
+        if (sdlValue > 0) {
+            dir = Silver::Binding::AxisDirection::Positive;
+        } else {
+            dir = Silver::Binding::AxisDirection::Negative;
+        }
+    } else {
+        dir = Silver::Binding::AxisDirection::Center;
     }
 
-    return directionStr[direction];
+    return dir;
 }
 
 struct SDLGamepad : virtual public Silver::Gamepad {
@@ -96,9 +95,9 @@ struct SDLGamepad : virtual public Silver::Gamepad {
         return SDL_JoystickNumHats(this->dev);
     };
 
-    Silver::HatDirection getHat(int idx) override {
+    Silver::Binding::HatDirection getHat(int idx) override {
         if(idx >= getHatCount()) {
-            return Silver::HatDirection::Invalid;
+            return Silver::Binding::HatDirection::Invalid;
         }
 
         u8 direction = SDL_JoystickGetHat(this->dev, idx);
@@ -108,7 +107,7 @@ struct SDLGamepad : virtual public Silver::Gamepad {
 private:
     SDL_Joystick *dev;
     std::vector<bool> buttonStates;
-    std::vector<Silver::HatDirection> hatStates;
+    std::vector<Silver::Binding::HatDirection> hatStates;
     std::vector<u16> axisStates;
 };
 
@@ -144,21 +143,20 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
     while(SDL_PollEvent(&event)) {
         switch(event.type) {
         case SDL_JOYAXISMOTION: {
-            // TODO: make configurable
-            constexpr u16 axisDeadZone = 13107_u16;// 40%
+            Binding::AxisDirection direction = convertSDLAxisValue(event.jaxis.value);
 
             binding->sendInput(
                     Silver::Binding::makeGamepadAxisInput(
                             event.jaxis.which,
                             event.jaxis.axis,
-                            event.jaxis.value > 0 ? 1 : -1),
-                    ::abs(event.jaxis.value) >= axisDeadZone);
+                            direction),
+                    direction != Binding::AxisDirection::Center);
             break;
         }
 
         case SDL_JOYHATMOTION: {
             auto direction = convertSDLDirection(event.jhat.value);
-            if(direction == HatDirection::Invalid) {
+            if(direction == Binding::HatDirection::Invalid) {
                 break;
             }
 
@@ -167,7 +165,7 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
                             event.jhat.which,
                             event.jhat.hat,
                             direction),
-                    direction != HatDirection::Center);
+                    direction != Binding::HatDirection::Center);
             break;
         }
 
@@ -181,10 +179,12 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
             break;
         }
 
-        case SDL_JOYDEVICEADDED:this->addDevice(event.jdevice.which);
+        case SDL_JOYDEVICEADDED:
+            this->addDevice(event.jdevice.which);
             break;
 
-        case SDL_JOYDEVICEREMOVED:this->removeDevice(event.jdevice.which);
+        case SDL_JOYDEVICEREMOVED:
+            this->removeDevice(event.jdevice.which);
             break;
 
             // case SDL_JOYBALLMOTION:

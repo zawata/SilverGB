@@ -1,4 +1,3 @@
-#include <cstring>
 #include <sstream>
 
 #include "binding.hpp"
@@ -21,7 +20,41 @@ const char *Silver::Binding::getButtonName(Button button) {
         button = Button::None;
     }
 
-    return buttonStr[button];
+    return buttonStr[(int) button];
+}
+
+const char *hatDirectionStr[] = {
+        "Center",
+        "North",
+        "North East",
+        "East",
+        "South East",
+        "South",
+        "South West",
+        "West",
+        "North West"
+};
+
+const char *Silver::Binding::getHatDirectionName(Silver::Binding::HatDirection direction) {
+    if(direction >= Silver::Binding::HatDirection::_End) {
+        return "invalid";
+    }
+
+    return hatDirectionStr[(int) direction];
+}
+
+const char *axisDirectionStr[] = {
+        "Center",
+        "Positive",
+        "Negative"
+};
+
+const char *Silver::Binding::getAxisDirectionName(Silver::Binding::AxisDirection direction) {
+    if(direction >= Silver::Binding::AxisDirection::_End) {
+        return "invalid";
+    }
+
+    return axisDirectionStr[(int) direction];
 }
 
 std::string Silver::Binding::getInputDescription(const GenericInput &action) {
@@ -34,12 +67,13 @@ std::string Silver::Binding::getInputDescription(const GenericInput &action) {
         ss << "Gamepad " << (int) gamepadAction.deviceIdx << " ";
 
         if(gamepadAction.type == Silver::Binding::GamepadInput::Type::Axis) {
-            ss << "Axis " << gamepadAction.inputIdx << " " << (gamepadAction.direction == -1 ? '-' : '+');
+            ss << "Axis " << gamepadAction.inputIdx << " "
+               << Silver::Binding::getAxisDirectionName(static_cast<Binding::AxisDirection>(gamepadAction.direction));
         } else if(gamepadAction.type == Silver::Binding::GamepadInput::Type::Button) {
             ss << "Button " << gamepadAction.inputIdx;
         } else if(gamepadAction.type == Silver::Binding::GamepadInput::Type::Hat) {
             ss << "Hat " << gamepadAction.inputIdx << " "
-               << Silver::getHatDirectionName(static_cast<Silver::HatDirection>(gamepadAction.direction));
+               << Silver::Binding::getHatDirectionName(static_cast<Binding::HatDirection>(gamepadAction.direction));
         }
     } else {
         ss << "None";

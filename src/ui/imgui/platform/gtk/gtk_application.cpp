@@ -151,7 +151,7 @@ bool GtkApp::handleEvent(const std::shared_ptr<const Gdk::Event> &event) {
     bool isKeyEvent = isKeyPressEvent || isKeyReleasedEvent;
 
     if(isKeyEvent) {
-        if(event->get_keyval() == GDK_KEY_Escape) {
+        if(event->get_keyval() == GDK_KEY_Escape && this->app->binding->isRecording()) {
             this->app->binding->stopRecording();
             return true;
         }
@@ -244,7 +244,7 @@ void GtkApp::create_menubar() {
         case Silver::MenuItem::Toggle: {
             auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
             auto action = Gio::SimpleAction::create_bool(partialActionName);
-            action->signal_change_state().connect([nuiMenuItem, &action](const Glib::VariantBase &b) -> void {
+            action->signal_change_state().connect([nuiMenuItem, action](const Glib::VariantBase &b) -> void {
                 auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
                 action->set_state(b);
 

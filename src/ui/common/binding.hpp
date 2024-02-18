@@ -70,7 +70,7 @@ struct std::hash<Silver::Binding::GamepadInput> {
 
 
 namespace Silver::Binding {
-enum Button {
+enum class Button {
     None = 0,
     A,
     B,
@@ -83,7 +83,31 @@ enum Button {
     _End
 };
 
+enum class HatDirection {
+    Invalid = -1,
+    Center,
+    North,
+    NorthEast,
+    East,
+    SouthEast,
+    South,
+    SouthWest,
+    West,
+    NorthWest,
+    _End
+};
+
+enum class AxisDirection {
+    Invalid = -1,
+    Center,
+    Positive,
+    Negative,
+    _End
+};
+
 extern const char *getButtonName(Button button);
+extern const char *getHatDirectionName(HatDirection);
+extern const char *getAxisDirectionName(AxisDirection);
 
 std::string getInputDescription(const GenericInput &input);
 
@@ -99,27 +123,27 @@ inline GenericInput makeGamepadButtonInput(int gamepadIdx, int buttonIndex) {
     }};
 }
 
-inline GenericInput makeGamepadAxisInput(int gamepadIdx, int axisIndex, int axisDirection) {
+inline GenericInput makeGamepadAxisInput(int gamepadIdx, int axisIndex, AxisDirection axisDirection) {
     return GenericInput{GamepadInput{
             GamepadInput::Type::Axis,
             gamepadIdx,
             axisIndex,
-            axisDirection
+            (int)axisDirection
     }};
 }
 
-inline GenericInput makeGamepadHatInput(int gamepadIdx, int hatIndex, int hatDirection) {
+inline GenericInput makeGamepadHatInput(int gamepadIdx, int hatIndex, HatDirection hatDirection) {
     return GenericInput{GamepadInput{
             GamepadInput::Type::Hat,
             gamepadIdx,
             hatIndex,
-            hatDirection
+            (int)hatDirection
     }};
 }
 
 struct Tracker {
     Tracker() {
-        button_state.reserve(Button::_End);
+        button_state.reserve((int)Button::_End);
     }
 
     void clear() {
@@ -178,8 +202,7 @@ struct Tracker {
         return {};
     }
 
-    bool sendInput(GenericInput input, bool pressed = true) {
-         std::cout << "input: " << getInputDescription(input) << " " << pressed << std::endl;
+    bool sendInput(GenericInput input, bool pressed) {
         Button button = Button::None;
         if(isRecording()) {
             if (!pressed) {
@@ -188,7 +211,7 @@ struct Tracker {
 
             mapButton(input, recording_for_button);
 
-            auto nextButton = static_cast<Button>(recording_for_button + 1);
+            auto nextButton = static_cast<Button>((int)recording_for_button + 1);
             if (nextButton < Button::_End) {
                 startRecording(nextButton);
             } else {
@@ -199,8 +222,8 @@ struct Tracker {
         }
 
         button = getButtonForInput(input);
-        if(button == Button::None) {
-            button_state[button] = pressed;
+        if(button != Button::None) {
+            button_state[(int)button] = pressed;
             return true;
         }
 
@@ -208,18 +231,18 @@ struct Tracker {
     }
 
     bool isButtonPressed(Button button) {
-        return button_state[button];
+        return button_state[(int)button];
     }
 
     void getButtonStates(Joypad::button_states_t &button_states) {
-        button_states.a = this->button_state[Button::A];
-        button_states.b = this->button_state[Button::B];
-        button_states.start = this->button_state[Button::Start];
-        button_states.select = this->button_state[Button::Select];
-        button_states.up = this->button_state[Button::Up];
-        button_states.down = this->button_state[Button::Down];
-        button_states.left = this->button_state[Button::Left];
-        button_states.right = this->button_state[Button::Right];
+        button_states.a = isButtonPressed(Button::A);
+        button_states.b = isButtonPressed(Button::B);
+        button_states.start = isButtonPressed(Button::Start);
+        button_states.select = isButtonPressed(Button::Select);
+        button_states.up = isButtonPressed(Button::Up);
+        button_states.down = isButtonPressed(Button::Down);
+        button_states.left = isButtonPressed(Button::Left);
+        button_states.right = isButtonPressed(Button::Right);
     }
 
 private:

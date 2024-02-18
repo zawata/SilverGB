@@ -39,10 +39,6 @@ void buildFpsWindow(float fps) {
 }
 
 void buildOptionsWindow(Silver::Application *app) {
-    if (app->app_state.ui.show_options) {
-        return;
-    }
-
     namespace im = ImGui;
 
     im::SetNextWindowSize(im::GetMainViewport()->Size);
@@ -61,7 +57,7 @@ void buildOptionsWindow(Silver::Application *app) {
             im::TableSetupColumn("Input");
             im::TableSetupColumn("Clear");
 
-            for(int button = Silver::Binding::Button::A; button < Silver::Binding::Button::_End; button++) {
+            for(int button = (int)Silver::Binding::Button::A; button < (int)Silver::Binding::Button::_End; button++) {
                 im::TableNextRow();
                 // Button Name
                 im::TableSetColumnIndex(0);

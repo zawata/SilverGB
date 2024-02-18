@@ -9,21 +9,7 @@
 namespace Silver {
     struct GamepadManager;
 
-    enum HatDirection {
-        Invalid = -1,
-        Center,
-        North,
-        NorthEast,
-        East,
-        SouthEast,
-        South,
-        SouthWest,
-        West,
-        NorthWest,
-        _End
-    };
-
-    extern const char *getHatDirectionName(Silver::HatDirection direction);
+    extern const char *getHatDirectionName(Binding::HatDirection direction);
 
     struct Gamepad {
         virtual void getName(std::string &str) = 0;
@@ -36,7 +22,8 @@ namespace Silver {
         virtual u8 getAxisCount() = 0;
         virtual s16 getAxis(int idx) = 0;
         virtual u8 getHatCount() = 0;
-        virtual Silver::HatDirection getHat(int idx) = 0;
+        virtual Binding::HatDirection getHat(int idx) = 0;
+
     private:
         friend GamepadManager;
     };
@@ -46,7 +33,7 @@ namespace Silver {
         ~GamepadManager();
 
         void getAvailableGamepads(std::vector<std::shared_ptr<Gamepad>> &vec);
-        void updateGamepads(const std::shared_ptr<Silver::Binding::Tracker>& binding);
+        void updateGamepads(const std::shared_ptr<Binding::Tracker>& binding);
 
     protected:
         void addDevice(int uniqueId);

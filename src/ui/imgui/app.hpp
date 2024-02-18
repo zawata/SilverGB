@@ -14,10 +14,10 @@
 #include "audio/audio.hpp"
 
 namespace Silver {
-  // TODO: rename or namespace Silver::Core
-  using GBCore = Silver::Core;
+// TODO: rename or namespace Silver::Core
+using GBCore = Silver::Core;
 
-  struct Application {
+struct Application {
     std::shared_ptr<Config> config;
     std::shared_ptr<GBCore> core;
     std::shared_ptr<AudioManager> audio;
@@ -41,12 +41,12 @@ namespace Silver {
     } app_state;
 
     struct {
-      std::function<void (
-          const std::string &title,
-          const std::string &filters,
-          std::function<void (const std::string&)> cb
-      )> openFileDialog;
-      std::function<void (const std::string &title, const std::string &message)> openMessageBox;
+        std::function<void(
+                const std::string &title,
+                const std::string &filters,
+                std::function<void(const std::string &)> cb
+        )> openFileDialog;
+        std::function<void(const std::string &title, const std::string &message)> openMessageBox;
     } window_cb;
 
     void onInit(int argc, const char **argv);
@@ -57,5 +57,5 @@ namespace Silver {
     void onClose();
 
     Silver::File *rom_file, *bootrom_file;
-  };
+};
 }

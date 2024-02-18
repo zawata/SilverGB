@@ -47,13 +47,10 @@ namespace Silver {
     };
 
     struct [[maybe_unused]] TextMenuItem : public MenuItem {
-        explicit TextMenuItem(std::string label) :
-                label(std::move(label)) {}
-
         explicit TextMenuItem(const char *label) :
                 label(label) {}
 
-        virtual MenuItem::Type get_type() const override {
+        [[nodiscard]] MenuItem::Type get_type() const override {
             return MenuItem::Type::Text;
         }
 
@@ -71,21 +68,13 @@ namespace Silver {
     struct [[maybe_unused]] SeparatorMenuItem : public MenuItem {
         SeparatorMenuItem() = default;
 
-        virtual MenuItem::Type get_type() const override {
+        [[nodiscard]] MenuItem::Type get_type() const override {
             return MenuItem::Type::Separator;
         }
     };
 
     struct [[maybe_unused]] ToggleMenuItem : public TextMenuItem {
         using CallbackType = std::function<void(const ToggleMenuItem &, bool, void *)>;
-
-        ToggleMenuItem(std::string label, CallbackType cb, void *us_data = nullptr, bool initial_state = false) :
-                TextMenuItem(std::move(label)),
-                cb(std::move(cb)),
-                callback_mode(true),
-                state_toggle(nullptr),
-                default_state(initial_state),
-                us_data(us_data) {}
 
         ToggleMenuItem(const char *label, CallbackType cb, void *us_data = nullptr, bool initial_state = false) :
                 TextMenuItem(label),
@@ -94,6 +83,11 @@ namespace Silver {
                 state_toggle(nullptr),
                 default_state(initial_state),
                 us_data(us_data) {}
+
+        ToggleMenuItem(const char *label, bool *state_toggle) :
+                TextMenuItem(label),
+                callback_mode(false),
+                state_toggle(state_toggle) {}
 
         void operator()(bool new_state) {
             if(callback_mode)
@@ -108,14 +102,14 @@ namespace Silver {
             return default_state;
         }
 
-        virtual MenuItem::Type get_type() const override {
+        [[nodiscard]] MenuItem::Type get_type() const override {
             return MenuItem::Type::Toggle;
         }
     private:
         std::function<void(ToggleMenuItem &, bool, void *us_Data)> cb;
         bool callback_mode,
              *state_toggle,
-             default_state{};
+             default_state;
         void *us_data{};
     };
 
@@ -131,7 +125,7 @@ namespace Silver {
             cb(*this, us_data);
         }
 
-        virtual MenuItem::Type get_type() const override {
+        [[nodiscard]] MenuItem::Type get_type() const override {
             return MenuItem::Type::Callback;
         }
     private:
@@ -165,17 +159,9 @@ namespace Silver {
     struct [[maybe_unused]] SubMenuItem : public TextMenuItem {
         std::unique_ptr<Menu> menu;
 
-        explicit SubMenuItem(std::string label) :
-                TextMenuItem(std::move(label)),
-                menu(std::make_unique<Menu>()) {}
-
         explicit SubMenuItem(const char *label) :
                 TextMenuItem(label),
                 menu(std::make_unique<Menu>()) {}
-
-        explicit SubMenuItem(std::string label, Menu &menu) :
-                TextMenuItem(std::move(label)),
-                menu(std::make_unique<Menu>(std::move(menu))) {}
 
         explicit SubMenuItem(const char *label, Menu &menu) :
                 TextMenuItem(label),
@@ -184,7 +170,7 @@ namespace Silver {
         ~SubMenuItem() override = default;
 
 
-        virtual MenuItem::Type get_type() const override {
+        [[nodiscard]] MenuItem::Type get_type() const override {
             return MenuItem::Type::SubMenu;
         }
     };
