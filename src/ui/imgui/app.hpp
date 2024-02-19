@@ -24,7 +24,7 @@ struct Application {
     std::shared_ptr<Binding::Tracker> binding;
     std::shared_ptr<GamepadManager> gamepadManager;
 
-    void *screen_texture_id;
+    u32 screen_texture_id, debug_bg_texture_id, debug_wnd_texture_id;
 
     struct {
         struct {
@@ -32,12 +32,12 @@ struct Application {
         } game;
         struct {
             bool show_fps = false;
-            bool debug_mode = false;
             bool show_options = false;
         } ui;
         struct {
-            bool game_wants_input = true;
-        } input;
+          bool enabled = false;
+          bool drawToBackground = true;
+        } debug;
     } app_state;
 
     struct {

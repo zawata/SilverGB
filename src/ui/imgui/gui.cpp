@@ -1,6 +1,7 @@
-#include "gui.hpp"
+#include <cmath>
 
 #include "imgui.h"
+#include "gui.hpp"
 
 GUI::GUI(Config *config) :
         config(config) {
@@ -8,6 +9,44 @@ GUI::GUI(Config *config) :
 
 GUI::~GUI() {
     delete config;
+}
+
+static void get_screen_area(const ImVec2 &win_bounds, ImVec2 &top_left, ImVec2 &bottom_right) {
+    //auto screen sizing and placement code
+    float scaling_factor =
+            std::fmin(win_bounds.x / Silver::Core::native_width, win_bounds.y / Silver::Core::native_height);
+    float width = scaling_factor * Silver::Core::native_width;
+    float height = scaling_factor * Silver::Core::native_height;
+    float wRemainder = win_bounds.x - width;
+    float hRemainder = win_bounds.y - height;
+
+    top_left = {wRemainder / 2.0f, hRemainder / 2.0f};
+    bottom_right = {top_left.x + width, top_left.y + height};
+}
+
+void buildScreenView(Silver::Application *app) {
+    namespace im = ImGui;
+    bool drawToBackground = true;
+
+    if(app->app_state.debug.enabled) {
+        drawToBackground = app->app_state.debug.drawToBackground;
+    }
+
+    if(drawToBackground) {
+        ImVec2 top_left, bottom_right;
+        get_screen_area(ImGui::GetMainViewport()->WorkSize, top_left, bottom_right);
+        ImGui::GetBackgroundDrawList()->AddImage((void *) app->screen_texture_id, top_left, bottom_right);
+    } else {
+        // TODO: set the sive of this better
+        if(im::Begin("Game")) {
+            ImVec2 size = im::GetWindowSize();
+            im::BeginChild("##Render");
+            im::Image((void *) app->screen_texture_id, size);
+            im::EndChild();
+        }
+
+        im::End();
+    }
 }
 
 void buildFpsWindow(float fps) {
@@ -57,7 +96,7 @@ void buildOptionsWindow(Silver::Application *app) {
             im::TableSetupColumn("Input");
             im::TableSetupColumn("Clear");
 
-            for(int button = (int)Silver::Binding::Button::A; button < (int)Silver::Binding::Button::_End; button++) {
+            for(int button = (int) Silver::Binding::Button::A; button < (int) Silver::Binding::Button::_End; button++) {
                 im::TableNextRow();
                 // Button Name
                 im::TableSetColumnIndex(0);
@@ -89,6 +128,31 @@ void buildOptionsWindow(Silver::Application *app) {
 
     im::End();
     im::PopStyleVar();
+}
+
+void buildDebugWindow(Silver::Application *app) {
+    namespace im = ImGui;
+
+    if(!im::Begin("Debug", nullptr, 0)) {
+        im::End();
+        return;
+    }
+
+    if(im::BeginTabBar("##TabBar")) {
+        if(im::BeginTabItem("Background")) {
+            im::Image((void *) app->debug_bg_texture_id, {256, 256});
+            im::EndTabItem();
+        }
+
+        if(im::BeginTabItem("Window")) {
+            im::Image((void *) app->debug_wnd_texture_id, {256, 256});
+            im::EndTabItem();
+        }
+
+        im::EndTabBar();
+    }
+
+    im::End();
 }
 
 void buildCPURegisterWindow(Silver::Core *core) {

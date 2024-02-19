@@ -1,4 +1,3 @@
-#include <cassert>
 #include <iostream>
 #include <memory>
 #include <regex>
@@ -23,12 +22,9 @@
 
 #include "binding.hpp"
 #include "gb_core/core.hpp"
-#include "gb_core/defs.hpp"
 #include "gtk_application.hpp"
 #include "imgui/backends/imgui_impl_opengl3.h"
-#include "imgui/imgui.h"
 #include "imgui_impl_gtkmm.hpp"
-#include "menu.hpp"
 
 static const std::string class_name = "org.zawata.silver";
 
@@ -185,22 +181,36 @@ void GtkApp::on_shutdown() {
 
 void GtkApp::create_screen_texture() {
     //leave unpopulated right now so we can do partial updates later
-    glGenTextures(1, &this->screen_texture);
-    check_gl_error();
-    glBindTexture(GL_TEXTURE_2D, this->screen_texture);
-    check_gl_error();
+    GLuint screen_texture;
+    glGenTextures(1, &screen_texture);
+    glBindTexture(GL_TEXTURE_2D, screen_texture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    check_gl_error();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    check_gl_error();
     glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, Silver::Core::native_width, Silver::Core::native_height);
-    check_gl_error();
-    glBindTexture(GL_TEXTURE_2D, 0);
-    check_gl_error();
+    this->app->screen_texture_id = screen_texture;
 
-    this->app->screen_texture_id = (ImTextureID) screen_texture;
+    GLuint debug_bg_texture;
+    glGenTextures(1, &debug_bg_texture);
+    glBindTexture(GL_TEXTURE_2D, debug_bg_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
+    this->app->debug_bg_texture_id = debug_bg_texture;
+
+    GLuint debug_wnd_texture;
+    glGenTextures(1, &debug_wnd_texture);
+    glBindTexture(GL_TEXTURE_2D, debug_wnd_texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    this->app->debug_wnd_texture_id = debug_wnd_texture;
 }
 
 void GtkApp::create_menubar() {
@@ -313,6 +323,7 @@ void GtkApp::unrealize() {
 }
 
 u8 screen_buffer[Silver::Core::native_pixel_count * 4] = {0};
+u8 debug_buffer[256 * 256 * 3] = {0};
 
 // serves as our run-loop
 bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {
@@ -328,7 +339,7 @@ bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {
             );
 
             // draw screen to texture
-            glBindTexture(GL_TEXTURE_2D, screen_texture);
+            glBindTexture(GL_TEXTURE_2D, reinterpret_cast<GLuint>(this->app->screen_texture_id));
             glTexSubImage2D(
                     GL_TEXTURE_2D,
                     0,
@@ -341,6 +352,38 @@ bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {
                     screen_buffer
             );
             glBindTexture(GL_TEXTURE_2D, 0);
+
+            if(this->app->app_state.debug.enabled) {
+                glBindTexture(GL_TEXTURE_2D, this->app->debug_bg_texture_id);
+                this->app->core->getBGBuffer(debug_buffer);
+                glTexSubImage2D(
+                        GL_TEXTURE_2D,
+                        0,
+                        0,
+                        0,
+                        256, // TODO
+                        256, // TODO
+                        GL_RGB,
+                        GL_UNSIGNED_BYTE,
+                        debug_buffer
+                );
+
+                ::memset(debug_buffer, 0, 256*256*3);
+                this->app->core->getWNDBuffer(debug_buffer);
+                glBindTexture(GL_TEXTURE_2D, this->app->debug_wnd_texture_id);
+                glTexSubImage2D(
+                        GL_TEXTURE_2D,
+                        0,
+                        0,
+                        0,
+                        256, // TODO
+                        256, // TODO
+                        GL_RGB,
+                        GL_UNSIGNED_BYTE,
+                        screen_buffer
+                );
+                glBindTexture(GL_TEXTURE_2D, 0);
+            }
         }
 
         ImGui_ImplGtkmm_NewFrame();
