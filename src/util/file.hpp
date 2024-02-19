@@ -79,7 +79,7 @@ private:
 
 template<typename T>
 void File::toVector(std::vector<T> &vec) {
-    static_assert(std::is_pod<T>::value, "");
+    static_assert(std::is_standard_layout_v<T> && std::is_trivial_v<T>, "");
 
     u32 size = this->getSize();
 
@@ -93,7 +93,7 @@ void File::toVector(std::vector<T> &vec) {
 
 template<typename T>
 void File::fromVector(std::vector<T> const& vec) {
-    static_assert(std::is_pod<T>::value, "");
+    static_assert(std::is_standard_layout_v<T> && std::is_trivial_v<T>, "");
 
     setBuffer(0, (void *)vec.data(), vec.size() * sizeof(T));
 
