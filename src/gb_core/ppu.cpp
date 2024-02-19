@@ -9,11 +9,6 @@
 #include "mem.hpp"
 #include "ppu.hpp"
 
-#include "util/types/pixel.hpp"
-#include "util/types/primitives.hpp"
-#include "util/bit.hpp"
-#include "util/util.hpp"
-
 #define reg(X) (mem->registers.X)
 
 #define LCDC_LCD_ENABLED_BIT      7
@@ -226,8 +221,8 @@ device(device) {
             obj_palettes[0] = gb_palette;
         } else if(dev_is_GBC(device)) {
             if(cart->isCGBCart()) {
-                for(int i = 0; i < 8; i++) {
-                    bg_palettes[i] = { 0x7F, 0x7F, 0x7F, 0x7F };
+                for(auto & bg_palette : bg_palettes) {
+                    bg_palette = { 0x7F, 0x7F, 0x7F, 0x7F };
                 }
             } else {
                 // set dmg-style object priority
@@ -262,7 +257,7 @@ device(device) {
                         //get the letter list that corresponds to this index and search it for the 4th char in the cart title
                         const char *found_char = strchr(title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START], cart_char);
                         //if the char title is in the list
-                        if(found_char != NULL) {
+                        if(found_char != nullptr) {
                             //offset the palette index based on which index the letter was found.
                             auto x = title_fourth_chars[compat_plt_id - AMBIGUOUS_CHK_IDXS_START] - found_char;
                             compat_plt_id += x * (AMBIGUOUS_CHK_IDXS_END - AMBIGUOUS_CHK_IDXS_START);
@@ -278,7 +273,6 @@ device(device) {
                 u8 shuffle_flags = palette_triplet_id >> 5;
                 const u8 (*triplet)[3] = &(triplet_palette_idxs[palette_triplet_id & 0x1F]);
 
-                palette_t OBP0, OBP1;
                 //theres probably a cleaner way to implement this logic but this is easier
                 switch(shuffle_flags & 0x3) {
                 // remember, OBP0 = 0, OBP1 = 1 in both the triplet and the obj_palette, BGP = 2 in the triplet.
@@ -519,7 +513,7 @@ void PPU::ppu_tick_vram() {
     }
 
     if(pause_bg_fifo) {
-        if(displayed_sprites.size() > 0) {
+        if(!displayed_sprites.empty()) {
             enqueue_sprite_data(displayed_sprites.front());
             displayed_sprites.pop_front();
         } else {
@@ -693,7 +687,7 @@ void PPU::ppu_tick_vram() {
      * Actual PPU logic
      */
     if(bg_fifo->size() > 0) {
-        fifo_color_t bg_color;
+        fifo_color_t bg_color{};
         bg_fifo->dequeue(bg_color);
 
         //if background is disabled, force write a 0
@@ -703,7 +697,7 @@ void PPU::ppu_tick_vram() {
 
         //if drawing a sprite, dequeue a sprite pixel
         if(sp_fifo->size() > 0) {
-            fifo_color_t s_color;
+            fifo_color_t s_color{};
             sp_fifo->dequeue(s_color);
 
             //this could all be a single if check but it would get messy as hell

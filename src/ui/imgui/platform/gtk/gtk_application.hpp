@@ -41,6 +41,5 @@ protected:
 private:
     Gtk::ApplicationWindow *window;
     Gtk::GLArea *gl_area;
-    u32 screen_texture;
     Silver::Application *app;
 };

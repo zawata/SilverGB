@@ -15,8 +15,10 @@ namespace Silver {
 
 #define DMG_BIOS_CRC 0x59c8598e
 
+void buildScreenView(Silver::Application *app);
 void buildFpsWindow(float fps);
 void buildOptionsWindow(Silver::Application *app);
+void buildDebugWindow(Silver::Application *app);
 void buildCPURegisterWindow(Silver::Core* core);
 void buildIORegisterWindow(Silver::Core* core);
 void buildBreakpointWindow(Silver::Core *core);

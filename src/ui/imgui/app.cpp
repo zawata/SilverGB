@@ -84,6 +84,12 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
     windowMenu.addItem<ToggleMenuItem>("Show FPS", &this->app_state.ui.show_fps);
     menubar->addItem<Silver::SubMenuItem>("Window", windowMenu);
 
+    /**
+     * Debug
+     */
+    auto debugMenu = Menu();
+    debugMenu.addItem<ToggleMenuItem>("Debug Mode", &this->app_state.debug.enabled);
+    menubar->addItem<Silver::SubMenuItem>("Debug", debugMenu);
 }
 
 void Silver::Application::onLoadRomFile(const std::string &filePath) {
@@ -118,19 +124,6 @@ float get_calc_fps() {
     return 1000000.0f / (float) rollingDeltaMicroseconds;
 }
 
-void get_screen_area(const ImVec2 &win_bounds, ImVec2 &top_left, ImVec2 &bottom_right) {
-    //auto screen sizing and placement code
-    float scaling_factor =
-            std::fmin(win_bounds.x / Silver::Core::native_width, win_bounds.y / Silver::Core::native_height);
-    float width = scaling_factor * Silver::Core::native_width;
-    float height = scaling_factor * Silver::Core::native_height;
-    float wRemainder = win_bounds.x - width;
-    float hRemainder = win_bounds.y - height;
-
-    top_left = {wRemainder / 2.0f, hRemainder / 2.0f};
-    bottom_right = {top_left.x + width, top_left.y + height};
-}
-
 void Silver::Application::onUpdate() {
     float fps = get_calc_fps();
 
@@ -159,9 +152,7 @@ void Silver::Application::onUpdate() {
     }
 
     // draw screen
-    ImVec2 top_left, bottom_right;
-    get_screen_area(ImGui::GetMainViewport()->WorkSize, top_left, bottom_right);
-    ImGui::GetBackgroundDrawList()->AddImage((void *)this->screen_texture_id, top_left, bottom_right);
+    buildScreenView(this);
 
     if(this->app_state.ui.show_options) {
         buildOptionsWindow(this);
@@ -171,7 +162,9 @@ void Silver::Application::onUpdate() {
         buildFpsWindow(fps);
     }
 
-    ImGui::ShowDemoWindow();
+    if (this->app_state.debug.enabled) {
+        buildDebugWindow(this);
+    }
 }
 
 void Silver::Application::onClose() {
