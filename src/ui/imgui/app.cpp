@@ -51,7 +51,7 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
     fileMenu.addItem<CallbackMenuItem>("Open file", [this](const CallbackMenuItem &, void *) {
         this->window_cb.openFileDialog(
                 "Open Rom",
-                "Gameboy ROM:gb,bin",
+                "Gameboy ROM:gb;Gameboy Color ROM:gbc;bin",
                 [this](const std::string &filepath) {
                     this->onLoadRomFile(filepath);
                 }

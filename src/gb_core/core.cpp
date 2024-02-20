@@ -10,17 +10,16 @@
 #include "core.hpp"
 #include "defs.hpp"
 #include "joy.hpp"
-#include "util/types/pixel.hpp"
 #include "ppu.hpp"
 #include "util/bit.hpp"
+#include "util/types/pixel.hpp"
 #include "util/util.hpp"
 
 using namespace jnk0le;
 
 namespace Silver {
 
-Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device):
-device(device) {
+Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) : device(device) {
     // the Audio buffering system is threaded because it's simpler
     // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
     // so we use an SPSC queue to buffer entire audio buffers at a time
@@ -88,7 +87,7 @@ void Core::tick_instr() {
         tick_once();
     }
 
-    if(cpu->getRegisters().PC == breakpoint && bp_active){
+    if(cpu->getRegisters().PC == breakpoint && bp_active) {
         bp_active = false;
         throw breakpoint_exception();
     }
@@ -103,7 +102,6 @@ void Core::tick_frame() {
         apu->tick();
         this->frame_ready = ppu->tick();
 
-
         if(bp_active && instr_completed && cpu->getRegisters().PC == breakpoint) {
             bp_active = false;
             throw breakpoint_exception();
@@ -113,8 +111,8 @@ void Core::tick_frame() {
         // 90 tends to underflow every couple frames, while 85 keeps buffer sizes at 2-3x higher than the callback copy size.
         // the ideal rate right now seems to be 87, it will underflow every couple seconds
         if(tick_cntr++ == 87) {
-            float left,right;
-            apu->sample(&left,&right);
+            float left, right;
+            apu->sample(&left, &right);
             audio_vector.push_back(left);
             tick_cntr = 0;
         }
@@ -138,10 +136,10 @@ void Core::tick_delta_or_frame() {
     u64 nsDelta = (Clock::now() - last_invocation).count();
     u64 totalTicks;
 
-    if (dev_is_SGB(this->device)) {
+    if(dev_is_SGB(this->device)) {
         // 4.194304 MHz = 238.42 ns(p);
         totalTicks = nsDelta * 238.42f;
-    } else if (dev_is_GBC(this->device)) {
+    } else if(dev_is_GBC(this->device)) {
         // 8.388688 MHz = 119.21 ns(p);
         totalTicks = nsDelta * 119.21f;
     } else {
@@ -157,13 +155,13 @@ void Core::tick_delta_or_frame() {
 }
 
 bool Core::is_frame_ready() {
-  return this->frame_ready;
+    return this->frame_ready;
 }
 
 /**
  * Interface Functions
  */
-void Core::set_input_state(Joypad::button_states_t const& state) {
+void Core::set_input_state(Joypad::button_states_t const &state) {
     joy->set_input_state(state);
 }
 
@@ -191,9 +189,9 @@ const std::vector<Silver::Pixel> &Core::getPixelBuffer() {
  * Util Functions
  */
 void write_5bit_color(u8 *loc, u16 color) {
-    *loc++ = (((color >> 0)  & 0x001F) * 527 + 23 ) >> 6;
-    *loc++ = (((color >> 5)  & 0x001F) * 527 + 23 ) >> 6;
-    *loc++ = (((color >> 10) & 0x001F) * 527 + 23 ) >> 6;
+    *loc++ = (((color >> 0) & 0x001F) * 527 + 23) >> 6;
+    *loc++ = (((color >> 5) & 0x001F) * 527 + 23) >> 6;
+    *loc++ = (((color >> 10) & 0x001F) * 527 + 23) >> 6;
 }
 
 CPU::registers_t Core::getRegistersFromCPU() {
@@ -204,24 +202,24 @@ Memory::io_registers_t Core::getregistersfromIO() {
     return mem->registers;
 }
 
-u8 Core::getByteFromIO(u16 addr) { return 0; }
-
 std::vector<u8> Core::getOAMEntry(int index) {
-    if(index >= 40 ) { return {}; }
+    if(index >= 40) {
+        return {};
+    }
 
     PPU::obj_sprite_t sprite = ppu->oam_fetch_sprite(index);
 
-    u16 base_addr = 0x8000 & ((u16)(sprite.tile_num)) << 5;
+    u16 base_addr = 0x8000 & ((u16) (sprite.tile_num)) << 5;
 
     std::vector<u8> ret_vec;
-    u8 palette = mem->read_reg( Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
-    for( int i = 0; i < 16; i += 2 ) {
+    u8 palette = mem->read_reg(Bit::test(sprite.attrs, 4) ? OBP1_REG : OBP0_REG);
+    for(int i = 0; i < 16; i += 2) {
         u8 b1 = mem->read_oam(base_addr | i),
-           b2 = mem->read_oam(base_addr | i + 1);
+                b2 = mem->read_oam(base_addr | i + 1);
 
         for(int j = 0; j < 8; j++) {
             u8 out_color = ((b1 >> (7 - j)) & 1);
-            out_color   |= ((b2 >> (7 - j)) & 1) << 1;
+            out_color |= ((b2 >> (7 - j)) & 1) << 1;
 
             u8 colors[3] = {0};
             write_5bit_color(colors, PPU::gb_palette.colors[(palette >> (out_color * 2)) & 0x3]);
@@ -245,145 +243,150 @@ void Core::set_bp(u16 bp, bool en) {
 u16 Core::get_bp() { return breakpoint; }
 
 void Core::set_bp_active(bool en) { bp_active = en; }
-bool Core::get_bp_active()        { return bp_active; }
+bool Core::get_bp_active() { return bp_active; }
 
-#define Y_FLIP_BIT        6
-#define X_FLIP_BIT        5
+#define Y_FLIP_BIT 6
+#define X_FLIP_BIT 5
 #define GBC_VRAM_BANK_BIT 3
-#define GBC_PALETTE_MASK  0x7
+#define GBC_PALETTE_MASK 0x7
 
-#define BG_PRIORITY(attr)       (Bit::test((attr), PRIORITY_BIT))
-#define BG_Y_FLIP(attr)         (Bit::test((attr), Y_FLIP_BIT))
-#define BG_X_FLIP(attr)         (Bit::test((attr), X_FLIP_BIT))
-#define BG_VRAM_BANK(attr)      (Bit::test((attr), GBC_VRAM_BANK_BIT)) //false if bank 0
-#define BG_PALETTE(attr)        ((attr) & GBC_PALETTE_MASK)
+#define BG_PRIORITY(attr) (Bit::test((attr), PRIORITY_BIT))
+#define BG_Y_FLIP(attr) (Bit::test((attr), Y_FLIP_BIT))
+#define BG_X_FLIP(attr) (Bit::test((attr), X_FLIP_BIT))
+#define BG_VRAM_BANK(attr) (Bit::test((attr), GBC_VRAM_BANK_BIT))//false if bank 0
+#define BG_PALETTE(attr) ((attr) &GBC_PALETTE_MASK)
+#define reg(X) (mem->registers.X)
 
-//TODO: de-duplicate these functions
+std::pair<u16, u8> Core::calcTileAddrForCoordinate(bool window, u8 x_tile, u8 y) {
+    u8 y_tile = y >> 3;
 
-void Core::getBGBuffer(u8 *buf) {
-    #define reg(X) (mem->registers.X)
+    bool map_bit = window
+                   ? Bit::test(reg(LCDC), 6)
+                   : Bit::test(reg(LCDC), 3);
 
-    for(int y = 0; y < 256; y++) {
-        for(int x = 0; x < 32; x++) {
+    u16 base = Bit::test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
+    u16 loc = base + x_tile + (y_tile * 32);
+    u8 tile_idx = mem->read_vram(loc, true, false);
+    u8 bg_attr;
 
-            u8 y_tile = y / 8;
+    if(dev_is_GBC(device) && !mem->get_dmg_compat_mode()) {
+        bg_attr = mem->read_vram(loc, true, true);
+    }
 
-            u16 base = Bit::test(reg(LCDC), 3) ? 0x9C00 : 0x9800;
-            u16 loc = base + x + (y_tile * 32);
-            u8 bg_idx = mem->read_vram(loc, true, false);
-            u8 bg_attr;
+    u16 tile_addr = 0x8000;
+    if(Bit::test(tile_idx, 7)) {
+        tile_addr += 0x0800;
+    } else if(!Bit::test(reg(LCDC), 4)) {
+        tile_addr += 0x1000;
+    }
 
-            if(dev_is_GBC(device)) {
-                bg_attr = mem->read_vram(loc, true, true);
-            }
+    u8 tile_y_line = y & 0x7;
+    if(dev_is_GBC(device) && !mem->get_dmg_compat_mode() && BG_Y_FLIP(bg_attr)) {
+        tile_y_line = 7 - tile_y_line;
+    }
 
-            u16 tile_addr = 0;
-            if(Bit::test(bg_idx, 7)) {
-                tile_addr = 0x0800;
-            }
-            else if(!Bit::test(reg(LCDC), 4)) {
-                tile_addr = 0x1000;
-            }
+    tile_addr += ((tile_idx & 0x7F) << 4) | (tile_y_line << 1);
+    return {tile_addr, bg_attr};
+}
 
-            u8 tile_y_line = y & 0x7;
-            if(dev_is_GBC(device) && BG_Y_FLIP(bg_attr)) tile_y_line = 7 - tile_y_line;
+std::pair<u8, u8> Core::getTileLineByAddr(u16 addr, bool bank1) {
+    return {
+            mem->read_vram(addr, true, bank1),
+            mem->read_vram(addr + 1, true, bank1)};
+}
 
-            tile_addr +=
-                    ((bg_idx & 0x7F) << 4) |
-                    (tile_y_line << 1);
+void Core::parseTileLine(std::array<Silver::Pixel, 8> &arr, u8 byte_1, u8 byte_2, u8 bg_attr) {
+    for(int tile_x = 0; tile_x < 8; tile_x++) {
+        u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x));
 
-            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true, BG_VRAM_BANK(bg_attr)),
-               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true, BG_VRAM_BANK(bg_attr));
+        u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
+        tile_idx |= ((byte_2 >> tile_x_bit) & 1) << 1;
 
-            for(int tile_x = 0; tile_x < 8; tile_x++) {
-                u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x)) ;
+        u8 color_idx;
+        u8 palette_idx;
+        if(dev_is_GBC(device)) {
+            color_idx = tile_idx & 0x3_u8;
+            palette_idx = BG_PALETTE(bg_attr);
+        } else {
+            tile_idx <<= 1;
+            color_idx = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
+            palette_idx = 0;
+        }
 
-                u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
-                tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
+        auto p = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
+        arr[tile_x] = p;
+    }
+}
 
-                u8 color_idx;
-                u8 palette_idx;
-                if(dev_is_GBC(device)) {
-                    color_idx = tile_idx & 0x3_u8;
-                    palette_idx = BG_PALETTE(bg_attr);
-                } else {
-                    tile_idx <<= 1;
-                    color_idx = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
-                    palette_idx = 0;
-                }
+// 16x8 tiles, 128x64 pixels
+void Core::getVRAMBuffer(std::vector<Pixel> &vec, u8 vramIdx, bool vramBank) {
+    u16 baseAddr = 0x8000;
 
-                auto p = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
-                PixelBufferEncoder<u8>::WritePixel<PixelFormat::RGB>::write(
-                    &buf[((y*256) + (x * 8) + tile_x) * 3], 
-                    p
-                );
+    if(vramIdx == 1) {
+        baseAddr += 0x800;
+    } else if (vramIdx == 2) {
+        baseAddr += 0x1000;
+    }
+
+    for(u8 y = 0; y < 64; y++) {
+        for(u8 x_tile = 0; x_tile <= 16; x_tile++) {
+            u8 y_tile = y >> 3;
+            u16 addr = baseAddr | (y_tile<<8) | x_tile;
+
+            u8 byte_1, byte_2;
+            std::tie(byte_1, byte_2) = getTileLineByAddr(addr, vramBank);
+
+            std::array<Pixel, 8> arr;
+            parseTileLine(arr, byte_1, byte_2, 0);
+            for(const auto &pixel : arr) {
+                vec.push_back(pixel);
             }
         }
     }
-
-    #undef reg
 }
 
-void Core::getWNDBuffer(u8 *buf) {
-    #define reg(X) (mem->registers.X)
-
+// 32 x 32 tiles, 256x256 pixels
+void Core::getBGBuffer(std::vector<Pixel> &vec) {
+    vec.clear();
+    vec.reserve(256*256);
     for(int y = 0; y < 256; y++) {
-        for(int x = 0; x < 32; x++) {
-
-            u8 y_tile = y / 8;
-
-            u16 base = Bit::test(reg(LCDC), 6) ? 0x9C00 : 0x9800;
-            u16 loc = base + x + (y_tile * 32);
-            u8 bg_idx = mem->read_vram(loc, true, false);
+        for(int x_tile = 0; x_tile < 32; x_tile++) {
+            u16 tile_addr;
             u8 bg_attr;
+            std::tie(tile_addr, bg_attr) = calcTileAddrForCoordinate(false, x_tile, y);
 
-            if(dev_is_GBC(device)) {
-                bg_attr = mem->read_vram(loc, true, true);
-            }
+            u8 byte_1, byte_2;
+            std::tie(byte_1, byte_2) = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
 
-            u16 tile_addr = 0;
-            if(Bit::test(bg_idx, 7)) {
-                tile_addr = 0x0800;
-            }
-            else if(!Bit::test(reg(LCDC), 4)) {
-                tile_addr = 0x1000;
-            }
-
-            u8 tile_y_line = y & 0x7;
-            if(dev_is_GBC(device) && BG_Y_FLIP(bg_attr)) tile_y_line = 7 - tile_y_line;
-
-            tile_addr +=
-                    ((bg_idx & 0x7F) << 4) |
-                    (tile_y_line << 1);
-
-            u8 byte_1 = mem->read_vram(0x8000 + tile_addr, true, BG_VRAM_BANK(bg_attr)),
-               byte_2 = mem->read_vram(0x8000 + tile_addr + 1, true, BG_VRAM_BANK(bg_attr));
-
-            for(int tile_x = 0; tile_x < 8; tile_x++) {
-                u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x)) ;
-
-                u8 tile_idx = ((byte_1 >> tile_x_bit) & 1);
-                tile_idx   |= ((byte_2 >> tile_x_bit) & 1) << 1;
-                u8 color_idx;
-                u8 palette_idx;
-                if(dev_is_GBC(device)) {
-                    color_idx = tile_idx & 0x3_u8;
-                    palette_idx = BG_PALETTE(bg_attr);
-                } else {
-                    tile_idx <<= 1;
-                    color_idx = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
-                    palette_idx = 0;
-                }
-
-                auto p = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
-                PixelBufferEncoder<u8>::WritePixel<PixelFormat::RGB>::write(
-                    &buf[((y*256) + (x * 8) + tile_x) * 3], 
-                    p
-                );
+            std::array<Pixel, 8> arr;
+            parseTileLine(arr, byte_1, byte_2, bg_attr);
+            for(const auto &pixel : arr) {
+                vec.push_back(pixel);
             }
         }
     }
-    #undef reg
 }
 
-} // namespace Silver
+// void Core::getWNDBuffer(std::vector<Pixel> &vec) {
+//     vec.clear();
+//     vec.reserve(256*256);
+//     for(int y = 0; y < 256; y++) {
+//         for(int x_tile = 0; x_tile < 32; x_tile++) {
+//             u16 tile_addr;
+//             u8 bg_attr;
+//             std::tie(tile_addr, bg_attr) = calcTileAddrForCoordinate(true, x_tile, y);
+
+//             u8 byte_1, byte_2;
+//             std::tie(byte_1, byte_2) = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
+//             std::array<Pixel, 8> arr;
+//             parseTileLine(arr, byte_1, byte_2, bg_attr);
+//             for(const auto &pixel : arr) {
+//                 vec.push_back(pixel);
+//             }
+//         }
+//     }
+// }
+
+#undef reg
+
+}// namespace Silver

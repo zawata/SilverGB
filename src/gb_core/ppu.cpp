@@ -207,11 +207,11 @@ device(device) {
     // or we'll do it if there emulating the bootrom
     if(dev_is_GB(device)) {
         obj_priority_mode = true;
-    } else if(dev_is_GBC(device)) {
+    } else if(this->isGBCAllowed()) {
         obj_priority_mode = false;
     }
 
-    bool cgb_mode = dev_is_GBC(device) && cart->isCGBCart();
+    bool cgb_mode = this->isGBCAllowed() && cart->isCGBCart();
 
     if(!bootrom_enabled) {
         nowide::cout << "Starting PPU without bootrom not fully supported!" << std::endl;
@@ -219,7 +219,7 @@ device(device) {
         if(dev_is_GB(device)) {
             bg_palettes[0] = gb_palette;
             obj_palettes[0] = gb_palette;
-        } else if(dev_is_GBC(device)) {
+        } else if(this->isGBCAllowed()) {
             if(cart->isCGBCart()) {
                 for(auto & bg_palette : bg_palettes) {
                     bg_palette = { 0x7F, 0x7F, 0x7F, 0x7F };
@@ -397,6 +397,10 @@ const std::vector<Silver::Pixel> &PPU::getPixelBuffer() {
     return this->pixBuf;
 }
 
+bool PPU::isGBCAllowed() {
+    return dev_is_GBC(this->device) && !mem->get_dmg_compat_mode();
+}
+
 /**
  * Internal Stuff
  */
@@ -424,7 +428,7 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
                 (tile_num << 4) |
                 (pixel_line << 1);
 
-    bool bank1 = dev_is_GBC(device) && OBJ_GBC_VRAM_BANK(curr_sprite);
+    bool bank1 = this->isGBCAllowed() && OBJ_GBC_VRAM_BANK(curr_sprite);
 
     u8 sprite_tile_1 = mem->read_vram(addr, true, bank1),
        sprite_tile_2 = mem->read_vram(addr + 1, true, bank1);
@@ -442,7 +446,7 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite) {
 
         fifo_color_t color{};
         u8 palette_idx;
-        if(dev_is_GBC(device)) {
+        if(this->isGBCAllowed()) {
             palette_idx = OBJ_GBC_PALETTE(curr_sprite);
             color.color_idx = tile_idx;
         } else {
@@ -534,7 +538,7 @@ void PPU::ppu_tick_vram() {
     case BM_0:
         bg_map_byte = mem->read_vram(bg_map_addr, true, false); // read from bank 0
 
-        if(dev_is_GBC(device)) {
+        if(this->isGBCAllowed()) {
             attr_byte = mem->read_vram(bg_map_addr, true, true); //read from bank 1
             bg_map_bank_1 = BG_VRAM_BANK(attr_byte);
         } else {
@@ -562,7 +566,7 @@ void PPU::ppu_tick_vram() {
         }
 
         tile_y_line = ((y_cntr + reg(SCY)) & 0x7);
-        if(dev_is_GBC(device) && BG_Y_FLIP(attr_byte)) {
+        if(this->isGBCAllowed() && BG_Y_FLIP(attr_byte)) {
             tile_y_line = (7 - tile_y_line);
         }
 
@@ -575,7 +579,7 @@ void PPU::ppu_tick_vram() {
     case WM_0:
         wnd_map_byte = mem->read_vram(wnd_map_addr, true, false); // read from bank 0
 
-        if(dev_is_GBC(device)) {
+        if(this->isGBCAllowed()) {
             attr_byte = mem->read_vram(wnd_map_addr, true, true); //read from bank 1
             bg_map_bank_1 = BG_VRAM_BANK(attr_byte);
         } else {
@@ -598,7 +602,7 @@ void PPU::ppu_tick_vram() {
         }
 
         tile_y_line = (wnd_y_cntr & 0x7);
-        if(dev_is_GBC(device) && BG_Y_FLIP(attr_byte)) {
+        if(this->isGBCAllowed() && BG_Y_FLIP(attr_byte)) {
             tile_y_line = (7 - tile_y_line);
         }
 
@@ -644,14 +648,16 @@ void PPU::ppu_tick_vram() {
         // the first fetch 2 clock cycles too long
         if(bg_fifo->size() == 0) {
             for(int i = 0; i < 8; i++) {
-                u8 x_pixel = ((dev_is_GBC(device) && BG_X_FLIP(attr_byte)) ? (i) : (7 - i)) ;
+                u8 x_pixel = (this->isGBCAllowed() && BG_X_FLIP(attr_byte))
+                        ? (i)
+                        : (7 - i);
 
                 u8 tile_idx = ((tile_byte_1 >> x_pixel) & 1);
                 tile_idx   |= ((tile_byte_2 >> x_pixel) & 1) << 1;
 
                 fifo_color_t color{};
                 u8 palette_idx;
-                if(dev_is_GBC(device)) {
+                if(this->isGBCAllowed()) {
                     color.priority = BG_PRIORITY(attr_byte);
                     palette_idx = BG_PALETTE(attr_byte);
                     color.color_idx = tile_idx & 0x3_u8;
@@ -691,7 +697,7 @@ void PPU::ppu_tick_vram() {
         bg_fifo->dequeue(bg_color);
 
         //if background is disabled, force write a 0
-        if(!LCDC_BG_ENABLED && !dev_is_GBC(device)) {
+        if(!LCDC_BG_ENABLED && !this->isGBCAllowed()) {
             bg_color.color_idx = 0;
         }
 
@@ -700,8 +706,7 @@ void PPU::ppu_tick_vram() {
             fifo_color_t s_color{};
             sp_fifo->dequeue(s_color);
 
-            //this could all be a single if check but it would get messy as hell
-            bool bg_has_priority = dev_is_GBC(device) && bg_color.priority && LCDC_CGB_BG_PRIORITY;
+            bool bg_has_priority = this->isGBCAllowed() && bg_color.priority && LCDC_CGB_BG_PRIORITY;
             bool sprite_has_priority = s_color.priority && !bg_has_priority;
             bool should_draw_sprite = bg_color.color_idx == 0 || sprite_has_priority;
 
@@ -734,7 +739,7 @@ void PPU::ppu_tick_vram() {
 
         // Check Active Sprites to see if we should start displaying them
         if(LCDC_OBJ_ENABLED) {
-            for(auto sprite : active_sprites) {
+            for(const auto &sprite : active_sprites) {
                 if(x_cntr - (reg(SCX) % 8) == sprite.pos_x) {
                     pause_bg_fifo = true;
                     displayed_sprites.push_back(sprite);

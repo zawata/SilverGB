@@ -449,6 +449,7 @@ void Memory::set_dmg_compat_mode(bool compat_mode) {
         Bit::reset(&registers.KEY0, 2);
     }
 }
+
 bool Memory::get_dmg_compat_mode() {
     return Bit::test(registers.KEY0, 2);
 }

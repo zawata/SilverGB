@@ -11,7 +11,7 @@
 #include <memory>
 
 struct breakpoint_exception {
-    breakpoint_exception() {}
+    breakpoint_exception() = default;
 };
 
 namespace Silver {
@@ -22,7 +22,7 @@ public:
     static constexpr u32 native_height = PPU::native_height;
     static constexpr u32 native_pixel_count = PPU::native_pixel_count;
 
-    Core(Silver::File *rom, Silver::File *bootrom = nullptr, gb_device_t device = device_GBC);
+    explicit Core(Silver::File *rom, Silver::File *bootrom = nullptr, gb_device_t device = device_GBC);
     ~Core();
 
     void init_thread(bool paused = true);
@@ -48,9 +48,14 @@ public:
     Memory::io_registers_t getregistersfromIO();
     u8 getByteFromIO(u16 addr);
 
+    std::pair<u8, u8> getTileLineByAddr(u16 addr, bool bank1);
+    void parseTileLine(std::array<Silver::Pixel, 8> &arr, u8 byte_1, u8 byte_2, u8 bg_attr);
+    std::pair<u16, u8> calcTileAddrForCoordinate(bool window, u8 x, u8 y);
+
     std::vector<u8> getOAMEntry(int index);
-    void getBGBuffer(u8 *buf);
-    void getWNDBuffer(u8 *buf);
+    void getVRAMBuffer(std::vector<Pixel> &vec, u8 vramIdx, bool vramBank);
+    void getBGBuffer(std::vector<Pixel> &vec);
+    // void getWNDBuffer(u8 *buf);
 
     void set_bp(u16 bp, bool en = false);
     u16 get_bp();

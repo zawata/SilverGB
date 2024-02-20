@@ -25,6 +25,7 @@
 #include "gtk_application.hpp"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui_impl_gtkmm.hpp"
+#include "textures.hpp"
 
 static const std::string class_name = "org.zawata.silver";
 
@@ -179,40 +180,6 @@ void GtkApp::on_shutdown() {
     ImGui::DestroyContext();
 }
 
-void GtkApp::create_screen_texture() {
-    //leave unpopulated right now so we can do partial updates later
-    GLuint screen_texture;
-    glGenTextures(1, &screen_texture);
-    glBindTexture(GL_TEXTURE_2D, screen_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, Silver::Core::native_width, Silver::Core::native_height);
-    this->app->screen_texture_id = screen_texture;
-
-    GLuint debug_bg_texture;
-    glGenTextures(1, &debug_bg_texture);
-    glBindTexture(GL_TEXTURE_2D, debug_bg_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
-    this->app->debug_bg_texture_id = debug_bg_texture;
-
-    GLuint debug_wnd_texture;
-    glGenTextures(1, &debug_wnd_texture);
-    glBindTexture(GL_TEXTURE_2D, debug_wnd_texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-    glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    this->app->debug_wnd_texture_id = debug_wnd_texture;
-}
-
 void GtkApp::create_menubar() {
     // call back to get menu
     auto menubarTemplate = new Silver::Menu();
@@ -302,7 +269,7 @@ void GtkApp::realize() {
         ImGui_ImplGtkmm_Init(this->window, this->gl_area);
         ImGui_ImplOpenGL3_Init();
 
-        create_screen_texture();
+        buildTextures(this);
     } catch(const Gdk::GLError &gle) {
         std::cerr << "An error occurred making the context current during realize:" << std::endl;
         std::cerr << gle.domain() << "-" << gle.code() << "-" << gle.what() << std::endl;
@@ -330,61 +297,7 @@ bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {
     try {
         this->gl_area->throw_if_error();
 
-        if(this->app->core) {
-            // this type and format must match the texture pixel format
-            Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGB>(
-                    screen_buffer,
-                    Silver::Core::native_pixel_count * 4,
-                    this->app->core->getPixelBuffer()
-            );
-
-            // draw screen to texture
-            glBindTexture(GL_TEXTURE_2D, reinterpret_cast<GLuint>(this->app->screen_texture_id));
-            glTexSubImage2D(
-                    GL_TEXTURE_2D,
-                    0,
-                    0,
-                    0,
-                    Silver::Core::native_width,
-                    Silver::Core::native_height,
-                    GL_RGB,
-                    GL_UNSIGNED_BYTE,
-                    screen_buffer
-            );
-            glBindTexture(GL_TEXTURE_2D, 0);
-
-            if(this->app->app_state.debug.enabled) {
-                glBindTexture(GL_TEXTURE_2D, this->app->debug_bg_texture_id);
-                this->app->core->getBGBuffer(debug_buffer);
-                glTexSubImage2D(
-                        GL_TEXTURE_2D,
-                        0,
-                        0,
-                        0,
-                        256, // TODO
-                        256, // TODO
-                        GL_RGB,
-                        GL_UNSIGNED_BYTE,
-                        debug_buffer
-                );
-
-                ::memset(debug_buffer, 0, 256*256*3);
-                this->app->core->getWNDBuffer(debug_buffer);
-                glBindTexture(GL_TEXTURE_2D, this->app->debug_wnd_texture_id);
-                glTexSubImage2D(
-                        GL_TEXTURE_2D,
-                        0,
-                        0,
-                        0,
-                        256, // TODO
-                        256, // TODO
-                        GL_RGB,
-                        GL_UNSIGNED_BYTE,
-                        screen_buffer
-                );
-                glBindTexture(GL_TEXTURE_2D, 0);
-            }
-        }
+        updateTextures(this);
 
         ImGui_ImplGtkmm_NewFrame();
         ImGui_ImplOpenGL3_NewFrame();

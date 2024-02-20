@@ -11,11 +11,12 @@
 #include "binding.hpp"
 #include "app.hpp"
 
+struct GenericTexture;
+
 class GtkApp : public Gtk::Application {
 public:
     GtkApp(int argc, const char *argv[]);
 
-protected:
     // Override default signal handlers:
     void on_activate() override;
     void on_startup() override;
@@ -36,10 +37,13 @@ protected:
     bool render(const Glib::RefPtr<Gdk::GLContext> & /* context */);
 
     void create_menubar();
-    void create_screen_texture();
 
-private:
     Gtk::ApplicationWindow *window;
     Gtk::GLArea *gl_area;
     Silver::Application *app;
+
+    // textures
+    GenericTexture *screenTex;
+    GenericTexture *backgroundDebugTex;
+    GenericTexture *vramDebugTex[6];
 };

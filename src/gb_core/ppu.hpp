@@ -88,14 +88,7 @@ public:
     ~PPU();
 
     bool tick();
-
     obj_sprite_t oam_fetch_sprite(int index);
-    void enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite);
-
-    bool ppu_tick();
-    void ppu_tick_oam();
-    void ppu_tick_vram();
-
     void write_bg_color_data(u8 data);
     u8 read_bg_color_data();
     void write_obj_color_data(u8 data);
@@ -110,6 +103,12 @@ public:
     palette_t obj_palettes[8];
 
 private:
+    void enqueue_sprite_data(PPU::obj_sprite_t const& curr_sprite);
+
+    void ppu_tick_oam();
+    void ppu_tick_vram();
+
+    bool isGBCAllowed();
     void set_color_data(u8 *reg, palette_t *palette_mem, u8 data);
     u8 get_color_data(u8 *reg, palette_t *palette_mem);
 

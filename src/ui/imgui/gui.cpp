@@ -140,14 +140,19 @@ void buildDebugWindow(Silver::Application *app) {
 
     if(im::BeginTabBar("##TabBar")) {
         if(im::BeginTabItem("Background")) {
-            im::Image((void *) app->debug_bg_texture_id, {256, 256});
+            im::Image(app->debug_bg_texture_id, {256, 256});
             im::EndTabItem();
         }
 
-        if(im::BeginTabItem("Window")) {
-            im::Image((void *) app->debug_wnd_texture_id, {256, 256});
+        if(im::BeginTabItem("Tiles")) {
+            im::Image(app->vram_debug_texture_ids[0], {128, 64});
             im::EndTabItem();
         }
+
+        // if(im::BeginTabItem("Window")) {
+        //     im::Image((void *) app->debug_wnd_texture_id, {256, 256});
+        //     im::EndTabItem();
+        // }
 
         im::EndTabBar();
     }

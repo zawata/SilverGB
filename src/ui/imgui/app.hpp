@@ -24,7 +24,9 @@ struct Application {
     std::shared_ptr<Binding::Tracker> binding;
     std::shared_ptr<GamepadManager> gamepadManager;
 
-    u32 screen_texture_id, debug_bg_texture_id, debug_wnd_texture_id;
+    void *screen_texture_id;
+    void *debug_bg_texture_id;
+    void *vram_debug_texture_ids[6];
 
     struct {
         struct {
