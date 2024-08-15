@@ -13,9 +13,6 @@
 
 #include "util/types/pixel.hpp"
 
-// TODO: find a better place for this
-extern Silver::Application *g_app;
-
 @implementation AppViewController
 
 -(instancetype)initWithNibName:(nullable NSString *)nibNameOrNil bundle:(nullable NSBundle *)nibBundleOrNil {
@@ -65,7 +62,7 @@ extern Silver::Application *g_app;
             height:Silver::Core::native_height
             mipmapped:FALSE
     ];
-    g_app->screen_texture_id = self.screen_texture = [self.device newTextureWithDescriptor:descriptor];
+    Silver::getApp()->screen_texture_id = self.screen_texture = [self.device newTextureWithDescriptor:descriptor];
 
     return self;
 }
@@ -110,14 +107,14 @@ u8 screen_buffer[Silver::Core::native_pixel_count * 4] = { 0 };
     ImGui::NewFrame();
 
     // this will run the core logic
-    g_app->onDraw();
+    Silver::getApp()->onUpdate();
 
-    if (g_app->core) {
+    if (Silver::getApp()->core) {
         // this type and format must match the texture pixel format
         Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGBA>(
                 screen_buffer,
                 Silver::Core::native_pixel_count * 4,
-                g_app->core->getPixelBuffer()
+                Silver::getApp()->core->getPixelBuffer()
         );
 
         [self.screen_texture

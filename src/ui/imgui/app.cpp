@@ -6,7 +6,13 @@
 #include "gui.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "util/log.hpp"
 
+/**
+ * Called as early as possible when the app starts
+ * @param argc command-line argument array length
+ * @param argv command-line argument array
+ */
 void Silver::Application::onInit(int argc, const char *argv[]) {
     argparse::ArgumentParser program("SilverGB");
 
@@ -43,6 +49,10 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
     this->onLoadRomFile(filename);
 }
 
+/**
+ * Called to construct the menubar
+ * @param menubar menubar instance to populate
+ */
 void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
     /**
      * File
@@ -170,4 +180,9 @@ void Silver::Application::onUpdate() {
 void Silver::Application::onClose() {
     //TODO
     exit(0);
+}
+
+Silver::Application *Silver::getApp() {
+    static Silver::Application app{};
+    return &app;
 }

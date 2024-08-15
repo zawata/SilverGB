@@ -60,4 +60,6 @@ struct Application {
 
     Silver::File *rom_file, *bootrom_file;
 };
+
+Application *getApp();
 }

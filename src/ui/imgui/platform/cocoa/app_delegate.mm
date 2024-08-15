@@ -14,8 +14,7 @@
 #include "menu.hpp"
 
 #include "util.hh"
-
-Silver::Application *g_app;
+#include "input/input.hpp"
 
 @implementation AppDelegate
 
@@ -23,44 +22,41 @@ Silver::Application *g_app;
     // self->windowDrawCallback = drawCallback;
     // self->windowDrawCallbackData = callbackData;
     if (self = [super init]) {
-        g_app = new Silver::Application();
-        g_app->window_cb.openFileDialog = [self](
+        // Construct Window Object
+        // bounds = NSMakeRect(0, 0, Silver::Window::DefaultWidth, Silver::Window::DefaultHeight);
+        AppViewController *rootViewController = [[AppViewController alloc] initWithNibName:nil bundle:nil];
+        self->window = [[NSWindow alloc] initWithContentRect:NSZeroRect
+                                                   styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
+                                                     backing:NSBackingStoreBuffered
+                                                       defer:NO];
+
+        Silver::getApp()->window_cb.openFileDialog = [self](
                 const std::string &title,
                 const std::string &filters,
                 const std::function<void(std::string)> &cb
         ) {
             [self openFileDialog:s_to_ns(title) filters:s_to_ns(filters) cb:cb];
         };
-        g_app->window_cb.openMessageBox = [self](const std::string &title, const std::string &message) {
+        Silver::getApp()->window_cb.openMessageBox = [self](const std::string &title, const std::string &message) {
             [self openMessageBox:s_to_ns(title) message:s_to_ns(message)];
         };
 
-        // bounds = NSMakeRect(0, 0, Silver::Window::DefaultWidth, Silver::Window::DefaultHeight);
-        AppViewController *rootViewController = [[AppViewController alloc] initWithNibName:nil bundle:nil];
-        self->window = [[NSWindow alloc] initWithContentRect:NSZeroRect
-                styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskResizable | NSWindowStyleMaskMiniaturizable
-                backing:NSBackingStoreBuffered
-                defer:NO];
+        int *argc = _NSGetArgc();
+        char ***argv = _NSGetArgv();
+        Silver::getApp()->onInit(*argc, const_cast<const char **>(*argv));
+
         self->window.contentViewController = rootViewController;
         [self->window center];
         [self->window makeKeyAndOrderFront:self];
-
-        int *argc = _NSGetArgc();
-        char ***argv = _NSGetArgv();
-        g_app->onInit(*argc, const_cast<const char **>(*argv));
     }
     return self;
 }
 
 - (void)applicationWillFinishLaunching:(NSNotification *)notification {
-    std::cout << "applicationWillFinishLaunching" << std::endl;
-
     [[NSApplication sharedApplication] setActivationPolicy:NSApplicationActivationPolicyRegular];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
-    std::cout << "applicationDidFinishLaunching" << std::endl;
-
     NSMenu *mainMenu = [NSApp mainMenu];
     mainMenu = [[[NSMenu alloc] initWithTitle:@"MainMenu"] autorelease];
     [NSApp setMainMenu:mainMenu];
@@ -70,14 +66,14 @@ Silver::Application *g_app;
     [appleItem setSubmenu:appleMenu];
 
     auto menubarTemplate = new Silver::Menu();
-    g_app->makeMenuBar(menubarTemplate);
+    Silver::getApp()->makeMenuBar(menubarTemplate);
 
     //deque for a breadth-first tree traversal
     std::deque<std::pair<NSMenu *, Silver::MenuItem *>> d;
 
-    //addx menus to processing list
+    //add menus to processing list
     for(auto &i : menubarTemplate->items) {
-        d.push_back({mainMenu, i.get()});
+        d.emplace_back(mainMenu, i.get());
     }
 
     while(!d.empty()) {
@@ -104,7 +100,7 @@ Silver::Application *g_app;
                 }
 
                 for(auto &i : itemTemplate->menu->items) {
-                    d.push_back({sub_menu, i.get()});
+                    d.emplace_back(sub_menu, i.get());
                 }
                 break;
             }

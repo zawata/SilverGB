@@ -7,8 +7,7 @@
 #common cmake build folders
 out/
 build/
-cmake-build-debug
-cmake-build-debug-event-trace
+cmake-build-*
 
 #vcpkg manifest installation directory
 vcpkg_installed
