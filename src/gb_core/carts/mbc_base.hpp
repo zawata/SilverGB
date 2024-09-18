@@ -2,11 +2,10 @@
 
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
 #include "cart.hpp"
 #include "defs.hpp"
 
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 struct MBC1_Base : public MemoryBankController {
@@ -71,7 +70,7 @@ struct MBC1_Base : public MemoryBankController {
             }
         }
         else {
-            nowide::cerr << "read out of bounds: " << offset << std::endl;
+            LogError("MBC1Base") << "read OOB: " << offset;
             return 0;
         }
     }
@@ -87,7 +86,7 @@ struct MBC1_Base : public MemoryBankController {
             }
         }
         else {
-            nowide::cerr << "write out of bounds: " << offset << std::endl;
+            LogError("MBC1Base") << "write OOB: " << offset;
         }
     }
 

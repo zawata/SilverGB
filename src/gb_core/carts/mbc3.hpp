@@ -2,10 +2,10 @@
 
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
 #include "cart.hpp"
+
 #include "util/bit.hpp"
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 #include "mbc_base.hpp"
@@ -29,7 +29,7 @@ struct MBC3_Controller : public MBC1_Base {
             }
         }
         else {
-            nowide::cerr << "MBC3 read out of bounds: " << offset << std::endl;
+            LogError("MBC3") << "read out of bounds: " << offset;
             return 0;
         }
     }
@@ -68,7 +68,7 @@ struct MBC3_Controller : public MBC1_Base {
             MBC1_Base::write(offset, data);
         }
         else {
-            nowide::cerr << "MBC3 write out of bounds: " << offset << std::endl;
+            LogError("MBC3") << "write out of bounds: " << offset;
         }
     }
 

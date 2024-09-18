@@ -1,14 +1,12 @@
-#include <cassert>
 #include <cstring>
 
 #include <chrono>
-
-#include <nowide/iostream.hpp>
 
 #include "defs.hpp"
 #include "apu.hpp"
 
 #include "util/bit.hpp"
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 #define NUETRAL ( 0 )
@@ -22,6 +20,8 @@ enum {
 };
 
 inline bool _duty_check(u8 duty, u8 wv_count) {
+    DebugCheck(duty < 4) << "Invalid duty cycle";
+
     // Bits  Cyc%   0 1 2 3 4 5 6 7
     // 00  : 12.5%  ________==______
     // 01  : 25%    ________====____
@@ -40,9 +40,9 @@ inline bool _duty_check(u8 duty, u8 wv_count) {
                wv_count == 5;
     case 3:
         return !_duty_check(1,wv_count);
+    default:
+        unreachable();
     }
-    assert(false);
-    return false;
 }
 
 APU::APU(bool bootrom_enabled) {
@@ -397,7 +397,7 @@ u8 APU::read_reg(u8 loc) {
     case NR52_REG:
         return registers.NR52 & NR52_READ_MASK;
     default:
-        nowide::cerr << "bad apu reg read: " << loc << std::endl;
+        LogWarn("APU") << "Read from unknown register: " << as_hex(loc);
         return 0xFF;
     }
 }
@@ -496,10 +496,13 @@ void APU::write_reg(u8 loc, u8 data) {
 }
 
 u8 APU::read_wavram(u8 loc) {
-    if(loc < WAVRAM_LEN) return wav_ram[loc];
-    return 0;
+    DebugCheck(loc < WAVRAM_LEN) << "Tried to read from WAVRAM out of bounds";
+
+    return wav_ram[loc];
 }
 
 void APU::write_wavram(u8 loc, u8 data) {
-    if(loc < WAVRAM_LEN) wav_ram[loc] = data;
+    DebugCheck(loc < WAVRAM_LEN) << "Tried to write from WAVRAM out of bounds";
+
+    wav_ram[loc] = data;
 }

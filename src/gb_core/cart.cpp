@@ -2,12 +2,12 @@
 #include <numeric>
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
 #include "cart.hpp"
 
-#include "util/util.hpp"
+#include "flags.hpp"
 #include "util/bit.hpp"
+#include "util/log.hpp"
+#include "util/util.hpp"
 
 #include "carts/rom.hpp"
 #include "carts/mbc1.hpp"
@@ -30,25 +30,25 @@ std::string get_ram_file_name(const std::string& rom_file_name) {
 
 bool Cartridge::loadRAMFile(const std::string& ram_file_name, std::vector<u8> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
-        nowide::cerr << "SAV File: does not exist" << std::endl;
+        LogWarn("Cartridge") << ram_file_name << " does not exist";
         return false;
     }
 
     Silver::File *ram_file = Silver::File::openFile(ram_file_name);
     if(ram_file == nullptr) {
-        nowide::cerr << "SAV File: could not be opened" << std::endl;
+        LogWarn("Cartridge") << ram_file_name << " could not be opened";
         return false;
     }
 
     if(ram_file->getSize() != getRAMSize()) {
-        nowide::cerr << "SAV File: incorrect size" << std::endl;
+        LogWarn("Cartridge") << ram_file_name << "incorrect size";
         return false;
     }
 
     ram_file->toVector(ram_buffer);
     delete ram_file;
 
-    nowide::cout << "SAV File: loaded" << std::endl;
+    LogInfo("Cartridge") << ram_file_name << " loaded";
     return true;
 }
 
@@ -62,11 +62,11 @@ bool Cartridge::saveRAMFile(const std::string& ram_file_name, std::vector<u8> co
     }
 
     if(ram_file == nullptr) {
-        nowide::cerr << "SAV File: could not be opened/created" << std::endl;
+        LogError("Cartridge") << ram_file_name << "could not be opened/created";
         return false;
     }
 
-    nowide::cout << "SAV File: saved" << std::endl;
+    LogInfo("Cartridge") << ram_file_name << " saved";
     ram_file->fromVector(ram_buffer);
     delete ram_file;
 
@@ -96,34 +96,40 @@ cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartri
     } else if (cart_type.MBC1) {
         controller = new MBC1_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC2) {
-        nowide::cerr << "MBC2 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "MBC2 not supported, emulator will now crash";
         //controller = new MBC2_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC3) {
         controller = new MBC3_Controller(cart_type, rom, ram);
     } else if (cart_type.MBC5) {
         //controller = new MBC5_Controller(cart_type, rom, ram);
-        nowide::cerr << "MBC5 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "MBC5 not supported, emulator will now crash";
     } else if (cart_type.MBC6) {
-        nowide::cerr << "MBC6 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "MBC6 not supported, emulator will now crash";
     } else if (cart_type.MBC7) {
-        nowide::cerr << "MBC7 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "MBC7 not supported, emulator will now crash";
     } else if (cart_type.HuC1) {
-        nowide::cerr << "HuC1 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "HuC1 not supported, emulator will now crash";
     } else if (cart_type.HuC3) {
-        nowide::cerr << "HuC3 not supported, emulator will now segfault" << std::endl;
+        LogFatal("Cartridge") << "HuC3 not supported, emulator will now crash";
+    }
+
+    // TODO: handle this better?
+    if (!controller) {
+        assert(false);
     }
 
     //debug info
-    nowide::cout << "cart:      " << getCartTitle() << std::endl;
-    nowide::cout << "cart type: " << (std::string)getCartType() << std::endl;
-    nowide::cout << "cart rom:  " << getROMSize() << std::endl;
+    LogInfo("Cartridge") << "loaded cartridge: " << getCartTitle();
+    LogInfo("Cartridge") << "cart:      " << getCartTitle();
+    LogInfo("Cartridge") << "cart type: " << (std::string)getCartType();
+    LogInfo("Cartridge") << "cart rom:  " << getROMSize();
     if(cart_type.RAM) {
-        nowide::cout << "cart ram:  " << getRAMSize();
+        LogInfo("Cartridge") << "cart ram:  " << getRAMSize();
         if(cart_type.BATTERY) {
-            nowide::cout << ", Battery-Backed" << std::endl;
+            LogInfo("Cartridge") << ", Battery-Backed";
         }
         else {
-            nowide::cout << std::endl;
+            LogInfo("Cartridge");
         }
     }
 }

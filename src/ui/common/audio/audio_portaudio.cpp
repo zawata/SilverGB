@@ -2,6 +2,8 @@
 
 #include "audio.hpp"
 
+#include "util/log.hpp"
+
 int _audio_callback(
     const void *inputBuffer,
     void *outputBuffer,
@@ -23,7 +25,7 @@ Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
 
     PaError err = Pa_Initialize();
     if(err != paNoError) {
-        nowide::cerr << "Error Initializing: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Initializing: " << Pa_GetErrorText(err);
         return nullptr;
     }
 
@@ -39,7 +41,7 @@ Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
             core             // userData
     );
     if(err != paNoError) {
-        nowide::cerr << "Error Initializing: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Initializing: " << Pa_GetErrorText(err);
         return nullptr;
     }
 
@@ -49,12 +51,12 @@ Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
 Silver::AudioManager::~AudioManager() {
     PaError err = Pa_CloseStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
-        nowide::cerr << "Error Closing Stream: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Closing Stream: " << Pa_GetErrorText(err);
     }
 
     err = Pa_Terminate();
     if(err != paNoError) {
-        nowide::cerr << "Error Terminating: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Terminating: " << Pa_GetErrorText(err);
     }
 }
 
@@ -62,13 +64,13 @@ Silver::AudioManager::~AudioManager() {
 void Silver::AudioManager::start_audio() {
     PaError err = Pa_StartStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
-        nowide::cerr << "Error Starting Stream: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Starting Stream: " << Pa_GetErrorText(err);
     }
 }
 
 void Silver::AudioManager::stop_audio() {
     PaError err = Pa_StopStream(static_cast<PaStream *>(this->audio_dev));
     if(err != paNoError) {
-        nowide::cerr << "Error Stopping Stream: " << Pa_GetErrorText(err) << std::endl;
+        LogError("AudioManager/PortAudio") << "Error Stopping Stream: " << Pa_GetErrorText(err);
     }
 }

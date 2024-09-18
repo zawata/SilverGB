@@ -1,13 +1,15 @@
 #include <cassert>
 #include <cstring>
 
-#include <nowide/iostream.hpp>
 #include <vector>
 
 #include "cart.hpp"
 #include "defs.hpp"
 #include "mem.hpp"
 #include "ppu.hpp"
+
+#include "util/log.hpp"
+
 
 #define reg(X) (mem->registers.X)
 
@@ -214,7 +216,7 @@ device(device) {
     bool cgb_mode = this->isGBCAllowed() && cart->isCGBCart();
 
     if(!bootrom_enabled) {
-        nowide::cout << "Starting PPU without bootrom not fully supported!" << std::endl;
+        LogWarn("PPU") << "Starting PPU without bootrom not fully supported!";
 
         if(dev_is_GB(device)) {
             bg_palettes[0] = gb_palette;
@@ -304,16 +306,16 @@ device(device) {
                 case 0b110:
                 case 0b111:
                 default:
-                    nowide::cerr << "compat: unknown case: " << (shuffle_flags & 0x3) << std::endl;
+                    LogWarn("PPU") << "compat: unknown case: " << (shuffle_flags & 0x3);
                 }
 
                 //BGP never changes from the 3rd offset
                 bg_palettes[0] = compat_palettes[(*triplet)[2]];
 
-                nowide::cout << "compat palletes chosen:" << std::endl;
-                nowide::cout << "BGP: " << bg_palettes[0].to_rgb24_string() << std::endl;
-                nowide::cout << "OBP0: " << obj_palettes[0].to_rgb24_string() << std::endl;
-                nowide::cout << "OBP1: " << obj_palettes[1].to_rgb24_string() << std::endl;
+                LogDebug("PPU") << "compat palletes chosen:";
+                LogDebug("PPU") << "BGP: " << bg_palettes[0].to_rgb24_string();
+                LogDebug("PPU") << "OBP0: " << obj_palettes[0].to_rgb24_string();
+                LogDebug("PPU") << "OBP1: " << obj_palettes[1].to_rgb24_string();
             }
         }
     }
@@ -685,7 +687,7 @@ void PPU::ppu_tick_vram() {
 
     default:
         //invalid VRAM fetch step
-        nowide::cerr << "vram step error" << vram_fetch_step << std::endl;
+        LogFatal("PPU") << "vram step error" << vram_fetch_step;
         assert(false);
     }
 
@@ -850,7 +852,7 @@ bool PPU::tick() {
         } else if(y_cntr < 154) {
             process_step = VBLANK;
         } else {
-            nowide::cerr << "y_cntr OOB: " << y_cntr << std::endl;
+            LogError("PPU") << "y_cntr OOB: " << y_cntr;
         }
     }
 
@@ -924,7 +926,7 @@ bool PPU::tick() {
             new_line = true;
         }
     } else {
-        nowide::cerr << "process_step error: " << as_hex((int)process_step) << std::endl;
+        LogError("PPU") << "process_step error: " << as_hex((int)process_step);
     }
 
     line_clock_count++; //used in HBLANK and VBLANK

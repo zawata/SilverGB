@@ -1,7 +1,6 @@
-#include <nowide/iostream.hpp>
-
 #include "cpu.hpp"
 #include "defs.hpp"
+#include "log.hpp"
 #include "mem.hpp"
 
 #include "util/bit.hpp"
@@ -311,7 +310,7 @@ void CPU::unset_interrupt(Memory::Interrupt i) {
 }
 
 u8 CPU::decode(u8 op) {
-    //  nowide::cout << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1) << std::endl;
+    //  LogDebug("CPU") << "I: 0x" << as_hex(PC_REG-1) << ": " << getOpString(PC_REG-1);
 
     switch(op) {
         case 0x00: return no_op();                       //   4  NOP
@@ -1791,7 +1790,7 @@ u8 CPU::ret_cond(bool cond) {
 // Invalid Op
 //====================
 u8 CPU::invalid_op(u8 op) {
-    nowide::cerr << "Invalid OP" << std::endl;
+    LogFatal("CPU") << "Invalid OP";
     PC_REG--; //to make the game freeze
     return 0;
 }

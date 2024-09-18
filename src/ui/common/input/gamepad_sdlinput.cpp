@@ -8,6 +8,8 @@
 #include "binding.hpp"
 #include "gamepad.hpp"
 
+#include "util/log.hpp"
+
 Silver::Binding::HatDirection convertSDLDirection(u8 sdlDirection) {
     switch(sdlDirection) {
     case SDL_HAT_CENTERED: return Silver::Binding::HatDirection::Center;
@@ -113,7 +115,7 @@ private:
 
 Silver::GamepadManager::GamepadManager() {
     if(SDL_Init(SDL_INIT_JOYSTICK) < 0) {
-        std::cout << "error iniitializing joystick" << SDL_GetError() << std::endl;
+        std::cout << "error iniitializing joystick" << SDL_GetError();
         return;
     }
 
@@ -123,7 +125,7 @@ Silver::GamepadManager::GamepadManager() {
 
     int numJoysticks = SDL_NumJoysticks();
     if(numJoysticks < 0) {
-        std::cerr << "error getting num joysticks: " << SDL_GetError() << std::endl;
+        LogError("GamepadManager/SDLInput") << "error getting num joysticks: " << SDL_GetError();
         return;
     }
 

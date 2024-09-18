@@ -23,6 +23,11 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
             .help("open file")
             .default_value(std::string(""));
 
+    program.add_argument("-l", "--log-level")
+            .help("Log Level")
+            .choices("debug", "info", "warn", "error", "fatal")
+            .default_value("warn");
+
     program.add_argument("-e", "--emu-bios")
             .help("use eumlated bios")
             .default_value(false)
@@ -34,11 +39,13 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
     try {
         program.parse_args(argc, argv);
     }
-    catch(const std::runtime_error &err) {
-        std::cout << err.what() << std::endl;
-        std::cout << program;
-        exit(0);
+    catch (const std::runtime_error &err) {
+        LogFatal("argparse") << err.what();
+        LogFatal("argparse") << program;
+        exit(-1);
     }
+
+    Silver::getLogger().setLogLevel(program.get<std::string>("--log-level"));
 
     this->config = std::make_shared<Config>();
     this->binding = std::make_shared<Binding::Tracker>();

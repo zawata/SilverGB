@@ -5,13 +5,13 @@
 #include <ratio>
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
 #include "core.hpp"
 #include "defs.hpp"
 #include "joy.hpp"
 #include "ppu.hpp"
+
 #include "util/bit.hpp"
+#include "util/log.hpp"
 #include "util/types/pixel.hpp"
 #include "util/util.hpp"
 
@@ -27,7 +27,7 @@ Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) : devic
     audio_vector = std::vector<float>();
     audio_vector.reserve(2048);
 
-    nowide::cout << "Starting Core with CPU: " << cpu_names[device] << std::endl;
+    LogInfo("Core") << "Starting Core with CPU: " << cpu_names[device];
 
     // Class Usage Heirarchy in diagram form
     // +-----+    +-----+      +------+
@@ -167,7 +167,7 @@ void Core::set_input_state(Joypad::button_states_t const &state) {
 
 void Core::do_audio_callback(float *buff, int copy_cnt) {
     if(audio_queue->isEmpty()) {
-        nowide::cerr << "audio buffer underflow" << std::endl;
+        LogWarn("Core") << "audio buffer underflow";
         memset(buff, 0, copy_cnt * 4);
     } else {
         // TODO: don't want to do 2 copies of this data

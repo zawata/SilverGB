@@ -169,7 +169,6 @@ public:
             deserializer.Read(&viewSettings);
             deserializer.Read(&emulationSettings);
         } else {
-            std::cout << "Loading Defaults" << std::endl;
             fileSettings.setDefaults();
             viewSettings.setDefaults();
             emulationSettings.setDefaults();

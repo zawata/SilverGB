@@ -1,12 +1,9 @@
-// #include <stdexcept>
-
-#include <nowide/iostream.hpp>
-
 #include "defs.hpp"
 #include "io.hpp"
 #include "mem.hpp"
 
 #include "util/bit.hpp"
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 #define reg(X) (mem->registers.X)
@@ -158,7 +155,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         return read_reg(offset - IO_REGS_START);
     }
 
-    nowide::cerr << "IO Overread" << std::endl;
+    LogError("IO_Bus") << "read OOB: " << as_hex(offset);
     return 0;
 }
 
@@ -232,7 +229,7 @@ void IO_Bus::write(u16 offset, u8 data) {
         return;
     }
 
-    nowide::cerr << "IO Overwrite: " << as_hex(offset) << std::endl;
+    LogError("IO_Bus") << "write OOB: " << as_hex(offset);
 }
 
 // Some Registers have special behavior (such as instantaneous sampling and on-change behavior)
@@ -266,7 +263,7 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     switch(loc) {
     case P1_REG:
         if(cart->cartSupportsSGB() && (data & P1_WRITE_MASK) == 0) {
-            nowide::cout << "Game may be attempting a SGB Command?" << std::endl;
+            LogInfo("IO_Bus") << "Game may be attempting a SGB Command?";
         }
 
         joy->write(data & P1_WRITE_MASK);
@@ -289,17 +286,17 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
     case LCDC_REG:
         //TODO: this can be moved to ppu.cpp or removed
         if(!Bit::test(data, 7) && !check_ppu_mode(MODE_VBLANK))
-            nowide::cerr << "LCD Disable outside VBLANK" << std::endl;
+            LogError("IO_Bus") << "LCD Disable outside VBLANK";
         break;
     case DMA_REG:
         dma_start = true;
         break;
     case ROMEN_REG:
-        nowide::cout << "Boot rom disabled" << std::endl;
+        LogDebug("IO_Bus") << "Boot rom disabled";
         bootrom_mode = false;
         return;
     case HDMA5_REG:
-        nowide::cout << "starting " << (Bit::test(data, 7) ? "HDMA" : "GDMA") << std::endl;
+        LogDebug("IO_Bus") << "starting " << (Bit::test(data, 7) ? "HDMA" : "GDMA");
         if(hdma_active) {
             hdma_active = false;
             if(Bit::test(data, 7)) {

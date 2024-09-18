@@ -2,6 +2,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "util/log.hpp"
+
 extern "C"
 void _audio_callback(void* userdata, uint8_t* stream, int len) {
     static_cast<Silver::Core *>(userdata)->do_audio_callback((float *)stream, len / 4);
@@ -23,7 +25,7 @@ Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
 
     *audio_dev = SDL_OpenAudioDevice(NULL, 0, &desired, NULL, 0);
     if(!*audio_dev) {
-        nowide::cerr << "Failed to open audio: " << SDL_GetError() << std::endl;
+        LogError("AudioManager/SDLAudio") << "Failed to open audio: " << SDL_GetError();
         return nullptr;
     }
 

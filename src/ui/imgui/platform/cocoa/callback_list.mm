@@ -1,4 +1,5 @@
 #import "cocoa/callback_list.hh"
+#include "util/log.hpp"
 
 #include <unordered_map>
 
@@ -17,12 +18,11 @@ void add_menu_callback(int menu_id, std::pair<Silver::MenuItem *, std::function<
 }
 
 -(void)onMenuCallback:(id)sender {
-    std::cout << "onMenuCallback" << std::endl;
     try {
         auto menu_comp = callback_map.at(self->menu_id);
         menu_comp.second(menu_comp.first);
     } catch(std::out_of_range &) {
-        std::cerr << "onMenuCallback: menu ID not found" << std::endl;
+        LogError("MenuActionItem") << "onMenuCallback: menu ID not found";
     }
 }
 @end

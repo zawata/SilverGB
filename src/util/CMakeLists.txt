@@ -1,5 +1,6 @@
 add_library(util
-		"file.cpp")
+		"file.cpp"
+		"log.cpp")
 
 find_package(ZLIB REQUIRED)
 

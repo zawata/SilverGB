@@ -1,9 +1,8 @@
-#include <nowide/iostream.hpp>
-
 #include "defs.hpp"
 #include "mem.hpp"
 
 #include "util/bit.hpp"
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 #define MODE_HBLANK 0
@@ -137,7 +136,7 @@ u8 Memory::read_reg(u8 loc) {
         return registers.IE   & IE_READ_MASK;
     }
 
-    nowide::cerr << "io/mem::reg_read miss:" << loc << std::endl;
+    LogError("Memory") << "reg_read OOB: " << loc;
     return 0;
 }
 
@@ -234,7 +233,9 @@ void Memory::write_reg(u8 loc, u8 data) {
         registers.KEY0 = data & KEY0_WRITE_MASK;
         return;
     case KEY1_REG:
-    if(Bit::test(data, 0)) nowide::cout << "Speed Switch requested" << std::endl;
+        if(Bit::test(data, 0)) {
+            LogDebug("Memory") << "Speed Switch requested";
+        }
         registers.KEY1 = data & KEY1_WRITE_MASK;
         return;
     case ROMEN_REG:
@@ -279,52 +280,45 @@ void Memory::write_reg(u8 loc, u8 data) {
         return;
     }
 
-    nowide::cerr << "io/mem::reg_write miss:" << as_hex(loc) << std::endl;
+    LogError("Memory") << "reg_write OOB:" << as_hex(loc);
 }
 
 /**
  * VRAM
  **/
 u8 Memory::read_vram(u16 offset, bool bypass, bool bypass_bank1) {
+    DebugCheck(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) << "read_vram OOB: " << as_hex(offset);
+
     if(check_mode(MODE_VRAM) && !bypass) return 0xFF;
 
-    if(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) {
-        offset -= VIDEO_RAM_START;
+    offset -= VIDEO_RAM_START;
 
-        if(bypass) {
-            return ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1 : 0)) + offset];
-        }
+    if(bypass) {
+        return ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1 : 0)) + offset];
+    }
 
-        if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
-            return ppu_ram[DMG_VRAM_SIZE + offset];
-        }
-        else {
-            return ppu_ram[offset];
-        }
+    if(dev_is_GBC(device) && (registers.VBK & VBK_READ_MASK)) {
+        return ppu_ram[DMG_VRAM_SIZE + offset];
     }
     else {
-        nowide::cerr << "vram read OOB: " << as_hex(offset) << std::endl;
-        return 0;
+        return ppu_ram[offset];
     }
 }
 
 void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
-    if(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) {
-        offset -= VIDEO_RAM_START;
+    DebugCheck(bounded(offset, VIDEO_RAM_START, VIDEO_RAM_END)) << "write_vram OOB: " << as_hex(offset);
+    
+    offset -= VIDEO_RAM_START;
 
-        if(bypass) {
-            ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1: 0)) + offset] = data;
-        }
+    if(bypass) {
+        ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1: 0)) + offset] = data;
+    }
 
-        if(dev_is_GBC(device) && !get_dmg_compat_mode() && (registers.VBK & VBK_WRITE_MASK)) {
-            ppu_ram[DMG_VRAM_SIZE + offset] = data;
-        }
-        else {
-            ppu_ram[offset] = data;
-        }
+    if(dev_is_GBC(device) && !get_dmg_compat_mode() && (registers.VBK & VBK_WRITE_MASK)) {
+        ppu_ram[DMG_VRAM_SIZE + offset] = data;
     }
     else {
-        nowide::cerr << "vram write OOB: " << as_hex(offset) << std::endl;
+        ppu_ram[offset] = data;
     }
 }
 
@@ -332,77 +326,61 @@ void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
  * OAM
  **/
 u8 Memory::read_oam(u16 offset, bool bypass) {
+    DebugCheck(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) << "read_oam OOB: " << as_hex(offset);
+
     if((check_mode(MODE_OAM) || check_mode(MODE_VRAM)) && !bypass) return 0xFF;
 
-    if(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) {
-        offset -= OBJECT_RAM_START;
-
-        return oam_ram[offset];
-    }
-    else {
-        nowide::cerr << "oam read OOB: " << as_hex(offset) << std::endl;
-        return 0;
-    }
+    offset -= OBJECT_RAM_START;
+    return oam_ram[offset];
 }
 
 void Memory::write_oam(u16 offset, u8 data) {
-    if(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) {
-        offset -= OBJECT_RAM_START;
+    DebugCheck(bounded(offset, OBJECT_RAM_START, OBJECT_RAM_END)) << "write_oam OOB: " << as_hex(offset);
 
-        oam_ram[offset] = data;
-    }
-    else {
-        nowide::cerr << "oam write OOB: " << as_hex(offset) << std::endl;
-    }
+    offset -= OBJECT_RAM_START;
+    oam_ram[offset] = data;
 }
 
 /**
  * RAM
  **/
-u8 Memory::read_ram(u16 offset) {\
-    if(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) {
-        if(offset <= WORK_RAM_BANK0_END) {
-            offset -= WORK_RAM_BANK0_START;
-            return work_ram[offset];
+u8 Memory::read_ram(u16 offset) {
+    DebugCheck(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) << "read_ram OOB: " << as_hex(offset);
+
+    if(offset <= WORK_RAM_BANK0_END) {
+        offset -= WORK_RAM_BANK0_START;
+        return work_ram[offset];
+    } else {
+        offset -= WORK_RAM_BANK0_START;
+        if(dev_is_GBC(device)) {
+            offset -= WORK_RAM_BANK_SIZE;
+            //value 1-7 is bank 1-7
+            //value 0   is bank 1
+            u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
+            return work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)];
         } else {
-            offset -= WORK_RAM_BANK0_START;
-            if(dev_is_GBC(device)) {
-                offset -= WORK_RAM_BANK_SIZE;
-                //value 1-7 is bank 1-7
-                //value 0   is bank 1
-                u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
-                return work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)];
-            } else {
-                return work_ram[offset];
-            }
+            return work_ram[offset];
         }
-    }
-    else {
-        nowide::cerr << "ram read OOB: " << as_hex(offset) << std::endl;
-        return 0;
     }
 }
 
 void Memory::write_ram(u16 offset, u8 data) {
-    if(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) {
-        if(offset <= WORK_RAM_BANK0_END) {
-            offset -= WORK_RAM_BANK0_START;
-            work_ram[offset] = data;
+    DebugCheck(bounded(offset, WORK_RAM_BANK0_START, WORK_RAM_BANK1_END)) << "write_ram OOB: " << as_hex(offset);
+
+    if(offset <= WORK_RAM_BANK0_END) {
+        offset -= WORK_RAM_BANK0_START;
+        work_ram[offset] = data;
+    } else {
+        offset -= WORK_RAM_BANK0_START;
+        if(dev_is_GBC(device)) {
+            offset -= WORK_RAM_BANK_SIZE;
+            //value 1-7 is bank 1-7
+            //value 0   is bank 1
+            u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
+            work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)] = data;
         } else {
-            offset -= WORK_RAM_BANK0_START;
-            if(dev_is_GBC(device)) {
-                offset -= WORK_RAM_BANK_SIZE;
-                //value 1-7 is bank 1-7
-                //value 0   is bank 1
-                u16 bank_mult = ((registers.SVBK == 0) ? 1 : registers.SVBK) & SVBK_READ_MASK;
-                work_ram[offset + (bank_mult * WORK_RAM_BANK_SIZE)] = data;
-            } else {
-                work_ram[offset] = data;
-            }
+            work_ram[offset] = data;
         }
-    }
-    else {
-        nowide::cerr << "ram write OOB: " << as_hex(offset) << std::endl;
     }
 }
 
@@ -410,26 +388,17 @@ void Memory::write_ram(u16 offset, u8 data) {
  * HRAM
  **/
 u8 Memory::read_hram(u16 offset) {
-    if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
-        offset -= HIGH_RAM_START;
+    DebugCheck(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) << "read_hram OOB: " << as_hex(offset);
 
-        return high_ram[offset];
-    }
-    else {
-        nowide::cerr << "hram read OOB: " << as_hex(offset) << std::endl;
-        return 0;
-    }
+    offset -= HIGH_RAM_START;
+    return high_ram[offset];
 }
 
 void Memory::write_hram(u16 offset, u8 data) {
-    if(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) {
-        offset -= HIGH_RAM_START;
+    DebugCheck(bounded(offset, HIGH_RAM_START, HIGH_RAM_END)) << "write_hram OOB: " << as_hex(offset);
 
-        high_ram[offset] = data;
-    }
-    else {
-        nowide::cerr << "hram write OOB: " << as_hex(offset) << std::endl;
-    }
+    offset -= HIGH_RAM_START;
+    high_ram[offset] = data;
 }
 
 /**
@@ -442,7 +411,8 @@ void Memory::request_interrupt(Memory::Interrupt i) {
 }
 
 void Memory::set_dmg_compat_mode(bool compat_mode) {
-    std::cout << "set c " << compat_mode << std::endl;
+    LogDebug("Memory") << "set_dmg_compat_mode " << compat_mode;
+
     if(compat_mode) {
         Bit::set(&registers.KEY0, 2);
     } else {

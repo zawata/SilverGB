@@ -27,6 +27,8 @@
 #include "imgui_impl_gtkmm.hpp"
 #include "textures.hpp"
 
+#include "util/log.hpp"
+
 static const std::string class_name = "org.zawata.silver";
 
 #define check_gl_error() _check_gl_error(__LINE__)
@@ -34,7 +36,7 @@ static const std::string class_name = "org.zawata.silver";
 void _check_gl_error(u32 line) {
     GLenum err;
     if((err = glGetError()) != GL_NO_ERROR) {
-        nowide::cerr << "GL" << line << ": " << as_hex(err) << std::endl;
+        LogError("GtkApp") << "GL" << line << ": " << as_hex(err);
     }
 }
 
@@ -62,20 +64,17 @@ void GtkApp::openFileDialog(
     std::string filter;
 
     while(std::getline(ss, filter, ';')) {
-        std::cout << "start filter" << std::endl;
         auto fileFilter = Gtk::FileFilter::create();
         std::stringstream filter_ss(filter);
 
         if(filter.find(':') != std::string::npos) {
             std::string name;
             std::getline(filter_ss, name, ':');
-            std::cout << "name: " << name << std::endl;
             fileFilter->set_name(name);
         }
 
         std::string next_pattern;
         while(std::getline(filter_ss, next_pattern, ',')) {
-            std::cout << "parsed pattern " << next_pattern << std::endl;
             if(next_pattern.find('.') != std::string::npos) {
                 fileFilter->add_pattern(next_pattern);
             } else {
@@ -253,7 +252,7 @@ void GtkApp::create_menubar() {
             // case Silver::MenuItem::Radio:
         case Silver::MenuItem::None:
         default: {
-            std::cerr << "unrecognized menu item type" << std::endl;
+            LogError("GtkApp") << "unrecognized menu item type";
         }
         }
     }
@@ -271,8 +270,8 @@ void GtkApp::realize() {
 
         buildTextures(this);
     } catch(const Gdk::GLError &gle) {
-        std::cerr << "An error occurred making the context current during realize:" << std::endl;
-        std::cerr << gle.domain() << "-" << gle.code() << "-" << gle.what() << std::endl;
+        LogError("GtkApp") << "An error occurred making the context current during realize:";
+        LogError("GtkApp") << gle.domain() << "-" << gle.code() << "-" << gle.what();
     }
 }
 
@@ -284,8 +283,8 @@ void GtkApp::unrealize() {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGtkmm_Shutdown();
     } catch(const Gdk::GLError &gle) {
-        std::cerr << "An error occurred making the context current during unrealize" << std::endl;
-        std::cerr << gle.domain() << "-" << gle.code() << "-" << gle.what() << std::endl;
+        LogError("GtkApp") << "An error occurred making the context current during unrealize";
+        LogError("GtkApp") << gle.domain() << "-" << gle.code() << "-" << gle.what();
     }
 }
 
@@ -313,7 +312,7 @@ bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {
 
         return true;
     } catch(const Gdk::GLError &gle) {
-        std::cerr << gle.domain() << "-" << gle.code() << "-" << gle.what() << std::endl;
+        LogError("GtkApp") << gle.domain() << "-" << gle.code() << "-" << gle.what();
         return false;
     }
 }

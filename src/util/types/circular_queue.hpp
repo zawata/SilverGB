@@ -3,9 +3,9 @@
 #include <cstdlib>
 #include <cstring>
 
-#include <nowide/iostream.hpp>
-
 #include "primitives.hpp"
+
+#include "util/log.hpp"
 
 template<typename T>
 class CircularQueue {
@@ -115,17 +115,15 @@ void CircularQueue<T>::clear(void) {
 
 template<typename T>
 T const& CircularQueue<T>::at(size_t idx) {
-    if(size() <= idx) {
-        throw std::invalid_argument("idx must be less than size");
-    }
+    DebugCheck(idx < size()) << "idx must be less than size";
+
     return *_get_pos(idx);
 }
 
 template<typename T>
 void CircularQueue<T>::replace(size_t idx, T const& elem) {
-    if(size() <= idx) {
-        throw std::invalid_argument("idx must be less than size");
-    }
+    DebugCheck(idx < size()) << "idx must be less than size";
+
     T* pos = _get_pos(idx);
 
     *pos = elem;

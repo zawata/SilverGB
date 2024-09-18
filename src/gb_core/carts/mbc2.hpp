@@ -2,11 +2,10 @@
 
 #include <vector>
 
-#include <nowide/iostream.hpp>
-
 #include "cart.hpp"
 
 #include "util/bit.hpp"
+#include "util/log.hpp"
 
 /**
  * MBC2
@@ -16,7 +15,7 @@
 struct MBC2_Controller : public MemoryBankController {
     MBC2_Controller(Cartridge_Constants::cart_type_t const& cart_type, std::vector<u8> const& rom, std::vector<u8> const& ram) :
     MemoryBankController(cart_type, rom, ram) {
-        nowide::cerr << "MBC2 not yet implemented. Will probably crash now" << std::endl;
+        LogError("MBC2") << "MBC2 not yet implemented. Will probably crash now";
         if(cart_type.RAM)
             this->ram = ram;
 

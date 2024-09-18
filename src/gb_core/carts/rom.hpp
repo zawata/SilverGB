@@ -1,10 +1,9 @@
 #pragma once
 
-#include <nowide/iostream.hpp>
-
 #include "cart.hpp"
 #include "defs.hpp"
 
+#include "util/log.hpp"
 #include "util/util.hpp"
 
 /**
@@ -26,7 +25,7 @@ struct ROM_Controller : public MemoryBankController {
                 return 0;
         }
         else {
-            nowide::cerr << "ROM read out of bounds: " << as_hex(offset) << std::endl;
+            LogError("ROM") << "read out of bounds: " << as_hex(offset);
             return 0;
         }
     }
@@ -39,7 +38,7 @@ struct ROM_Controller : public MemoryBankController {
             }
         }
         else {
-            nowide::cerr << "ROM write out of bounds: " << as_hex(offset) << std::endl;
+            LogError("ROM") << "write out of bounds: " << as_hex(offset);
         }
     }
 };
