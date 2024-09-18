@@ -12,10 +12,18 @@ namespace Silver {
     extern const char *getHatDirectionName(Binding::HatDirection direction);
 
     struct Gamepad {
+#if defined(USE_MACOS_GAMECONTROLLER)
+        using UniqueId = void *;
+#elif defined(USE_SDLINPUT)
+        using UniqueId = int;
+#else
+        #error "must define a gamepad implementation"
+#endif
+
         virtual void getName(std::string &str) = 0;
         virtual u16 getVendorId() = 0;
         virtual u16 getProductId() = 0;
-        virtual int getUniqueId() = 0;
+        virtual UniqueId getUniqueId() = 0;
 
         virtual u8 getButtonCount() = 0;
         virtual u8 getButton(int idx) = 0;
@@ -36,8 +44,8 @@ namespace Silver {
         void updateGamepads(const std::shared_ptr<Binding::Tracker>& binding);
 
     protected:
-        void addDevice(int uniqueId);
-        void removeDevice(int uniqueId);
+        void addDevice(Gamepad::UniqueId uniqueId);
+        void removeDevice(Gamepad::UniqueId uniqueId);
 
     private:
         std::list<std::shared_ptr<Gamepad>> devices{};

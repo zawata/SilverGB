@@ -193,7 +193,7 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
     }
 }
 
-void Silver::GamepadManager::addDevice(int deviceIndex) {
+void Silver::GamepadManager::addDevice(Silver::Gamepad::UniqueId deviceIndex) {
     SDL_Joystick *joy = SDL_JoystickOpen(deviceIndex);
     if(!joy) {
         throw 1;
@@ -202,8 +202,8 @@ void Silver::GamepadManager::addDevice(int deviceIndex) {
     this->devices.emplace_back(std::make_shared<SDLGamepad>(joy));
 }
 
-void Silver::GamepadManager::removeDevice(int uniqueId) {
-    std::erase_if(this->devices, [uniqueId](const std::shared_ptr<Gamepad>& gamepad) -> bool {
+void Silver::GamepadManager::removeDevice(Silver::Gamepad::UniqueId uniqueId) {
+    std::erase_if(this->devices, [uniqueId](const std::shared_ptr<Silver::Gamepad>& gamepad) -> bool {
         return gamepad->getUniqueId() == uniqueId;
     });
 }
