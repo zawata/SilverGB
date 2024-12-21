@@ -1,6 +1,6 @@
 #pragma once
 
-#include "util/flags.hpp"
+#include "../flags.hpp"
 
 #ifdef __cplusplus
 extern "C" {
