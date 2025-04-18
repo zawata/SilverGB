@@ -3,6 +3,6 @@ add_library(gba_core
         "cpu.cpp"
         "io.cpp")
 target_include_directories(gba_core
-        PRIVATE "../inc")
+        PUBLIC "../")
 target_link_libraries(gba_core
         nowide::nowide)

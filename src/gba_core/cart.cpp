@@ -7,13 +7,12 @@
 
 #include "util/file.hpp"
 #include "util/util.hpp"
-#include "util/primitives.hpp"
 #include "util/bit.hpp"
 
 /**
  * Cartridge Data
  */
-std::string get_ram_file_name(std::string rom_file_name) {
+std::string get_ram_file_name(const std::string& rom_file_name) {
     std::string ram_file_name = rom_file_name;
     auto ext = rom_file_name.find_last_of('.') + 1;
 
@@ -23,7 +22,7 @@ std::string get_ram_file_name(std::string rom_file_name) {
     return ram_file_name;
 }
 
-bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u32> &ram_buffer) {
+bool Cartridge::loadRAMFile(const std::string& ram_file_name, std::vector<u32> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
         nowide::cout << "SAV File: does not exist" << std::endl;
         return false;
@@ -73,9 +72,9 @@ rom_file(f) {
     //TODO: Cartridge RAM
 }
 
-Cartridge::~Cartridge() {};
+Cartridge::~Cartridge() = default;
 
-u32   Cartridge::read(u32 offset)  { return rom.at(offset); }
+u32   Cartridge::read(u32 offset) const { return rom.at(offset); }
 void Cartridge::write(u32 offset, u32 data) {
     nowide::cout << "tried to write " << as_hex(data) << " to " << as_hex(offset) << std::endl;
 }

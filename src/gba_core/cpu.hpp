@@ -1,12 +1,9 @@
 #pragma once
-#include <queue>
-
 #include <nowide/iostream.hpp>
 
 #include "gba_core/io.hpp"
 
 #include "arm_instruction.hh"
-#include "util/util.hpp"
 
 class CPU {
 public:

@@ -2,13 +2,12 @@
 
 #include <string_view>
 #include <sys/types.h>
-#include <type_traits>
 #include <variant>
 
 #include "util/bit.hpp"
 #include "util/decl.hpp"
 #include "util/flags.hpp"
-#include "util/ints.hpp"
+#include "util/types/primitives.hpp"
 #include "util/util.hpp"
 
 namespace Arm {
@@ -189,6 +188,10 @@ namespace Arm {
 
   struct Instruction;
   class InstructionDataBase {
+  public:
+    virtual ~InstructionDataBase() = default;
+
+  private:
     friend struct Instruction;
     virtual enum Mnemonic Mnemonic() const = 0;
     virtual u32 Encode() const = 0;
@@ -1163,7 +1166,7 @@ namespace Arm {
       type = T::GetInstructionType();
     }
 
-    inline InstructionDataBase *get_variant_data_ptr() const {
+    [[nodiscard]] inline InstructionDataBase *get_variant_data_ptr() const {
       return reinterpret_cast<InstructionDataBase *>(data_ptr);
     }
 
@@ -1172,7 +1175,7 @@ namespace Arm {
       assert(!std::holds_alternative<std::monostate>(data));
     }
 
-    explicit Instruction(u32 word) : type(InstructionType::Undefined) {
+    explicit Instruction(const u32 word) : type(InstructionType::Undefined) {
       switch (Bit::range(Bit::Mask::between_inc<u32>(24, 27), word)) {
       // Class 1 instructions
       case 0x0:
@@ -1278,6 +1281,8 @@ namespace Arm {
       case 0xF:
         set_variant_data<SoftwareInterrupt>(word);
         break;
+      default:
+        unreachable();
       }
     }
   };

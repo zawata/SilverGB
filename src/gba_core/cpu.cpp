@@ -156,44 +156,44 @@ void CPU::execute() {
     using Instr = Arm::InstructionType;
 
     // we prefetch 2 instructions ahead
-    u32 word = op2;
+    const u32 word = op2;
 
     Arm::Instruction instr = Arm::Instruction::Decode(word);
 
     std::cout << instr.Disassemble() << std::endl;
     switch(instr.Type()) {
     case Instr::Branch: {
-       branch(instr);
-       break;
+        branch(instr);
+        break;
     }
     case Instr::BranchAndExchange: {
-       branch_and_exchange(instr);
-       break;
+        branch_and_exchange(instr);
+        break;
     }
     case Instr::DataProcessing: {
-       auto &i = instr.InstructionData<Arm::DataProcessing>();
-       if(i.is_imm) {
-         data_proc_immediate(instr);
-       } else {
-         if(i.ShiftedRegisterOperand.is_reg) {
-           data_proc_shifted_reg(instr);
-         } else {
-           data_proc_reg(instr);
-         }
-       }
-       break;
+        auto &i = instr.InstructionData<Arm::DataProcessing>();
+        if(i.is_imm) {
+            data_proc_immediate(instr);
+        } else {
+            if(i.ShiftedRegisterOperand.is_reg) {
+                data_proc_shifted_reg(instr);
+            } else {
+                data_proc_reg(instr);
+            }
+        }
+        break;
     }
     case Instr::PSRTransfer: {
-       psr_transfer(instr);
-       break;
+        psr_transfer(instr);
+        break;
     }
     case Instr::Multiply: {
 //       multiply(instr);
-       break;
+        break;
     }
     case Instr::MultiplyLong: {
 //       multiply_long(instr);
-       break;
+        break;
     }
     case Instr::SingleDataTransfer: {
 //       multiply_long(instr);
@@ -205,25 +205,25 @@ void CPU::execute() {
     }
     case Instr::BlockDataTransfer: {
 //       halfword_data_transfer(instr);
-       break;
+        break;
     }
     case Instr::Swap: {
-       swap(instr);
-       break;
+        swap(instr);
+        break;
     }
     case Instr::SoftwareInterrupt: {
-       std::cout << "Software Interrupt";
-       break;
+        std::cout << "Software Interrupt";
+        break;
     }
     case Instr::Undefined: {
-       std::cout << "Undefined Instruction";
-       break;
+        std::cout << "Undefined Instruction";
+        break;
     }
     case Instr::CoprocessorDataOperation:
     case Instr::CoprocessorDataTransfer:
     case Instr::CoprocessorRegisterTransfer: {
-       std::cout << "Coprocessor Instructions Not Implemented";
-       break;
+        std::cout << "Coprocessor Instructions Not Implemented";
+        break;
     }
     default:
         nowide::cout << "error";
@@ -247,12 +247,13 @@ void throw_data_abort() {
 // 1     1     Coprocessor register transfer (C-cycle)
 //               - not used
 
+
 void CPU::branch(Arm::Instruction instr) {
-    // 2S + 1N
-    // 1  pc+2L   i  0  (pc+2L)  N 0
-    // 2  alu     i  0  (alu)    S 0
-    // 3  alu+L   i  0  (alu+L)  S 0
-    //    alu+2L
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    //           1     pc+2L  i  0  pc+2L   N          0
+    //           2     alu    i  0  alu     S          0
+    //           3     alu+L  i  0  alu+L   S          0
+    //                 alu+2L
 
     auto &i = instr.InstructionData<Arm::Branch>();
 
@@ -289,10 +290,11 @@ void CPU::branch(Arm::Instruction instr) {
 
 //TODO: this function
 void CPU::branch_and_exchange(Arm::Instruction instr) {
-    // 1  pc+2W   I  0  (pc+2W)  N 0
-    // 2  alu     i  0  (alu)    S 0
-    // 3  alu+w   i  0  (alu+W)  S 0
-    //    alu+2w
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    //           1     pc+2W  I  0  pc+2W   N          0
+    //           2     alu    i  0  alu     S          0
+    //           3     alu+w  i  0  alu+W   S          0
+    //                 alu+2w
 
     auto &i = instr.InstructionData<Arm::BranchAndExchange>();
 
@@ -323,12 +325,13 @@ void CPU::branch_and_exchange(Arm::Instruction instr) {
 }
 
 void CPU::data_proc_reg(Arm::Instruction instr) {
-    // normal    1  pc+2L  i  0  (pc+2L)  S 0
-    //              pc+3L
-    // dest=pc   1  pc+2L  i  0  (pc+2L)  N 0
-    //           2  alu    i  0  (alu)    S 0
-    //           3  alu+L  i  0  (alu+L)  S 0
-    //              alu+2L
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    // normal    1     pc+2L  i  0  pc+2L   S          0
+    //                 pc+3L
+    // dest=pc   1     pc+2L  i  0  pc+2L   N          0
+    //           2     alu    i  0  alu     S          0
+    //           3     alu+L  i  0  alu+L   S          0
+    //                 alu+2L
 
     auto &i = instr.InstructionData<Arm::DataProcessing>();
 
@@ -358,14 +361,15 @@ void CPU::data_proc_reg(Arm::Instruction instr) {
 }
 
 void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
-    // shift(Rs) 1  pc+2L  i  0 (pc+2L)   I 0
-    //           2  pc+3L  i  0 -         S 1
-    //              pc+3L
-    // shift(Rs) 1  pc+8   2  0 (pc+8)    I 0
-    // dest=pc   2  pc+12  2  0 -         N 1
-    //           3  alu    2  0 (alu)     S 0
-    //           4  alu+4  2  0 (alu+4)   S 0
-    //              alu+8
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    // shift(Rs) 1     pc+2L  i  0 pc+2L    I          0
+    //           2     pc+3L  i  0 -        S          1
+    //                 pc+3L
+    // shift(Rs) 1     pc+8   2  0 pc+8     I          0
+    // dest=pc   2     pc+12  2  0 -        N          1
+    //           3     alu    2  0 alu      S          0
+    //           4     alu+4  2  0 alu+4    S          0
+    //                 alu+8
 
     auto &i = instr.InstructionData<Arm::DataProcessing>();
 
@@ -399,12 +403,13 @@ void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
 }
 
 void CPU::data_proc_immediate(Arm::Instruction instr) {
-    // normal    1  pc+2L  i  0  (pc+2L)  S 0
-    //              pc+3L
-    // dest=pc   1  pc+2L  i  0  (pc+2L)  N 0
-    //           2  alu    i  0  (alu)    S 0
-    //           3  alu+L  i  0  (alu+L)  S 0
-    //              alu+2L
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    // normal    1     pc+2L  i  0  pc+2L   S          0
+    //                 pc+3L
+    // dest=pc   1     pc+2L  i  0  pc+2L   N          0
+    //           2     alu    i  0  alu     S          0
+    //           3     alu+L  i  0  alu+L   S          0
+    //                 alu+2L
 
     auto &i = instr.InstructionData<Arm::DataProcessing>();
 
@@ -429,12 +434,13 @@ void CPU::data_proc_immediate(Arm::Instruction instr) {
 }
 
 void CPU::psr_transfer(Arm::Instruction instr) {
-    // normal    1  pc+2L  i  0  (pc+2L)  S 0
-    //              pc+3L
-    // dest=pc   1  pc+2L  i  0  (pc+2L)  N 0
-    //           2  alu    i  0  (alu)    S 0
-    //           3  alu+L  i  0  (alu+L)  S 0
-    //              alu+2L
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode
+    // normal    1     pc+2L  i  0  pc+2L   S          0
+    //                 pc+3L
+    // dest=pc   1     pc+2L  i  0  pc+2L   N          0
+    //           2     alu    i  0  alu     S          0
+    //           3     alu+L  i  0  alu+L   S          0
+    //                 alu+2L
 
     auto &i = instr.InstructionData<Arm::PSRTransfer>();
 
@@ -563,11 +569,12 @@ void CPU::load_store_immediate(Arm::Instruction instr) {
 }
 
 void CPU::swap(Arm::Instruction instr) {
-    // normal    1  pc+8  i  0  (pc+2L) N 0 c
-    //           2  Rn    s  0  (alu)   I 1 d
-    //           3  Rn    i  0  -       S 1 c
-    //           4  pc+12
-    //              pc+12
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+    // normal    1     pc+8   i  0  pc+2L   N          0      c
+    //           2     Rn     s  0  alu     I          1      d
+    //           3     Rn     i  0  -       S          1      c
+    //           4     pc+12
+    //                 pc+12
 
     auto &i = instr.InstructionData<Arm::Swap>();
 

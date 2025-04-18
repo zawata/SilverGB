@@ -4,11 +4,9 @@
 
 #include "gba_core/cart.hpp"
 
-#include "util/primitives.hpp"
-
 class IO_Bus {
 public:
-    IO_Bus(Cartridge *cart, Silver::File *bios_file = nullptr);
+    explicit IO_Bus(Cartridge *cart, Silver::File *bios_file = nullptr);
     ~IO_Bus();
 
     void tick();

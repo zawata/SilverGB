@@ -44,7 +44,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T bit(uint i) {
+    constexpr T bit(uint i) {
       static_assert(std::is_integral<T>::value && std::is_unsigned<T>::value);
       return static_cast<T>(1) << i;
     }
