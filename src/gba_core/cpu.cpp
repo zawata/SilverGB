@@ -1,3 +1,4 @@
+#include <bit>
 #include <cassert>
 #include <functional>
 
@@ -196,15 +197,23 @@ void CPU::execute() {
         break;
     }
     case Instr::SingleDataTransfer: {
-//       multiply_long(instr);
-       break;
+        if(instr.InstructionData<Arm::SingleDataTransfer>().is_imm) {
+            single_data_transfer_immediate(instr);
+        } else {
+            single_data_transfer_shifted_reg(instr);
+        }
+        break;
     }
     case Instr::HalfwordDataTransfer: {
-//       halfword_data_transfer(instr);
-       break;
+        if(instr.InstructionData<Arm::HalfwordDataTransfer>().is_imm) {
+            halfword_data_transfer_immediate(instr);
+        } else {
+            halfword_data_transfer_shifted_reg(instr);
+        }
+        break;
     }
     case Instr::BlockDataTransfer: {
-//       halfword_data_transfer(instr);
+        block_data_transfer(instr);
         break;
     }
     case Instr::Swap: {
@@ -476,17 +485,25 @@ void CPU::psr_transfer(Arm::Instruction instr) {
 
 
 
-void CPU::load_store_shifted_reg(Arm::Instruction instr) {
-    // normal    1  pc+2L  i  0  (pc+2L) N 0 c
-    //           2  alu    s  0  (alu)   I 1 d
-    //           3  pc+3L  i  0  -       S 1 c
-    //              pc+3L
-    // dest=pc   1  pc+8   2  0  (pc+8)  N 0 c
-    //           2  alu    0     pc’     I 1 d
-    //           3  pc+12  2  0  -       N 1 c
-    //           4  pc’    2  0  (pc’)   S 0 c
-    //           5  pc’+4  2  0  (pc’+4) S 0 c
-    //              pc’+8
+void CPU::single_data_transfer_shifted_reg(Arm::Instruction instr) {
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+    // store
+    //           1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  1  Rd      N          1      d
+    //                 pc+3L
+
+    // load
+    // normal    1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  0  alu     I          1      d
+    //           3     pc+3L  i  0  -       S          1      c
+    //                 pc+3L
+    // dest=pc   1     pc+8   2  0  pc+8    N          0      c
+    //           2     alu       0  pc’     I          1      d
+    //           3     pc+12  2  0  -       N          1      c
+    //           4     pc’    2  0  pc’     S          0      c
+    //           5     pc’+4  2  0  pc’+4   S          0      c
+    //                 pc’+8
+
 
     auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
@@ -494,45 +511,59 @@ void CPU::load_store_shifted_reg(Arm::Instruction instr) {
     io->tick();
     prefetch32();
     if(EvaluateCondition(i.condition)) {
+        u32 shift_operand = calc_shift_operand(
+            i.ShiftedRegisterOperand.shift_type,
+            i.ShiftedRegisterOperand.shift_amount,
+            i.ShiftedRegisterOperand.rM,
+            nullptr
+        );
 
-        //cycle 2
-        io->tick();
-        // internal cycle, no prefetch
+        if (i.load) {
+            //cycle 2
+            io->tick();
+            // internal cycle, no prefetch
 
-        //this will perform cycle 3
-        execute_load_store_command(
-            true,
-            pre_index,
-            add,
-            word,
-            write,
-            reg_N,
-            reg_D,
-            calc_shift_operand(shift_type, shift_amount, reg_M, nullptr));
+            //this will perform cycle 3
+            exec_sdt_load_op(instr, shift_operand);
 
-        if(i.rD == PC) {
-            //cycle 4
+            if(i.rD == PC) {
+                //cycle 4
+                io->tick();
+                prefetch32();
+
+                //cycle 5
+                io->tick();
+                prefetch32();
+            }
+        } else {
+            //cycle 2
             io->tick();
             prefetch32();
+            exec_sdt_store_op(instr, shift_operand);
 
-            //cycle 5
-            io->tick();
-            prefetch32();
         }
     }
 }
 
-void CPU::load_store_immediate(Arm::Instruction instr) {
-    // normal    1  pc+2L  i  0  (pc+2L) N 0 c
-    //           2  alu    s  0  (alu)   I 1 d
-    //           3  pc+3L  i  0  -       S 1 c
-    //              pc+3L
-    // dest=pc   1  pc+8   2  0  (pc+8)  N 0 c
-    //           2  alu    0     pc’     I 1 d
-    //           3  pc+12  2  0  -       N 1 c
-    //           4  pc’    2  0  (pc’)   S 0 c
-    //           5  pc’+4  2  0  (pc’+4) S 0 c
-    //              pc’+8
+void CPU::single_data_transfer_immediate(Arm::Instruction instr) {
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+    // store
+    //           1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  1  Rd      N          1      d
+    //                 pc+3L
+
+    // load
+    // normal    1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  0  alu     I          1      d
+    //           3     pc+3L  i  0  -       S          1      c
+    //                 pc+3L
+    // dest=pc   1     pc+8   2  0  pc+8    N          0      c
+    //           2     alu       0  pc’     I          1      d
+    //           3     pc+12  2  0  -       N          1      c
+    //           4     pc’    2  0  pc’     S          0      c
+    //           5     pc’+4  2  0  pc’+4   S          0      c
+    //                 pc’+8
+
 
     auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
@@ -540,30 +571,166 @@ void CPU::load_store_immediate(Arm::Instruction instr) {
     io->tick();
     prefetch32();
     if(EvaluateCondition(i.condition)) {
+        if (i.load) {
+            //cycle 2
+            io->tick();
+            // internal cycle, no prefetch
 
-        //cycle 2
-        io->tick();
-        // internal cycle, no prefetch
+            //this will perform cycle 3
+            exec_sdt_load_op(instr, i.ImmediateOperand.offset);
 
-        //this will perform cycle 3
-//        execute_load_store_command(
-//            true,
-//            pre_index,
-//            add,
-//            word,
-//            write,
-//            reg_N,
-//            reg_D,
-//            immediate);
+            if(i.rD == PC) {
+                //cycle 4
+                io->tick();
+                prefetch32();
 
-        if(i.rD == PC) {
-            //cycle 4
+                //cycle 5
+                io->tick();
+                prefetch32();
+            }
+        } else {
+            //cycle 2
             io->tick();
             prefetch32();
+            exec_sdt_store_op(instr, i.ImmediateOperand.offset);
 
-            //cycle 5
+        }
+    }
+}
+
+void CPU::halfword_data_transfer_shifted_reg(Arm::Instruction instr) {
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+    // store
+    //           1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  1  Rd      N          1      d
+    //                 pc+3L
+
+    // load
+    // normal    1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  0  alu     I          1      d
+    //           3     pc+3L  i  0  -       S          1      c
+    //                 pc+3L
+    // dest=pc   1     pc+8   2  0  pc+8    N          0      c
+    //           2     alu       0  pc’     I          1      d
+    //           3     pc+12  2  0  -       N          1      c
+    //           4     pc’    2  0  pc’     S          0      c
+    //           5     pc’+4  2  0  pc’+4   S          0      c
+    //                 pc’+8
+
+    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
+    //cycle 1
+    io->tick();
+    prefetch32();
+    if(EvaluateCondition(i.condition)) {
+        if(i.load) {
+            //cycle 2
+            io->tick();
+            // internal cycle, no prefetch
+
+            //this will perform cycle 3
+            exec_hwsd_load_op(instr, REG(i.rM));
+
+            if(i.rD == PC) {
+                //cycle 4
+                io->tick();
+                prefetch32();
+
+                //cycle 5
+                io->tick();
+                prefetch32();
+            }
+        } else {
+            //cycle 2
             io->tick();
             prefetch32();
+            exec_hwsd_store_op(instr, REG(i.rM));
+        }
+    }
+}
+
+void CPU::halfword_data_transfer_immediate(Arm::Instruction instr) {
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+    // store
+    //           1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  1  Rd      N          1      d
+    //                 pc+3L
+
+    // load
+    // normal    1     pc+2L  i  0  pc+2L   N          0      c
+    //           2     alu    s  0  alu     I          1      d
+    //           3     pc+3L  i  0  -       S          1      c
+    //                 pc+3L
+    // dest=pc   1     pc+8   2  0  pc+8    N          0      c
+    //           2     alu       0  pc’     I          1      d
+    //           3     pc+12  2  0  -       N          1      c
+    //           4     pc’    2  0  pc’     S          0      c
+    //           5     pc’+4  2  0  pc’+4   S          0      c
+    //                 pc’+8
+
+    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
+
+    //cycle 1
+    io->tick();
+    prefetch32();
+    if(EvaluateCondition(i.condition)) {
+        if(i.load) {
+            //cycle 2
+            io->tick();
+            // internal cycle, no prefetch
+
+            //this will perform cycle 3
+            exec_hwsd_load_op(instr, i.ImmediateOperand.offset);
+
+            if(i.rD == PC) {
+                //cycle 4
+                io->tick();
+                prefetch32();
+
+                //cycle 5
+                io->tick();
+                prefetch32();
+            }
+        } else {
+            //cycle 2
+            io->tick();
+            prefetch32();
+            exec_hwsd_store_op(instr, REG(i.rM));
+        }
+
+    }
+}
+
+void CPU::block_data_transfer(Arm::Instruction instr) {
+    //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
+
+    auto &i = instr.InstructionData<Arm::BlockDataTransfer>();
+
+    //cycle 1
+    io->tick();
+    prefetch32();
+    if(EvaluateCondition(i.condition)) {
+        if (i.load) {
+            //cycle 2
+            io->tick();
+            // internal cycle, no prefetch
+
+            bool shift_carry_out;
+            //cycle 3-N
+            exec_bdt_load_op(instr);
+
+            if(Bit::test(i.registers, PC)) {
+                //cycle N + 1
+                io->tick();
+                prefetch32();
+
+                //cycle N + 2
+                io->tick();
+                prefetch32();
+            }
+        } else {
+            // cycle 2 - N
+            io->tick();
+            exec_bdt_store_op(instr);
         }
     }
 }
@@ -807,46 +974,36 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
     }
 }
 
-inline void CPU::exec_ls_op(
-//    Arm::Instruction instr,
-    bool load,
-    bool pre_index,
-    bool add,
-    bool word,
-    bool write,
-    u8 reg_N,
-    u8 reg_D,
-    u32 offset
-) {
-#define calc_sub_idx(reg, offset) (REG(reg_N) - offset)
-#define calc_add_idx(reg, offset) (REG(reg_N) + offset)
+inline void CPU::exec_sdt_load_op(Arm::Instruction instr, u32 offset) {
+#define calc_sub_idx(reg, offset) (REG(i.rN) - offset)
+#define calc_add_idx(reg, offset) (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
     u32 index;
-    if(pre_index) {
-        index = calc_auto_idx(reg_N, offset, add);
-        if(word && (index % 4) != 0) {
+    if(i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+        if(!i.is_byte && (index % 4) != 0) {
             throw_data_abort();
         }
-        if(write) {
-            REG(reg_N) = index;
+        if(i.write_back) {
+            REG(i.rN) = index;
         }
     } else {
-        index = REG(reg_N);
+        index = REG(i.rN);
     }
 
     //cycle 3
     io->tick();
     prefetch32();
-    REG(reg_D) = io->read(index) & (word ? 0xFFFFFFFF : 0xFF);
+    REG(i.rD) = io->read(index) & (!i.is_byte ? 0xFFFFFFFF : 0xFF);
 
-    if(!pre_index) {
-        index = calc_auto_idx(reg_N, offset, add);
+    if(!i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
 
-        // base reg is always written on a post-idx?
-        REG(reg_N) = index;
+        // base reg is always written on a post-idx
+        REG(i.rN) = index;
     }
 
 #undef calc_auto_idx
@@ -854,49 +1011,225 @@ inline void CPU::exec_ls_op(
 #undef calc_sub_idx
 }
 
-inline void CPU::exec_hwsd_op(
-    //    Arm::Instruction instr,
-    bool load,
-    bool pre_index,
-    bool add,
-    bool word,
-    bool write,
-    u8 reg_N,
-    u8 reg_D,
-    u32 offset
-) {
-#define calc_sub_idx(reg, offset) (REG(reg_N) - offset)
-#define calc_add_idx(reg, offset) (REG(reg_N) + offset)
+inline void CPU::exec_sdt_store_op(Arm::Instruction instr, u32 offset) {
+#define calc_sub_idx(reg, offset) (REG(i.rN) - offset)
+#define calc_add_idx(reg, offset) (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
     u32 index;
-    if(pre_index) {
-        index = calc_auto_idx(reg_N, offset, add);
-        if(word && (index % 4) != 0) {
+    if(i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+        if(!i.is_byte && (index % 4) != 0) {
             throw_data_abort();
         }
-        if(write) {
-            REG(reg_N) = index;
+        if(i.write_back) {
+            REG(i.rN) = index;
         }
     } else {
-        index = REG(reg_N);
+        index = REG(i.rN);
     }
 
-    //cycle 3
-    io->tick();
-    prefetch32();
-    REG(reg_D) = io->read(index) & (word ? 0xFFFFFFFF : 0xFF);
+    io->write(index, REG(i.rD));
 
-    if(!pre_index) {
-        index = calc_auto_idx(reg_N, offset, add);
+    if(!i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
 
-        // base reg is always written on a post-idx?
-        REG(reg_N) = index;
+        // base reg is always written on a post-idx
+        REG(i.rN) = index;
     }
 
 #undef calc_auto_idx
 #undef calc_add_idx
 #undef calc_sub_idx
+}
+
+inline u32 compute_hwsd_result(u32 data, bool halfwords, bool signed_data) {
+    if (!halfwords) {
+        bool sign = Bit::test(data, 7);
+        u32 signMask = sign && signed_data ? 0xFFFFFF00 : 0;
+        return signMask | (data & 0xFF);
+    } else {
+        bool sign = Bit::test(data, 15);
+        u32 signMask = sign ? 0xFFFF0000 : 0;
+        return signMask | (data & 0xFFFF);
+    }
+}
+
+inline void CPU::exec_hwsd_load_op(Arm::Instruction instr, u32 offset) {
+#define calc_sub_idx(reg, offset) (REG(i.rN) - offset)
+#define calc_add_idx(reg, offset) (REG(i.rN) + offset)
+#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+
+    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
+
+    u32 index;
+    if(i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+        if(!i.halfwords && (index % 2) != 0) {
+            throw_data_abort(); // TODO: unpredictable behavior
+        }
+        if(i.write_back) {
+            REG(i.rN) = index;
+        }
+    } else {
+        index = REG(i.rN);
+    }
+
+    //cycle 3
+    io->tick();
+    prefetch32();
+ 
+    REG(i.rD) = compute_hwsd_result(io->read(index), i.halfwords, i.signed_data);
+ 
+    if(!i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+
+        // base reg is always written on a post-idx?
+        REG(i.rN) = index;
+    }
+
+#undef calc_auto_idx
+#undef calc_add_idx
+#undef calc_sub_idx
+}
+
+inline void CPU::exec_hwsd_store_op(Arm::Instruction instr, u32 offset) {
+#define calc_sub_idx(reg, offset) (REG(i.rN) - offset)
+#define calc_add_idx(reg, offset) (REG(i.rN) + offset)
+#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+
+    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
+
+    u32 index;
+    if(i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+        if(!i.halfwords && (index % 2) != 0) {
+            throw_data_abort(); // TODO: unpredictable behavior
+        }
+        if(i.write_back) {
+            REG(i.rN) = index;
+        }
+    } else {
+        index = REG(i.rN);
+    }
+
+    //cycle 3
+    io->tick();
+    prefetch32();
+ 
+    io->write(index, compute_hwsd_result(REG(i.rD), i.halfwords, i.signed_data));
+ 
+    if(!i.is_pre_idx) {
+        index = calc_auto_idx(i.rN, offset, i.is_inc);
+
+        // base reg is always written on a post-idx?
+        REG(i.rN) = index;
+    }
+
+#undef calc_auto_idx
+#undef calc_add_idx
+#undef calc_sub_idx
+}
+
+inline void CPU::exec_bdt_store_op(Arm::Instruction instr) {
+    // offset is number of registers we're gonna write
+    // write always increments index
+    // post-decrement actually means pre-increment from negative index???
+
+    auto &i = instr.InstructionData<Arm::BlockDataTransfer>();
+
+    u8 reg_count = std::popcount(i.registers);
+
+    u32 start_index;
+    u32 index;
+
+    if (i.is_inc) {
+        index = REG(i.rN) + (reg_count << 2);
+        start_index = REG(i.rN);
+        if(i.is_pre_idx) {
+            start_index += 4;
+        }
+    } else {
+        index = REG(i.rN) - (reg_count << 2);
+        start_index = index;
+        if(!i.is_pre_idx) {
+            start_index += 4;
+        }
+    }
+
+    if((start_index % 4) != 0) {
+        throw_data_abort();
+    }
+
+    if(i.write_back) {
+        REG(i.rN) = index;
+    }
+
+
+    u16 registers = i.registers;
+    for(u8 j = 0; j < 16; j++) {
+        if (!Bit::test(registers, j)) {
+            continue;
+        }
+
+        if (j == 15 && i.load_psr) {
+            REG_CPSR = PSR(getSPSRIndexForCurrentMode());
+        }
+
+        io->tick();
+        prefetch32();
+
+        io->write(start_index + (j << 2), REG(j));
+    }
+}
+
+inline void CPU::exec_bdt_load_op(Arm::Instruction instr) {
+    auto &i = instr.InstructionData<Arm::BlockDataTransfer>();
+
+    u8 reg_count = std::popcount(i.registers);
+
+    u32 start_index;
+    u32 index;
+
+    if (i.is_inc) {
+        index = REG(i.rN) + (reg_count << 2);
+        start_index = REG(i.rN);
+        if(i.is_pre_idx) {
+            start_index += 4;
+        }
+    } else {
+        index = REG(i.rN) - (reg_count << 2);
+        start_index = index;
+        if(!i.is_pre_idx) {
+            start_index += 4;
+        }
+    }
+
+    if((start_index % 4) != 0) {
+        throw_data_abort();
+    }
+
+    if(i.write_back) {
+        REG(i.rN) = index;
+    }
+
+
+    u16 registers = i.registers;
+    for(u8 j = 0; j < 16; j++) {
+        if (!Bit::test(registers, j)) {
+          continue;
+        }
+
+        if (j == 15 && i.load_psr) {
+            REG_CPSR = PSR(getSPSRIndexForCurrentMode());
+        }
+
+
+        io->tick();
+        prefetch32();
+
+        REG(j) = io->read(start_index + (j << 2));
+    }
 }

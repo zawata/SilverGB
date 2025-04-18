@@ -661,7 +661,8 @@ namespace Arm {
     reg_t rN {}, rD {};
     union {
       struct {
-        ShiftType shift;
+        ShiftType shift_type;
+        u8 shift_amount;
         reg_t rM;
       } ShiftedRegisterOperand;
       struct {
@@ -685,7 +686,11 @@ namespace Arm {
       if (is_imm) {
         ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
       } else {
-        ShiftedRegisterOperand.shift = (ShiftType) Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
+        // shift-reg not allowed for this instruction class
+        assert(Bit::test(word, 4) == 0);
+
+        ShiftedRegisterOperand.shift_type = (ShiftType) Bit::range(Bit::Mask::between_inc<u32>(5, 6), word);
+        ShiftedRegisterOperand.shift_amount = Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
         ShiftedRegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
       }
     }
@@ -721,7 +726,7 @@ namespace Arm {
           ss << "]";
         }
       } else {
-        ss << (is_inc ? "+" : "-") << ShiftedRegisterOperand.rM.to_string() << to_string(ShiftedRegisterOperand.shift);
+        ss << (is_inc ? "+" : "-") << ShiftedRegisterOperand.rM.to_string() << to_string(ShiftedRegisterOperand.shift_type);
       }
 
       if (is_pre_idx) {
@@ -1245,17 +1250,22 @@ namespace Arm {
       // Class 2 Instructions
       case 0x4:
       case 0x5:
-        set_variant_data<SingleDataTransfer>(word);
-        break;
-      case 0x6:
-      case 0x7: {
+        // reg-indicated shift is not available for this instruction class
         if (Bit::range(Bit::Mask::bit<u32>(4), word)) {
           set_variant_data<Undefined>(word);
         } else {
           set_variant_data<SingleDataTransfer>(word);
         }
         break;
-      }
+      case 0x6:
+      case 0x7:
+        // reg-indicated shift is not available for this instruction class
+        if (Bit::range(Bit::Mask::bit<u32>(4), word)) {
+          set_variant_data<Undefined>(word);
+        } else {
+          set_variant_data<SingleDataTransfer>(word);
+        }
+        break;
       case 0x8:
       case 0x9:
         set_variant_data<BlockDataTransfer>(word);
