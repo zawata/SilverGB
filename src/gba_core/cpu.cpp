@@ -79,7 +79,6 @@ io(io) {
 CPU::~CPU() {}
 
 void CPU::tick() {
-    nowide::cout << "PC: " << as_hex(REG(PC)) << std::endl;
     execute();
 }
 
@@ -102,49 +101,45 @@ bool cond_never()                        { return false; }
 
 bool CPU::EvaluateCondition(Arm::Condition condition) {
     static bool (*conditions[])(void) = {
-      cond_equal,
-      cond_not_equal,
-      cond_carry_set,
-      cond_carry_clear,
-      cond_minus,
-      cond_plus,
-      cond_overflow,
-      cond_no_overflow,
-      cond_unsigned_higher,
-      cond_unsigned_lower_or_same,
-      cond_signed_greater_than_or_equal,
-      cond_signed_less_than,
-      cond_signed_greater_than,
-      cond_signed_less_than_or_equal,
-      cond_always,
-      cond_never // unpredictable in ARMv4, but whatever
+        cond_equal,
+        cond_not_equal,
+        cond_carry_set,
+        cond_carry_clear,
+        cond_minus,
+        cond_plus,
+        cond_overflow,
+        cond_no_overflow,
+        cond_unsigned_higher,
+        cond_unsigned_lower_or_same,
+        cond_signed_greater_than_or_equal,
+        cond_signed_less_than,
+        cond_signed_greater_than,
+        cond_signed_less_than_or_equal,
+        cond_always,
+        cond_never // unpredictable in ARMv4, but whatever
     };
 
     return conditions[(u8)condition]();
 }
 
 void CPU::prefetch16() {
-    nowide::cout << "prefetch16() " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(REG_PC);
     REG_PC += 2;
 }
 
 void CPU::prefetch16(u16 dest) {
-    nowide::cout << "prefetch16(u16) " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(dest);
 }
 
 void CPU::prefetch32() {
-    nowide::cout << "prefetch32() " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(REG_PC);
     REG_PC += 4;
 }
 
 void CPU::prefetch32(u32 dest) {
-    nowide::cout << "prefetch32(u32) " << as_hex(dest) << std::endl;
     op2 = op1;
     op1 = io->read(dest);
 }
@@ -777,7 +772,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
 
     switch(i.operation_code) {
     case OpCode::AND: {
-        nowide::cout << "AND" << std::endl;
         REG(i.rD) = REG(i.rN) & shift_operand;
 
         if(i.set_flags) {
@@ -789,7 +783,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::EOR: {
-        nowide::cout << "EOR" << std::endl;
         REG(i.rD) = REG(i.rN) ^ shift_operand;
 
         if(i.set_flags) {
@@ -801,7 +794,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::SUB: {
-        nowide::cout << "SUB" << std::endl;
         REG(i.rD) = REG(i.rN) - shift_operand;
 
         if(i.set_flags) {
@@ -813,7 +805,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::RSB: {
-        nowide::cout << "RSB" << std::endl;
         REG(i.rD) = shift_operand - REG(i.rN);
 
         if(i.set_flags) {
@@ -825,7 +816,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::ADD: {
-        nowide::cout << "ADD" << std::endl;
         REG(i.rD) = REG(i.rN) + shift_operand;
 
         if(i.set_flags) {
@@ -837,7 +827,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::ADC: {
-        nowide::cout << "ADC" << std::endl;
         REG(i.rD) = REG(i.rN) + shift_operand + (get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
@@ -849,7 +838,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::SBC: {
-        nowide::cout << "SBC" << std::endl;
         REG(i.rD) = REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
@@ -861,7 +849,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::RSC: {
-        nowide::cout << "RSC" << std::endl;
         REG(i.rD) = shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
@@ -873,7 +860,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::TST: {
-        nowide::cout << "TST" << std::endl;
         u32 alu_out = REG(i.rN) - shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
@@ -883,7 +869,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::TEQ: {
-        nowide::cout << "TEQ" << std::endl;
         u32 alu_out = REG(i.rN) - shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
@@ -893,7 +878,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::CMP: {
-        nowide::cout << "CMP" << std::endl;
         u32 alu_out = REG(i.rN) - shift_operand;
         change_cpsr_N(Bit::test(alu_out, 31));
         change_cpsr_Z(alu_out == 0);
@@ -902,7 +886,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::CMN: {
-        nowide::cout << "CMN" << std::endl;
         u32 alu_out = REG(i.rN) + shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
@@ -912,7 +895,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::ORR: {
-        nowide::cout << "ORR" << std::endl;
         REG(i.rD) = REG(i.rN) | shift_operand;
 
         if(i.set_flags) {
@@ -924,7 +906,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::MOV: {
-        nowide::cout << "MOV" << std::endl;
         REG(i.rN) = shift_operand;
 
         if(i.set_flags) {
@@ -936,7 +917,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::BIC: {
-        nowide::cout << "BIC" << std::endl;
         REG(i.rD) = REG(i.rN) & ~shift_operand;
 
         if(i.set_flags) {
@@ -948,7 +928,6 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         break;
     }
     case OpCode::MVN: {
-        nowide::cout << "MVN" << std::endl;
         REG(i.rN) = ~shift_operand;
 
         if(i.set_flags) {

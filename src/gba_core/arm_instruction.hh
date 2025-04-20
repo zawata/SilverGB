@@ -431,7 +431,17 @@ namespace Arm {
         ss << rN.to_string() << ", ";
       }
 
-      // TODO: op2
+      if (is_imm) {
+        u16 op2 = ImmediateOperand.rotate << 8 | ImmediateOperand.immediate;
+        ss << "#" << as_hex(op2);
+      } else {
+        ss << ShiftedRegisterOperand.rM.to_string() << ", " << to_string(ShiftedRegisterOperand.shift_type) << " ";
+        if (ShiftedRegisterOperand.is_reg) {
+          ss << ShiftedRegisterOperand.rS;
+        } else {
+          ss << "#" << as_hex(ShiftedRegisterOperand.shift_amount);
+        }
+      }
 
       return ss.str();
     };
@@ -535,9 +545,26 @@ namespace Arm {
 
     std::string Disassemble() const override {
       std::stringstream ss;
+      ss << to_string(Mnemonic()) << to_string(condition) << " ";
 
-      // ss << to_string(Mnemonic()) << to_string(condition) << " " <<
-      // as_hex(offset);
+      switch (type) {
+        case Type::PSRToRegister:
+          ss << PSRToRegister.rD.to_string() << ", " << (use_spsr ? "SPSR_all" : "CPSR_all");
+        break;
+        case Type::RegisterToPSR:
+          ss << (use_spsr ? "SPSR_all" : "CPSR_all") << ", " << RegisterToPSR.rM.to_string();
+        break;
+        case Type::RegisterToPSRF:
+          ss << (use_spsr ? "SPSR_flg" : "CPSR_flg") << ", ";
+          if (RegisterToPSRF.is_imm) {
+            u16 op2 = RegisterToPSRF.ImmediateOperand.rotation << 8 | RegisterToPSRF.ImmediateOperand.value;
+            ss << "#" << as_hex(op2);
+          } else {
+            ss << RegisterToPSRF.RegisterOperand.rM.to_string();
+          }
+        break;
+      }
+
       return ss.str();
     };
 
@@ -713,16 +740,17 @@ namespace Arm {
       ss << "[" << rN.to_string();
       if (!is_pre_idx) {
         ss << ']';
+      } else {
+        ss << ", ";
       }
 
-      if (is_imm) {
-        if (ImmediateOperand.offset == 0) {
-          ss << (u32) ImmediateOperand.offset;
-        } else {
-          ss << "]";
-        }
+      if (is_imm && ImmediateOperand.offset != 0) {
+          ss << "#" << as_hex(ImmediateOperand.offset);
       } else {
-        ss << (is_inc ? "+" : "-") << ShiftedRegisterOperand.rM.to_string() << to_string(ShiftedRegisterOperand.shift_type);
+        ss << (is_inc ? "" : "-") << ShiftedRegisterOperand.rM.to_string();
+        if (ShiftedRegisterOperand.shift_amount > 0) {
+          ss << ", #" << as_hex(ShiftedRegisterOperand.shift_amount);
+        }
       }
 
       if (is_pre_idx) {
@@ -864,8 +892,11 @@ namespace Arm {
     }
 
     std::string Disassemble() const override {
+      std::stringstream ss;
       // TODO
-      return "";
+      ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
@@ -946,8 +977,8 @@ namespace Arm {
 
     std::string Disassemble() const override {
       std::stringstream ss;
-
-      ss << to_string(Mnemonic()) << to_string(condition) << " " << as_hex(comment);
+      // TODO
+      ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
       return ss.str();
     }
@@ -984,8 +1015,11 @@ namespace Arm {
     }
 
     std::string Disassemble() const override {
+      std::stringstream ss;
       // TODO
-      return "";
+      ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
@@ -1021,8 +1055,11 @@ namespace Arm {
     }
 
     std::string Disassemble() const override {
+      std::stringstream ss;
       // TODO
-      return "";
+      ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
@@ -1058,8 +1095,11 @@ namespace Arm {
     }
 
     std::string Disassemble() const override {
+      std::stringstream ss;
       // TODO
-      return "";
+      ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+
+      return ss.str();
     }
 
     static constexpr InstructionType GetInstructionType() {
