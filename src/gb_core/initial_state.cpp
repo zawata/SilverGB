@@ -1,6 +1,7 @@
-#include "mem.hpp"
 #include "util/types/primitives.hpp"
+
 #include "defs.hpp"
+#include "mem.hpp"
 
 u8 get_default_idx(gb_device_t device) {
     if(device == device_GB_cpu_dmg0) {
@@ -12,10 +13,11 @@ u8 get_default_idx(gb_device_t device) {
     } else if(dev_is_GBC(device)) {
         return 3_u8;
     } else {
-      unreachable();
+        unreachable();
     }
 }
 
+// clang-format off
 #define __UK 0x00 // unknown value
 constexpr u8 default_reg_values[55][4] =
 /*             DMG0/cb, DMG/MGB SGB/SGB2 CGB/AGB */
@@ -3690,3 +3692,4 @@ constexpr u8 work_ram_CGB_initial_state[GBC_WORK_RAM_SIZE] = {
 /* 7fe0 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 /* 7ff0 */ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
+// clang-format on

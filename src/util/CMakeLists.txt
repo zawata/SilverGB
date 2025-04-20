@@ -1,6 +1,6 @@
 add_library(util
-		"file.cpp"
-		"log.cpp")
+        "file.cpp"
+        "log.cpp")
 
 find_package(ZLIB REQUIRED)
 
@@ -9,5 +9,5 @@ target_include_directories(gb_core
         PUBLIC "../")
 
 target_link_libraries(util
-	PRIVATE ZLIB::ZLIB
-	PRIVATE nowide::nowide)
+        PRIVATE ZLIB::ZLIB
+        PRIVATE nowide::nowide)

@@ -2,34 +2,36 @@
 
 #include <vector>
 
-#include "defs.hpp"
 #include "util/types/primitives.hpp"
 
-#define HIGH_RAM_SIZE 0x7f
+#include "defs.hpp"
+
+#define HIGH_RAM_SIZE      0x7f
 
 #define WORK_RAM_BANK_SIZE 0x1000
 #define WORK_RAM_BASE_SIZE 0x1000
 #define DMG_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + WORK_RAM_BANK_SIZE)
 #define GBC_WORK_RAM_SIZE  (WORK_RAM_BASE_SIZE + (WORK_RAM_BANK_SIZE * 7))
 
-#define DMG_VRAM_SIZE  0x3000
-#define GBC_VRAM_SIZE  (DMG_VRAM_SIZE + DMG_VRAM_SIZE)
+#define DMG_VRAM_SIZE      0x3000
+#define GBC_VRAM_SIZE      (DMG_VRAM_SIZE + DMG_VRAM_SIZE)
 
-#define OAM_RAM_SIZE   0xA0
+#define OAM_RAM_SIZE       0xA0
 
 class Core;
 class IO_Bus;
 
 class Memory {
-friend Core;
-friend IO_Bus;
+    friend Core;
+    friend IO_Bus;
+
 public:
     enum Interrupt {
-        VBLANK_INT   = 1<<0,
-        LCD_STAT_INT = 1<<1,
-        TIMER_INT    = 1<<2,
-        SERIAL_INT   = 1<<3,
-        JOYPAD_INT   = 1<<4,
+        VBLANK_INT   = 1 << 0,
+        LCD_STAT_INT = 1 << 1,
+        TIMER_INT    = 1 << 2,
+        SERIAL_INT   = 1 << 3,
+        JOYPAD_INT   = 1 << 4,
     };
 
     Memory(gb_device_t device, bool bootrom_enabled);
@@ -56,20 +58,20 @@ public:
     bool get_dmg_compat_mode();
 
     struct io_registers_t {
-        //Input
-        u8 P1; //implemented in Input_Manager
+        // Input
+        u8 P1; // implemented in Input_Manager
 
-        //Serial
-        u8 SB; //Serial not supported
+        // Serial
+        u8 SB; // Serial not supported
         u8 SC;
 
-        //Timer
+        // Timer
         u8 DIV; // emulated
         u8 TIMA;
         u8 TMA;
         u8 TAC;
 
-        //Interupt Flags
+        // Interupt Flags
         u8 IF;
 
         // PPU
@@ -113,9 +115,9 @@ public:
     } registers;
 
 private:
-    gb_device_t device;
+    gb_device_t     device;
 
-    u16 bank_offset;
+    u16             bank_offset;
 
     std::vector<u8> work_ram;
     std::vector<u8> high_ram;

@@ -5,11 +5,11 @@
 namespace Gtk {
     struct GLArea;
     struct ApplicationWindow;
-}
+} // namespace Gtk
 
 namespace Gdk {
     struct Event;
-}
+} // namespace Gdk
 
 IMGUI_IMPL_API bool ImGui_ImplGtkmm_Init(Gtk::ApplicationWindow *, Gtk::GLArea *);
 IMGUI_IMPL_API void ImGui_ImplGtkmm_Shutdown();
