@@ -66,7 +66,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T until(uint i) {
+    constexpr T until(const uint i) {
       return (bit<T>(i) - 1);
     }
 
@@ -77,7 +77,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T until_inc(uint i) {
+    constexpr T until_inc(const uint i) {
       return (until<T>(i) | bit<T>(i));
     }
 
@@ -88,7 +88,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T after(uint i) {
+    constexpr T after(const uint i) {
       return ~(until<T>(i) | bit<T>(i));
     }
 
@@ -99,7 +99,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T after_inc(uint i) {
+    constexpr T after_inc(uint i) {
       return ~(until<T>(i));
     }
 
@@ -110,7 +110,7 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T between(uint x, uint y) {
+    constexpr T between(uint x, uint y) {
       return until<T>(x) ^ until<T>(y);
     }
 
@@ -121,24 +121,32 @@ namespace Bit {
      * @return Bit Mask of type T
      */
     template<typename T>
-    __force_inline T between_inc(uint x, uint y) {
+    constexpr T between_inc(uint x, uint y) {
       return between<T>(x, y) | bit<T>(x) | bit<T>(y);
     }
   }// namespace Mask
 
   /**
    * Get bits masked by `m` from `v`
+   * @tparam T Integral, Unsigned
+   * @param m Bit Mask
+   * @param v Value to mask
+   * @return
    */
   template<typename T>
-  __force_inline T mask(T v, T m) {
+  __force_inline T mask(T m, T v) {
     return v & m;
   }
 
   /**
-   * Get bit range masked by `m` from `v` shifted to
+   * Get bit range masked by `m` from `v` shifted to lowest set bit of mask
+   * @tparam T Integral, Unsigned
+   * @param m Bit Mask
+   * @param v Value to mask
+   * @return
    */
   template<typename T>
-  __force_inline T range(T v, T m) {
+  __force_inline T range(T m, T v) {
     return mask(v, m) >> ctz<T>(m);
   }
 

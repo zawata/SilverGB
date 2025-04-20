@@ -31,7 +31,7 @@ u32 psr_regs[6]; // CPSR + SPSR*5
 #define make_reg_funcs(name, bit) \
   [[maybe_unused]] __force_inline bool get_##name()              { return Bit::test(REG_CPSR, bit); } \
   [[maybe_unused]] __force_inline void set_##name()              { Bit::set(&PSR(CPSR), bit); } \
-  [[maybe_unused]] __force_inline void change_##name(bool state) { Bit::set_cond(REG_CPSR, bit, Bit::from_bool(state));} \
+  [[maybe_unused]] __force_inline void change_##name(bool state) { Bit::set_cond(REG_CPSR, bit, state); } \
   [[maybe_unused]] __force_inline void reset_##name()            { Bit::reset(&PSR(CPSR), bit); } \
   [[maybe_unused]] __force_inline void flip_##name()             { Bit::toggle(REG_CPSR, bit); };
 
@@ -71,21 +71,15 @@ u8 getSPSRIndexForCurrentMode() {
 
 CPU::CPU(IO_Bus *io, bool bootrom_enabled) :
 io(io) {
-    REG_PC = 0;
     // fill the instruction pipeline
     prefetch32();
-    prefetch32(REG_PC + 4);
+    prefetch32();
 }
 
 CPU::~CPU() {}
 
 void CPU::tick() {
-    // TODO: we need to be careful about keeping the instruction pipeline full
-     if(PC <= 4) {
-       prefetch32();
-       return;
-     }
-    nowide::cout << "PC: " << REG_PC << std::endl;
+    nowide::cout << "PC: " << as_hex(REG(PC)) << std::endl;
     execute();
 }
 
@@ -133,6 +127,7 @@ void CPU::prefetch16() {
     nowide::cout << "prefetch16() " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(REG_PC);
+    REG_PC += 2;
 }
 
 void CPU::prefetch16(u16 dest) {
@@ -145,10 +140,11 @@ void CPU::prefetch32() {
     nowide::cout << "prefetch32() " << as_hex(REG_PC) << std::endl;
     op2 = op1;
     op1 = io->read(REG_PC);
+    REG_PC += 4;
 }
 
 void CPU::prefetch32(u32 dest) {
-    nowide::cout << "prefetch32(u32) " << getchar() << std::endl;
+    nowide::cout << "prefetch32(u32) " << as_hex(dest) << std::endl;
     op2 = op1;
     op1 = io->read(dest);
 }
@@ -161,7 +157,7 @@ void CPU::execute() {
 
     Arm::Instruction instr = Arm::Instruction::Decode(word);
 
-    std::cout << instr.Disassemble() << std::endl;
+    std::cout << as_hex(word) << ": " << instr.Disassemble() << std::endl;
     switch(instr.Type()) {
     case Instr::Branch: {
         branch(instr);
@@ -271,29 +267,23 @@ void CPU::branch(Arm::Instruction instr) {
     prefetch32();
 
     if(EvaluateCondition(i.condition)) {
-        //TODO: not exactly sure where PC gets set. its either:
-        // - in cycle 1 so the LR register is updated with a temp former PC value in cycle 2
-        // - in cycle 2 so the second 2 prefetches are performed from PC
-        // - in cycle 3 so the prefetches are computed from the alu result
-        // the last one seems cleanest imo
-
         // offset is shifted by instruction parser
-        u32 dest = REG_PC + i.offset;
+        u32 ret = REG_PC;
+        REG_PC += i.offset - 4; // TODO: why -4 ?
 
         //cycle 2
         io->tick();
-        prefetch32(dest);
+        prefetch32();
         if(i.link) {
-          REG_LR = REG_PC;
+          REG_LR = ret;
         }
 
         //cycle 3
         io->tick();
-        prefetch32(dest + 4);
+        prefetch32();
         if(i.link) {
           REG_LR -= 4;
         }
-        REG_PC = dest << 2;
     }
 }
 
@@ -329,7 +319,7 @@ void CPU::branch_and_exchange(Arm::Instruction instr) {
         //cycle 3
         io->tick();
         prefetch16(dest + 4);
-        REG_PC = dest << 2;
+        REG_PC = dest;
     }
 }
 
@@ -459,23 +449,22 @@ void CPU::psr_transfer(Arm::Instruction instr) {
     if(EvaluateCondition(i.condition)) {
         switch (i.type) {
         case Arm::PSRTransfer::Type::PSRToRegister:
-          REG(i.PSRToRegister.rD) = PSR(getSPSRIndexForCurrentMode());
-          break;
+            REG(i.PSRToRegister.rD) = PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR);
+            break;
         case Arm::PSRTransfer::Type::RegisterToPSR:
-          PSR(getSPSRIndexForCurrentMode()) = REG(i.PSRToRegister.rD);
-          break;
+            PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR) = REG(i.PSRToRegister.rD);
+            break;
         case Arm::PSRTransfer::Type::RegisterToPSRF:
-          u32 operand;
-          if(i.RegisterToPSRF.is_imm) {
-           bool shift_carry_out;
-           operand = Bit::ShiftWithCarry::rotate_right<u32>(
-               i.RegisterToPSRF.ImmediateOperand.value,
-               1 << i.RegisterToPSRF.ImmediateOperand.rotation,
-               &shift_carry_out);
+            u32 operand;
+            if(i.RegisterToPSRF.is_imm) {
+                operand = Bit::ShiftWithCarry::rotate_right<u32>(
+                    i.RegisterToPSRF.ImmediateOperand.value,
+                    1 << i.RegisterToPSRF.ImmediateOperand.rotation,
+                    nullptr);
           } else {
            operand = REG(i.RegisterToPSRF.RegisterOperand.rM);
           }
-          PSR(getSPSRIndexForCurrentMode()) |= (operand & (0xF << 28));
+          PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR) |= (operand & (0xF << 28));
           break;
         default:
             assert(false);
@@ -786,13 +775,12 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
 
     auto &i = instr.InstructionData<Arm::DataProcessing>();
 
-    bool set_flags = Bit::test((u64)i.operation_code, 0);
-    switch((OpCode)((u32)i.operation_code >> 1)) {
+    switch(i.operation_code) {
     case OpCode::AND: {
         nowide::cout << "AND" << std::endl;
         REG(i.rD) = REG(i.rN) & shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
@@ -804,7 +792,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "EOR" << std::endl;
         REG(i.rD) = REG(i.rN) ^ shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
@@ -816,7 +804,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "SUB" << std::endl;
         REG(i.rD) = REG(i.rN) - shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand));
@@ -828,7 +816,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "RSB" << std::endl;
         REG(i.rD) = shift_operand - REG(i.rN);
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN)));
@@ -840,7 +828,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "ADD" << std::endl;
         REG(i.rD) = REG(i.rN) + shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(check_carry_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
@@ -852,7 +840,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "ADC" << std::endl;
         REG(i.rD) = REG(i.rN) + shift_operand + (get_cpsr_C() ? 1 : 0);
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(check_carry_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
@@ -864,7 +852,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "SBC" << std::endl;
         REG(i.rD) = REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0);
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0)));
@@ -876,7 +864,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "RSC" << std::endl;
         REG(i.rD) = shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0);
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0)));
@@ -927,7 +915,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "ORR" << std::endl;
         REG(i.rD) = REG(i.rN) | shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
@@ -939,7 +927,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "MOV" << std::endl;
         REG(i.rN) = shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rN), 31));
             change_cpsr_Z(REG(i.rN) == 0);
             change_cpsr_C(shift_carry_out);
@@ -951,7 +939,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "BIC" << std::endl;
         REG(i.rD) = REG(i.rN) & ~shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rD), 31));
             change_cpsr_Z(REG(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
@@ -963,7 +951,7 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
         nowide::cout << "MVN" << std::endl;
         REG(i.rN) = ~shift_operand;
 
-        if(set_flags) {
+        if(i.set_flags) {
             change_cpsr_N(Bit::test(REG(i.rN), 31));
             change_cpsr_Z(REG(i.rN) == 0);
             change_cpsr_C(shift_carry_out);

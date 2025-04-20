@@ -295,7 +295,7 @@ namespace Arm {
 
       const static u32 isImmediate = Bit::Mask::bit<u32>(25);
       const static u32 isSetFlags = Bit::Mask::bit<u32>(20);
-      const static u32 OpCode = 0x03F00000;
+      const static u32 OpCode = Bit::Mask::between_inc<u32>(21, 24);
       const static u32 Reg_N = 0x000F0000;
       const static u32 Reg_D = 0x0000F000;
       const static u32 RegisterShiftValue = Bit::Mask::bit<u32>(4);
@@ -675,7 +675,7 @@ namespace Arm {
     friend struct Instruction;
     explicit SingleDataTransfer(u32 word) {
       condition = (Condition) Bit::range(Mask::condition, word);
-      is_imm = Bit::test(word, 25);
+      is_imm = !Bit::test(word, 25);
       is_pre_idx = Bit::test(word, 24);
       is_inc = Bit::test(word, 23);
       is_byte = Bit::test(word, 22);
@@ -686,10 +686,6 @@ namespace Arm {
       if (is_imm) {
         ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
       } else {
-        // shift-reg not allowed for this instruction class
-        assert(Bit::test(word, 4) == 0);
-
-        ShiftedRegisterOperand.shift_type = (ShiftType) Bit::range(Bit::Mask::between_inc<u32>(5, 6), word);
         ShiftedRegisterOperand.shift_amount = Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
         ShiftedRegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
       }
@@ -1196,7 +1192,7 @@ namespace Arm {
         // bex    [Cond     ] 0  0  0  1  0  0  1  0  1  1  1  1  1  1  1  1  1  1  1  1  0  0  0  1  [Rn       ]
         // hdt    [Cond     ] 0  0  0  P  U  I  W  L  [Rn       ] [Rd       ] [0/Offset ] 1  S  H  1  [Rn/Offset]
 
-        // if 25 is set, it can only be DP
+        // if 25 is set, it can only be DP or PSR
         if (!Bit::test(word, 25)) {
           // check bex early since it doesn't fit smoothly with everything else
           if (Bit::range(Mask::bex_const, word) == Literal::BEX_CONSTANT) {
@@ -1236,7 +1232,7 @@ namespace Arm {
                           Bit::range(DPI::BitMask::OpCode, word),
                           (uint) DPI::OperationCode::TST,
                           (uint) DPI::OperationCode::CMN) &&
-                      (bool) Bit::mask(word, DPI::BitMask::isSetFlags);
+                      !Bit::mask(word, DPI::BitMask::isSetFlags);
 
         if (is_psr) {
           set_variant_data<PSRTransfer>(word);
@@ -1250,21 +1246,11 @@ namespace Arm {
       // Class 2 Instructions
       case 0x4:
       case 0x5:
-        // reg-indicated shift is not available for this instruction class
-        if (Bit::range(Bit::Mask::bit<u32>(4), word)) {
-          set_variant_data<Undefined>(word);
-        } else {
-          set_variant_data<SingleDataTransfer>(word);
-        }
+        set_variant_data<SingleDataTransfer>(word);
         break;
       case 0x6:
       case 0x7:
-        // reg-indicated shift is not available for this instruction class
-        if (Bit::range(Bit::Mask::bit<u32>(4), word)) {
-          set_variant_data<Undefined>(word);
-        } else {
-          set_variant_data<SingleDataTransfer>(word);
-        }
+        set_variant_data<SingleDataTransfer>(word);
         break;
       case 0x8:
       case 0x9:

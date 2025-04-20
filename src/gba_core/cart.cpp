@@ -74,7 +74,7 @@ rom_file(f) {
 
 Cartridge::~Cartridge() = default;
 
-u32   Cartridge::read(u32 offset) const { return rom.at(offset); }
+u32   Cartridge::read(u32 offset) const { return rom.at(offset >> 2); }
 void Cartridge::write(u32 offset, u32 data) {
     nowide::cout << "tried to write " << as_hex(data) << " to " << as_hex(offset) << std::endl;
 }
