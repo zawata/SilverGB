@@ -3,12 +3,12 @@
 #include <bit>
 #include <cassert>
 #include <nowide/iostream.hpp>
+#include <variant>
 
-#include "gba_core/armv4.hpp"
+#include "gba_core/arm_instruction.hh"
 #include "gba_core/io.hpp"
 
 #include "util/bit.hpp"
-#include "util/file.hpp"
 #include "util/flags.hpp"
 
 u32 gen_regs[16];
@@ -149,89 +149,62 @@ void CPU::prefetch32(u32 dest) {
     op1 = io->read(dest);
 }
 
-void CPU::execute() {
-    using Instr            = Arm::InstructionType;
+// helper type for the visitor
+template<class... Ts>
+struct overloads: Ts... {
+    using Ts::operator()...;
+};
 
+void CPU::execute() {
     // we prefetch 2 instructions ahead
     const u32        word  = op2;
 
-    Arm::Instruction instr = Arm::Instruction::Decode(word);
+    Arm::Instruction instr = Arm::DecodeArm(word);
 
-    std::cout << as_hex(word) << ": " << instr.Disassemble() << std::endl;
-    switch(instr.Type()) {
-    case Instr::Branch: {
-        branch(instr);
-        break;
-    }
-    case Instr::BranchAndExchange: {
-        branch_and_exchange(instr);
-        break;
-    }
-    case Instr::DataProcessing: {
-        auto &i = instr.InstructionData<Arm::DataProcessing>();
-        if(i.is_imm) {
-            data_proc_immediate(instr);
-        } else {
-            if(i.ShiftedRegisterOperand.is_reg) {
-                data_proc_shifted_reg(instr);
+    std::cout << as_hex(word) << ": " << Arm::DisassembleArm(instr) << std::endl;
+
+    const auto instructionVisitor = overloads {
+        [this](Arm::Branch const &b) { branch(b); },
+        [this](Arm::BranchAndExchange const &bex) { branch_and_exchange(bex); },
+        [this](Arm::DataProcessing const &dp) {
+            if(dp.is_imm) {
+                data_proc_immediate(dp);
             } else {
-                data_proc_reg(instr);
+                if(dp.ShiftedRegisterOperand.is_reg) {
+                    data_proc_shifted_reg(dp);
+                } else {
+                    data_proc_reg(dp);
+                }
             }
-        }
-        break;
-    }
-    case Instr::PSRTransfer: {
-        psr_transfer(instr);
-        break;
-    }
-    case Instr::Multiply: {
-        //       multiply(instr);
-        break;
-    }
-    case Instr::MultiplyLong: {
-        //       multiply_long(instr);
-        break;
-    }
-    case Instr::SingleDataTransfer: {
-        if(instr.InstructionData<Arm::SingleDataTransfer>().is_imm) {
-            single_data_transfer_immediate(instr);
-        } else {
-            single_data_transfer_shifted_reg(instr);
-        }
-        break;
-    }
-    case Instr::HalfwordDataTransfer: {
-        if(instr.InstructionData<Arm::HalfwordDataTransfer>().is_imm) {
-            halfword_data_transfer_immediate(instr);
-        } else {
-            halfword_data_transfer_shifted_reg(instr);
-        }
-        break;
-    }
-    case Instr::BlockDataTransfer: {
-        block_data_transfer(instr);
-        break;
-    }
-    case Instr::Swap: {
-        swap(instr);
-        break;
-    }
-    case Instr::SoftwareInterrupt: {
-        std::cout << "Software Interrupt";
-        break;
-    }
-    case Instr::Undefined: {
-        std::cout << "Undefined Instruction";
-        break;
-    }
-    case Instr::CoprocessorDataOperation:
-    case Instr::CoprocessorDataTransfer:
-    case Instr::CoprocessorRegisterTransfer: {
-        std::cout << "Coprocessor Instructions Not Implemented";
-        break;
-    }
-    default: nowide::cout << "error";
-    }
+        },
+        [this](Arm::PSRTransfer const &psr) { psr_transfer(psr); },
+        [this](Arm::Multiply const &m) { /*multiply(m);*/ },
+        [this](Arm::MultiplyLong const &ml) { /*multiply_long(ml);*/ },
+        [this](Arm::SingleDataTransfer const &sdt) {
+            if(sdt.is_imm) {
+                single_data_transfer_immediate(sdt);
+            } else {
+                single_data_transfer_shifted_reg(sdt);
+            }
+        },
+        [this](Arm::HalfwordDataTransfer const &hdt) {
+            if(hdt.is_imm) {
+                halfword_data_transfer_immediate(hdt);
+            } else {
+                halfword_data_transfer_shifted_reg(hdt);
+            }
+        },
+        [this](Arm::BlockDataTransfer const &bdt) { block_data_transfer(bdt); },
+        [this](Arm::Swap const &s) { swap(s); },
+        [this](Arm::SoftwareInterrupt const &swi) { std::cout << "Software Interrupt"; },
+        [this](Arm::Undefined const &undef) { std::cout << "Undefined Instruction"; },
+        [this](Arm::CoprocessorDataOperation const &cdo) { std::cout << "Coprocessor Instructions Not Implemented"; },
+        [this](Arm::CoprocessorDataTransfer const &cdt) { std::cout << "Coprocessor Instructions Not Implemented"; },
+        [this](Arm::CoprocessorRegisterTransfer const &crt) {
+            std::cout << "Coprocessor Instructions Not Implemented";
+        }};
+
+    std::visit<void>(instructionVisitor, instr);
 }
 
 void throw_data_abort() { nowide::cerr << "data abort" << std::endl; }
@@ -249,14 +222,12 @@ void throw_data_abort() { nowide::cerr << "data abort" << std::endl; }
 // 1     1     Coprocessor register transfer (C-cycle)
 //               - not used
 
-void CPU::branch(Arm::Instruction instr) {
+void CPU::branch(Arm::Branch const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     //           1     pc+2L  i  0  pc+2L   N          0
     //           2     alu    i  0  alu     S          0
     //           3     alu+L  i  0  alu+L   S          0
     //                 alu+2L
-
-    auto &i = instr.InstructionData<Arm::Branch>();
 
     // cycle 1
     io->tick();
@@ -284,14 +255,12 @@ void CPU::branch(Arm::Instruction instr) {
 }
 
 // TODO: this function
-void CPU::branch_and_exchange(Arm::Instruction instr) {
+void CPU::branch_and_exchange(Arm::BranchAndExchange const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     //           1     pc+2W  I  0  pc+2W   N          0
     //           2     alu    i  0  alu     S          0
     //           3     alu+w  i  0  alu+W   S          0
     //                 alu+2w
-
-    auto &i = instr.InstructionData<Arm::BranchAndExchange>();
 
     // cycle 1
     io->tick();
@@ -319,7 +288,7 @@ void CPU::branch_and_exchange(Arm::Instruction instr) {
     }
 }
 
-void CPU::data_proc_reg(Arm::Instruction instr) {
+void CPU::data_proc_reg(Arm::DataProcessing const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     // normal    1     pc+2L  i  0  pc+2L   S          0
     //                 pc+3L
@@ -327,8 +296,6 @@ void CPU::data_proc_reg(Arm::Instruction instr) {
     //           2     alu    i  0  alu     S          0
     //           3     alu+L  i  0  alu+L   S          0
     //                 alu+2L
-
-    auto &i = instr.InstructionData<Arm::DataProcessing>();
 
     // cycle 1
     io->tick();
@@ -340,7 +307,7 @@ void CPU::data_proc_reg(Arm::Instruction instr) {
                 i.ShiftedRegisterOperand.shift_amount,
                 i.ShiftedRegisterOperand.rM,
                 &shift_carry_out);
-        exec_dp_op(instr, shift_operand, shift_carry_out);
+        exec_dp_op(i, shift_operand, shift_carry_out);
 
         if(i.rD == PC) {
             // cycle 2
@@ -354,7 +321,7 @@ void CPU::data_proc_reg(Arm::Instruction instr) {
     }
 }
 
-void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
+void CPU::data_proc_shifted_reg(Arm::DataProcessing const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     // shift(Rs) 1     pc+2L  i  0 pc+2L    I          0
     //           2     pc+3L  i  0 -        S          1
@@ -364,8 +331,6 @@ void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
     //           3     alu    2  0 alu      S          0
     //           4     alu+4  2  0 alu+4    S          0
     //                 alu+8
-
-    auto &i = instr.InstructionData<Arm::DataProcessing>();
 
     // cycle 1
     io->tick();
@@ -381,7 +346,7 @@ void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
                 REG(i.ShiftedRegisterOperand.rS),
                 i.ShiftedRegisterOperand.rM,
                 &shift_carry_out);
-        exec_dp_op(instr, shift_operand, shift_carry_out);
+        exec_dp_op(i, shift_operand, shift_carry_out);
 
         if(i.rD == PC) {
             // cycle 3
@@ -395,7 +360,7 @@ void CPU::data_proc_shifted_reg(Arm::Instruction instr) {
     }
 }
 
-void CPU::data_proc_immediate(Arm::Instruction instr) {
+void CPU::data_proc_immediate(Arm::DataProcessing const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     // normal    1     pc+2L  i  0  pc+2L   S          0
     //                 pc+3L
@@ -404,8 +369,6 @@ void CPU::data_proc_immediate(Arm::Instruction instr) {
     //           3     alu+L  i  0  alu+L   S          0
     //                 alu+2L
 
-    auto &i = instr.InstructionData<Arm::DataProcessing>();
-
     // cycle 1
     io->tick();
     prefetch32();
@@ -413,7 +376,7 @@ void CPU::data_proc_immediate(Arm::Instruction instr) {
         bool shift_carry_out;
         u32  shift_operand = Bit::ShiftWithCarry::rotate_right<u32>(
                 i.ImmediateOperand.immediate, 1 << i.ImmediateOperand.rotate, &shift_carry_out);
-        exec_dp_op(instr, shift_operand, shift_carry_out);
+        exec_dp_op(i, shift_operand, shift_carry_out);
 
         if(i.rD == PC) {
             // cycle 2
@@ -427,7 +390,7 @@ void CPU::data_proc_immediate(Arm::Instruction instr) {
     }
 }
 
-void CPU::psr_transfer(Arm::Instruction instr) {
+void CPU::psr_transfer(Arm::PSRTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode
     // normal    1     pc+2L  i  0  pc+2L   S          0
     //                 pc+3L
@@ -435,8 +398,6 @@ void CPU::psr_transfer(Arm::Instruction instr) {
     //           2     alu    i  0  alu     S          0
     //           3     alu+L  i  0  alu+L   S          0
     //                 alu+2L
-
-    auto &i = instr.InstructionData<Arm::PSRTransfer>();
 
     // cycle 1
     io->tick();
@@ -466,7 +427,7 @@ void CPU::psr_transfer(Arm::Instruction instr) {
     }
 }
 
-void CPU::single_data_transfer_shifted_reg(Arm::Instruction instr) {
+void CPU::single_data_transfer_shifted_reg(Arm::SingleDataTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
     // store
     //           1     pc+2L  i  0  pc+2L   N          0      c
@@ -484,8 +445,6 @@ void CPU::single_data_transfer_shifted_reg(Arm::Instruction instr) {
     //           4     pc’    2  0  pc’     S          0      c
     //           5     pc’+4  2  0  pc’+4   S          0      c
     //                 pc’+8
-
-    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
 
     // cycle 1
     io->tick();
@@ -503,7 +462,7 @@ void CPU::single_data_transfer_shifted_reg(Arm::Instruction instr) {
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_sdt_load_op(instr, shift_operand);
+            exec_sdt_load_op(i, shift_operand);
 
             if(i.rD == PC) {
                 // cycle 4
@@ -518,12 +477,12 @@ void CPU::single_data_transfer_shifted_reg(Arm::Instruction instr) {
             // cycle 2
             io->tick();
             prefetch32();
-            exec_sdt_store_op(instr, shift_operand);
+            exec_sdt_store_op(i, shift_operand);
         }
     }
 }
 
-void CPU::single_data_transfer_immediate(Arm::Instruction instr) {
+void CPU::single_data_transfer_immediate(Arm::SingleDataTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
     // store
     //           1     pc+2L  i  0  pc+2L   N          0      c
@@ -542,8 +501,6 @@ void CPU::single_data_transfer_immediate(Arm::Instruction instr) {
     //           5     pc’+4  2  0  pc’+4   S          0      c
     //                 pc’+8
 
-    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
-
     // cycle 1
     io->tick();
     prefetch32();
@@ -554,7 +511,7 @@ void CPU::single_data_transfer_immediate(Arm::Instruction instr) {
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_sdt_load_op(instr, i.ImmediateOperand.offset);
+            exec_sdt_load_op(i, i.ImmediateOperand.offset);
 
             if(i.rD == PC) {
                 // cycle 4
@@ -569,12 +526,12 @@ void CPU::single_data_transfer_immediate(Arm::Instruction instr) {
             // cycle 2
             io->tick();
             prefetch32();
-            exec_sdt_store_op(instr, i.ImmediateOperand.offset);
+            exec_sdt_store_op(i, i.ImmediateOperand.offset);
         }
     }
 }
 
-void CPU::halfword_data_transfer_shifted_reg(Arm::Instruction instr) {
+void CPU::halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
     // store
     //           1     pc+2L  i  0  pc+2L   N          0      c
@@ -593,7 +550,6 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::Instruction instr) {
     //           5     pc’+4  2  0  pc’+4   S          0      c
     //                 pc’+8
 
-    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
     // cycle 1
     io->tick();
     prefetch32();
@@ -604,7 +560,7 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::Instruction instr) {
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_hwsd_load_op(instr, REG(i.rM));
+            exec_hwsd_load_op(i, REG(i.rM));
 
             if(i.rD == PC) {
                 // cycle 4
@@ -619,12 +575,12 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::Instruction instr) {
             // cycle 2
             io->tick();
             prefetch32();
-            exec_hwsd_store_op(instr, REG(i.rM));
+            exec_hwsd_store_op(i, REG(i.rM));
         }
     }
 }
 
-void CPU::halfword_data_transfer_immediate(Arm::Instruction instr) {
+void CPU::halfword_data_transfer_immediate(Arm::HalfwordDataTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
     // store
     //           1     pc+2L  i  0  pc+2L   N          0      c
@@ -643,8 +599,6 @@ void CPU::halfword_data_transfer_immediate(Arm::Instruction instr) {
     //           5     pc’+4  2  0  pc’+4   S          0      c
     //                 pc’+8
 
-    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
-
     // cycle 1
     io->tick();
     prefetch32();
@@ -655,7 +609,7 @@ void CPU::halfword_data_transfer_immediate(Arm::Instruction instr) {
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_hwsd_load_op(instr, i.ImmediateOperand.offset);
+            exec_hwsd_load_op(i, i.ImmediateOperand.offset);
 
             if(i.rD == PC) {
                 // cycle 4
@@ -670,15 +624,13 @@ void CPU::halfword_data_transfer_immediate(Arm::Instruction instr) {
             // cycle 2
             io->tick();
             prefetch32();
-            exec_hwsd_store_op(instr, REG(i.rM));
+            exec_hwsd_store_op(i, REG(i.rM));
         }
     }
 }
 
-void CPU::block_data_transfer(Arm::Instruction instr) {
+void CPU::block_data_transfer(Arm::BlockDataTransfer const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
-
-    auto &i = instr.InstructionData<Arm::BlockDataTransfer>();
 
     // cycle 1
     io->tick();
@@ -691,7 +643,7 @@ void CPU::block_data_transfer(Arm::Instruction instr) {
 
             bool shift_carry_out;
             // cycle 3-N
-            exec_bdt_load_op(instr);
+            exec_bdt_load_op(i);
 
             if(Bit::test(i.registers, PC)) {
                 // cycle N + 1
@@ -705,20 +657,18 @@ void CPU::block_data_transfer(Arm::Instruction instr) {
         } else {
             // cycle 2 - N
             io->tick();
-            exec_bdt_store_op(instr);
+            exec_bdt_store_op(i);
         }
     }
 }
 
-void CPU::swap(Arm::Instruction instr) {
+void CPU::swap(Arm::Swap const &i) {
     //           cycle|addr  |sz|rw|data   |cycle type|opcode|transfer
     // normal    1     pc+8   i  0  pc+2L   N          0      c
     //           2     Rn     s  0  alu     I          1      d
     //           3     Rn     i  0  -       S          1      c
     //           4     pc+12
     //                 pc+12
-
-    auto &i = instr.InstructionData<Arm::Swap>();
 
     // cycle 1
     io->tick();
@@ -752,10 +702,8 @@ inline u32 CPU::calc_shift_operand(Arm::ShiftType shift_type, u8 amount, u8 reg_
     }
 }
 
-inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shift_carry_out) {
+inline void CPU::exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, bool shift_carry_out) {
     using OpCode = Arm::DataProcessing::OperationCode;
-
-    auto &i      = instr.InstructionData<Arm::DataProcessing>();
 
     switch(i.operation_code) {
     case OpCode::AND: {
@@ -932,14 +880,12 @@ inline void CPU::exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shif
     }
 }
 
-inline void CPU::exec_sdt_load_op(Arm::Instruction instr, u32 offset) {
+inline void CPU::exec_sdt_load_op(Arm::SingleDataTransfer const &i, u32 offset) {
 #define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
 #define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
-    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
-
-    u32   index;
+    u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
         if(!i.is_byte && (index % 4) != 0) {
@@ -969,14 +915,12 @@ inline void CPU::exec_sdt_load_op(Arm::Instruction instr, u32 offset) {
 #undef calc_sub_idx
 }
 
-inline void CPU::exec_sdt_store_op(Arm::Instruction instr, u32 offset) {
+inline void CPU::exec_sdt_store_op(Arm::SingleDataTransfer const &i, u32 offset) {
 #define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
 #define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
-    auto &i = instr.InstructionData<Arm::SingleDataTransfer>();
-
-    u32   index;
+    u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
         if(!i.is_byte && (index % 4) != 0) {
@@ -1015,14 +959,12 @@ inline u32 compute_hwsd_result(u32 data, bool halfwords, bool signed_data) {
     }
 }
 
-inline void CPU::exec_hwsd_load_op(Arm::Instruction instr, u32 offset) {
+inline void CPU::exec_hwsd_load_op(Arm::HalfwordDataTransfer const &i, u32 offset) {
 #define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
 #define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
-    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
-
-    u32   index;
+    u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
         if(!i.halfwords && (index % 2) != 0) {
@@ -1053,14 +995,12 @@ inline void CPU::exec_hwsd_load_op(Arm::Instruction instr, u32 offset) {
 #undef calc_sub_idx
 }
 
-inline void CPU::exec_hwsd_store_op(Arm::Instruction instr, u32 offset) {
+inline void CPU::exec_hwsd_store_op(Arm::HalfwordDataTransfer const &i, u32 offset) {
 #define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
 #define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
-    auto &i = instr.InstructionData<Arm::HalfwordDataTransfer>();
-
-    u32   index;
+    u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
         if(!i.halfwords && (index % 2) != 0) {
@@ -1091,17 +1031,11 @@ inline void CPU::exec_hwsd_store_op(Arm::Instruction instr, u32 offset) {
 #undef calc_sub_idx
 }
 
-inline void CPU::exec_bdt_store_op(Arm::Instruction instr) {
-    // offset is number of registers we're gonna write
-    // write always increments index
-    // post-decrement actually means pre-increment from negative index???
+inline void CPU::exec_bdt_store_op(Arm::BlockDataTransfer const &i) {
+    u8  reg_count = std::popcount(i.registers);
 
-    auto &i         = instr.InstructionData<Arm::BlockDataTransfer>();
-
-    u8    reg_count = std::popcount(i.registers);
-
-    u32   start_index;
-    u32   index;
+    u32 start_index;
+    u32 index;
 
     if(i.is_inc) {
         index       = REG(i.rN) + (reg_count << 2);
@@ -1142,13 +1076,11 @@ inline void CPU::exec_bdt_store_op(Arm::Instruction instr) {
     }
 }
 
-inline void CPU::exec_bdt_load_op(Arm::Instruction instr) {
-    auto &i         = instr.InstructionData<Arm::BlockDataTransfer>();
+inline void CPU::exec_bdt_load_op(Arm::BlockDataTransfer const &i) {
+    u8  reg_count = std::popcount(i.registers);
 
-    u8    reg_count = std::popcount(i.registers);
-
-    u32   start_index;
-    u32   index;
+    u32 start_index;
+    u32 index;
 
     if(i.is_inc) {
         index       = REG(i.rN) + (reg_count << 2);

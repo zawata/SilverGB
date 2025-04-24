@@ -158,69 +158,30 @@ namespace Arm {
         return shift_strings[(u8)shiftType];
     }
 
-    enum struct InstructionType {
-        Undefined,
-        Branch,
-        BranchAndExchange,
-        DataProcessing,
-        PSRTransfer,
-        Multiply,
-        MultiplyLong,
-        SingleDataTransfer,
-        HalfwordDataTransfer,
-        BlockDataTransfer,
-        Swap,
-        SoftwareInterrupt,
-        CoprocessorDataOperation,
-        CoprocessorDataTransfer,
-        CoprocessorRegisterTransfer,
-    };
-
-    struct Instruction;
-
-    class InstructionDataBase {
-    public:
-        virtual ~InstructionDataBase() = default;
-
-    private:
-        friend struct Instruction;
-
-        virtual enum Mnemonic Mnemonic() const    = 0;
-
-        virtual u32           Encode() const      = 0;
-
-        virtual std::string   Disassemble() const = 0;
-    };
-
     /**
      * Branch And Exchange
      * BX
      */
-    struct BranchAndExchange : private InstructionDataBase {
-        Condition condition;
-        reg_t     rN;
+    struct BranchAndExchange {
+        Condition                condition;
+        reg_t                    rN;
 
-    private:
-        friend struct Instruction;
-
-        explicit BranchAndExchange(u32 word) {
-            condition = (Condition)Bit::range<u32>(Mask::condition, word);
-            rN        = (u8)Bit::range(Mask::bex_reg_N, word);
+        static BranchAndExchange Decode(u32 word) {
+            BranchAndExchange bex {};
+            bex.condition = (Condition)Bit::range<u32>(Mask::condition, word);
+            bex.rN        = (u8)Bit::range(Mask::bex_reg_N, word);
+            return bex;
         }
 
-        explicit BranchAndExchange(const std::string_view &s) {
+        static BranchAndExchange Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic                         Mnemonic() const override { return Mnemonic::BX; }
+        enum Mnemonic Mnemonic() const { return Mnemonic::BX; }
 
-        static constexpr enum InstructionType Type() { return InstructionType::BranchAndExchange; }
+        u32 Encode() const { return 0_u32 | (u8)condition << 28 | Literal::BEX_CONSTANT << 4 | (rN & Mask::bex_reg_N); }
 
-        u32                                   Encode() const override {
-            return 0_u32 | (u8)condition << 28 | Literal::BEX_CONSTANT << 4 | (rN & Mask::bex_reg_N);
-        }
-
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
 
             ss << to_string(Mnemonic()) << to_string(condition) << " " << rN;
@@ -232,37 +193,37 @@ namespace Arm {
      * Branch
      * B, BL
      */
-    struct Branch : private InstructionDataBase {
-        Condition condition;
-        bool      link;
-        s32       offset;
+    struct Branch {
+        Condition     condition;
+        bool          link;
+        s32           offset;
 
-    private:
-        friend struct Instruction;
-
-        explicit Branch(u32 word) {
-            condition      = (Condition)Bit::range(Mask::condition, word);
-            link           = (bool)Bit::range(Mask::br_is_link, word);
+        static Branch Decode(u32 word) {
+            Branch b {};
+            b.condition    = (Condition)Bit::range(Mask::condition, word);
+            b.link         = (bool)Bit::range(Mask::br_is_link, word);
 
             u32 raw_offset = Bit::mask(Mask::br_offset, word);
 
             // The branch offset is left shifted by 2 then sign-extended.
             // The offset is 0-23bits + 2 for the shift, making the sign bit 25
-            offset         = Bit::sign_extend(raw_offset << 2, 25);
+            b.offset       = Bit::sign_extend(raw_offset << 2, 25);
+
+            return b;
         }
 
-        explicit Branch(const std::string_view &s) {
+        static Branch Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return link ? Mnemonic::BL : Mnemonic::B; }
+        enum Mnemonic Mnemonic() const { return link ? Mnemonic::BL : Mnemonic::B; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | 0b101 << 25 | (link ? 1 : 0) << 24
                  | Bit::sign_compress<u32>(offset & Mask::br_offset, 25) >> 2;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
 
             ss << to_string(Mnemonic()) << to_string(condition) << " ";
@@ -272,14 +233,12 @@ namespace Arm {
             ss << (offset + 8);
             return ss.str();
         };
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::Branch; }
     };
 
     /**
      * Data Processing
      */
-    struct DataProcessing : private InstructionDataBase {
+    struct DataProcessing {
         Condition condition;
 
         struct BitMask {
@@ -341,60 +300,61 @@ namespace Arm {
             } ImmediateOperand;
         };
 
-    private:
-        friend struct Instruction;
-        // Decode
-        explicit DataProcessing(u32 word) {
-            condition      = (Condition)Bit::range(Mask::condition, word);
-            operation_code = (OperationCode)Bit::range(BitMask::OpCode, word);
-            is_imm         = Bit::range(BitMask::isImmediate, word);
-            set_flags      = Bit::range(BitMask::isSetFlags, word);
-            rN             = Bit::range(BitMask::Reg_N, word);
-            rD             = Bit::range(BitMask::Reg_D, word);
+        static DataProcessing Decode(u32 word) {
+            DataProcessing dp {};
+            dp.condition      = (Condition)Bit::range(Mask::condition, word);
+            dp.operation_code = (OperationCode)Bit::range(BitMask::OpCode, word);
+            dp.is_imm         = Bit::range(BitMask::isImmediate, word);
+            dp.set_flags      = Bit::range(BitMask::isSetFlags, word);
+            dp.rN             = Bit::range(BitMask::Reg_N, word);
+            dp.rD             = Bit::range(BitMask::Reg_D, word);
 
-            if(is_imm) {
-                ImmediateOperand.rotate    = Bit::range(BitMask::ImmediateRotation, word);
-                ImmediateOperand.immediate = Bit::range(BitMask::ImmediateValue, word);
+            if(dp.is_imm) {
+                dp.ImmediateOperand.rotate    = Bit::range(BitMask::ImmediateRotation, word);
+                dp.ImmediateOperand.immediate = Bit::range(BitMask::ImmediateValue, word);
             } else {
-                ShiftedRegisterOperand.is_reg     = Bit::range(BitMask::RegisterShiftValue, word);
-                ShiftedRegisterOperand.shift_type = (ShiftType)Bit::range(BitMask::RegisterShiftType, word);
-                if(ShiftedRegisterOperand.is_reg) {
-                    ShiftedRegisterOperand.rS = Bit::range(BitMask::Reg_S, word);
+                dp.ShiftedRegisterOperand.is_reg     = Bit::range(BitMask::RegisterShiftValue, word);
+                dp.ShiftedRegisterOperand.shift_type = (ShiftType)Bit::range(BitMask::RegisterShiftType, word);
+                if(dp.ShiftedRegisterOperand.is_reg) {
+                    dp.ShiftedRegisterOperand.rS = Bit::range(BitMask::Reg_S, word);
                 } else {
-                    ShiftedRegisterOperand.shift_amount = Bit::range(BitMask::RegisterShiftImmediate, word);
+                    dp.ShiftedRegisterOperand.shift_amount = Bit::range(BitMask::RegisterShiftImmediate, word);
                 }
-                ShiftedRegisterOperand.rM = Bit::range(BitMask::Reg_M, word);
+                dp.ShiftedRegisterOperand.rM = Bit::range(BitMask::Reg_M, word);
             }
+
+            return dp;
         }
 
         // Assemble
-        explicit DataProcessing(const std::string_view &s) {
+        static DataProcessing Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override {
-            using I                                = enum Mnemonic;
-            static const enum Mnemonic instr_tbl[] = {I::AND,
-                    I::EOR,
-                    I::SUB,
-                    I::RSB,
-                    I::ADD,
-                    I::ADC,
-                    I::SBC,
-                    I::RSC,
-                    I::TST,
-                    I::TEQ,
-                    I::CMP,
-                    I::CMN,
-                    I::ORR,
-                    I::MOV,
-                    I::BIC,
-                    I::MVN};
+        enum Mnemonic Mnemonic() const {
+            using I = enum Mnemonic;
+            static const enum Mnemonic instr_tbl[]
+                    = {I::AND,
+                       I::EOR,
+                       I::SUB,
+                       I::RSB,
+                       I::ADD,
+                       I::ADC,
+                       I::SBC,
+                       I::RSC,
+                       I::TST,
+                       I::TEQ,
+                       I::CMP,
+                       I::CMN,
+                       I::ORR,
+                       I::MOV,
+                       I::BIC,
+                       I::MVN};
 
             return instr_tbl[(int)operation_code];
         }
 
-        u32 Encode() const override {
+        u32 Encode() const {
             u16 op2 = 0;
             if(is_imm) {
                 op2 = ImmediateOperand.rotate << 8 | ImmediateOperand.immediate;
@@ -411,7 +371,7 @@ namespace Arm {
                  | Bit::from_bool(set_flags) << 20 | (u8)rN << 16 | (u8)rN << 12 | op2;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
 
             bool opcode_produces_result = operation_code != OperationCode::CMP && operation_code != OperationCode::CMN
@@ -432,6 +392,7 @@ namespace Arm {
             }
 
             if(is_imm) {
+                // TODO: I think this is wrong
                 u16 op2 = ImmediateOperand.rotate << 8 | ImmediateOperand.immediate;
                 ss << "#" << as_hex(op2);
             } else {
@@ -446,14 +407,12 @@ namespace Arm {
 
             return ss.str();
         };
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::DataProcessing; }
     };
 
     /**
      * PSR Transfer
      */
-    struct PSRTransfer : private InstructionDataBase {
+    struct PSRTransfer {
         Condition condition;
         bool      use_spsr;
 
@@ -488,38 +447,38 @@ namespace Arm {
             } RegisterToPSRF;
         };
 
-    private:
-        friend struct Instruction;
-
-        explicit PSRTransfer(u32 word) {
-            condition    = (Condition)Bit::range(Mask::condition, word);
-            use_spsr     = Bit::test(word, 22);
-            u32 psr_type = Bit::range(Bit::Mask::between_inc<u32>(16, 21), word);
+        static PSRTransfer Decode(u32 word) {
+            PSRTransfer psr {};
+            psr.condition = (Condition)Bit::range(Mask::condition, word);
+            psr.use_spsr  = Bit::test(word, 22);
+            u32 psr_type  = Bit::range(Bit::Mask::between_inc<u32>(16, 21), word);
             if(psr_type == Literal::MRS_CONSTANT) {
-                type             = Type::PSRToRegister;
-                PSRToRegister.rD = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+                psr.type             = Type::PSRToRegister;
+                psr.PSRToRegister.rD = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
             } else if(psr_type == Literal::MSR_CONSTANT) {
-                type             = Type::RegisterToPSR;
-                PSRToRegister.rD = Bit::mask(Bit::Mask::until<u32>(3), word);
+                psr.type             = Type::RegisterToPSR;
+                psr.PSRToRegister.rD = Bit::mask(Bit::Mask::until<u32>(3), word);
             } else if(psr_type == Literal::MSRF_CONSTANT) {
-                type                  = Type::RegisterToPSRF;
-                RegisterToPSRF.is_imm = Bit::test(word, 25);
-                if(RegisterToPSRF.is_imm) {
-                    RegisterToPSRF.ImmediateOperand.rotation = Bit::range(Bit::Mask::between_inc<u32>(8, 11), word);
-                    RegisterToPSRF.ImmediateOperand.value    = Bit::mask(Bit::Mask::until_inc<u32>(7), word);
+                psr.type                  = Type::RegisterToPSRF;
+                psr.RegisterToPSRF.is_imm = Bit::test(word, 25);
+                if(psr.RegisterToPSRF.is_imm) {
+                    psr.RegisterToPSRF.ImmediateOperand.rotation = Bit::range(Bit::Mask::between_inc<u32>(8, 11), word);
+                    psr.RegisterToPSRF.ImmediateOperand.value    = Bit::mask(Bit::Mask::until_inc<u32>(7), word);
                 } else {
-                    RegisterToPSRF.RegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+                    psr.RegisterToPSRF.RegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
                 }
             }
+
+            return psr;
         }
 
-        explicit PSRTransfer(const std::string_view &s) {
+        static PSRTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return type == Type::PSRToRegister ? Mnemonic::MRS : Mnemonic::MSR; }
+        enum Mnemonic Mnemonic() const { return type == Type::PSRToRegister ? Mnemonic::MRS : Mnemonic::MSR; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             bool       imm_bit = type == Type::RegisterToPSRF && RegisterToPSRF.is_imm;
             static u32 type_const_tbl[] = {Literal::MRS_CONSTANT, Literal::MSR_CONSTANT, Literal::MSRF_CONSTANT};
 
@@ -541,7 +500,7 @@ namespace Arm {
                  | Bit::from_bool(use_spsr) << 22 | type_const_tbl[(int)type] << 16 | lower_half;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             ss << to_string(Mnemonic()) << to_string(condition) << " ";
 
@@ -565,45 +524,42 @@ namespace Arm {
 
             return ss.str();
         };
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::PSRTransfer; }
     };
 
     /**
      * Multiply and Multiply and Accumulate
      */
-    struct Multiply : private InstructionDataBase {
-        Condition condition;
-        bool      accumulate;
-        bool      set_flags;
-        reg_t     rD {}, rN {}, rS {}, rM {};
+    struct Multiply {
+        Condition       condition;
+        bool            accumulate;
+        bool            set_flags;
+        reg_t           rD {}, rN {}, rS {}, rM {};
 
-    private:
-        friend struct Instruction;
+        static Multiply Decode(u32 word) {
+            Multiply mul {};
+            mul.condition  = (Condition)Bit::range(Mask::condition, word);
+            mul.accumulate = Bit::range(Mask::mul_accum, word);
 
-        explicit Multiply(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            accumulate = Bit::range(Mask::mul_accum, word);
-
-            set_flags  = Bit::range(Mask::mul_accum, word);
-            rD         = Bit::range(Mask::mul_reg_D, word);
-            rN         = Bit::range(Mask::mul_reg_N, word);
-            rS         = Bit::range(Mask::mul_reg_S, word);
-            rM         = Bit::range(Mask::mul_reg_M, word);
+            mul.set_flags  = Bit::range(Mask::mul_accum, word);
+            mul.rD         = Bit::range(Mask::mul_reg_D, word);
+            mul.rN         = Bit::range(Mask::mul_reg_N, word);
+            mul.rS         = Bit::range(Mask::mul_reg_S, word);
+            mul.rM         = Bit::range(Mask::mul_reg_M, word);
+            return mul;
         }
 
-        explicit Multiply(const std::string_view &s) {
+        static Multiply Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return accumulate ? Mnemonic::MLA : Mnemonic::MUL; }
+        enum Mnemonic Mnemonic() const { return accumulate ? Mnemonic::MLA : Mnemonic::MUL; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | Bit::from_bool(accumulate) << 21 | Bit::from_bool(set_flags) << 20
                  | (u8)rD << 16 | (u8)rN << 12 | (u8)rS << 8 | (u8)Literal::MUL_CONSTANT << 4 | (u8)rD;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
 
             ss << to_string(Mnemonic()) << to_string(condition) << (set_flags ? "S" : "") << " ";
@@ -613,61 +569,56 @@ namespace Arm {
             }
             return ss.str();
         };
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::Multiply; }
     };
 
     /**
      * Multiply Long and Multiply Long and Accumulate
      */
-    struct MultiplyLong : private InstructionDataBase {
-        Condition condition;
-        bool      _signed;
-        bool      accumulate;
-        bool      set_flags;
-        reg_t     rDHi, rDLo, rS, rM;
+    struct MultiplyLong {
+        Condition           condition;
+        bool                _signed;
+        bool                accumulate;
+        bool                set_flags;
+        reg_t               rDHi, rDLo, rS, rM;
 
-    private:
-        friend struct Instruction;
-
-        explicit MultiplyLong(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            _signed    = Bit::test(word, 22);
-            accumulate = Bit::test(word, 21);
-            set_flags  = Bit::test(word, 20);
-            rDHi       = Bit::range(Mask::mul_reg_D, word);
-            rDLo       = Bit::range(Mask::mul_reg_N, word);
-            rS         = Bit::range(Mask::mul_reg_S, word);
-            rM         = Bit::range(Mask::mul_reg_M, word);
+        static MultiplyLong Decode(u32 word) {
+            MultiplyLong mul {};
+            mul.condition  = (Condition)Bit::range(Mask::condition, word);
+            mul._signed    = Bit::test(word, 22);
+            mul.accumulate = Bit::test(word, 21);
+            mul.set_flags  = Bit::test(word, 20);
+            mul.rDHi       = Bit::range(Mask::mul_reg_D, word);
+            mul.rDLo       = Bit::range(Mask::mul_reg_N, word);
+            mul.rS         = Bit::range(Mask::mul_reg_S, word);
+            mul.rM         = Bit::range(Mask::mul_reg_M, word);
+            return mul;
         }
 
-        explicit MultiplyLong(const std::string_view &s) {
+        static MultiplyLong Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return accumulate ? Mnemonic::MLAL : Mnemonic::MULL; }
+        enum Mnemonic Mnemonic() const { return accumulate ? Mnemonic::MLAL : Mnemonic::MULL; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | 1 << 23 | Bit::from_bool(_signed) << 22
                  | Bit::from_bool(accumulate) << 21 | Bit::from_bool(set_flags) << 20 | (u8)rDHi << 16 | (u8)rDLo << 12
                  | (u8)rS << 8 | (u8)Literal::MUL_CONSTANT << 4 | (u8)rM;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             ss << (_signed ? "U" : "S");
             ss << to_string(Mnemonic()) << to_string(condition) << (set_flags ? "S" : "") << " ";
             ss << rDLo.to_string() << ", " << rDHi.to_string() << ", " << rM.to_string() << ", " << rS.to_string();
             return ss.str();
         };
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::MultiplyLong; }
     };
 
     /**
      * Single Data Transfer
      */
-    struct SingleDataTransfer : private InstructionDataBase {
+    struct SingleDataTransfer {
         Condition condition;
         bool      is_imm;
         bool      is_pre_idx;
@@ -689,39 +640,38 @@ namespace Arm {
             } ImmediateOperand {};
         };
 
-    private:
-        friend struct Instruction;
-
-        explicit SingleDataTransfer(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            is_imm     = !Bit::test(word, 25);
-            is_pre_idx = Bit::test(word, 24);
-            is_inc     = Bit::test(word, 23);
-            is_byte    = Bit::test(word, 22);
-            write_back = Bit::test(word, 21);
-            load       = Bit::test(word, 20);
-            rN         = Bit::range(Bit::Mask::between_inc<u32>(16, 19), word);
-            rD         = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
-            if(is_imm) {
-                ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
+        static SingleDataTransfer Decode(u32 word) {
+            SingleDataTransfer sdt {};
+            sdt.condition  = (Condition)Bit::range(Mask::condition, word);
+            sdt.is_imm     = !Bit::test(word, 25);
+            sdt.is_pre_idx = Bit::test(word, 24);
+            sdt.is_inc     = Bit::test(word, 23);
+            sdt.is_byte    = Bit::test(word, 22);
+            sdt.write_back = Bit::test(word, 21);
+            sdt.load       = Bit::test(word, 20);
+            sdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(16, 19), word);
+            sdt.rD         = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+            if(sdt.is_imm) {
+                sdt.ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
             } else {
-                ShiftedRegisterOperand.shift_amount = Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
-                ShiftedRegisterOperand.rM           = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+                sdt.ShiftedRegisterOperand.shift_amount = Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
+                sdt.ShiftedRegisterOperand.rM           = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
             }
+            return sdt;
         }
 
-        explicit SingleDataTransfer(const std::string_view &s) {
+        static SingleDataTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return load ? Mnemonic::LDR : Mnemonic::STR; }
+        enum Mnemonic Mnemonic() const { return load ? Mnemonic::LDR : Mnemonic::STR; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             // TODO
             return 0;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             ss << to_string(Mnemonic()) << to_string(condition) << (is_byte ? "B" : "")
                << (!is_pre_idx && write_back ? "T" : "") << " ";
@@ -749,14 +699,13 @@ namespace Arm {
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::SingleDataTransfer; }
     };
 
     /**
      * Halfword and Signed Data Transfer
      */
-    struct HalfwordDataTransfer : private InstructionDataBase {
+    struct HalfwordDataTransfer {
+
         Condition condition;
         bool      is_pre_idx;
         bool      is_inc;
@@ -777,45 +726,44 @@ namespace Arm {
             } ImmediateOperand {};
         };
 
-        reg_t rM;
+        reg_t                       rM;
 
-    private:
-        friend struct Instruction;
-
-        explicit HalfwordDataTransfer(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            is_pre_idx = Bit::test(word, 24);
-            is_inc     = Bit::test(word, 23);
-            is_imm     = Bit::test(word, 22);
-            write_back = Bit::test(word, 21);
-            load       = Bit::test(word, 20);
-            rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
-            rD         = Bit::range(Bit::Mask::between_inc<u32>(15, 12), word);
+        static HalfwordDataTransfer Decode(u32 word) {
+            HalfwordDataTransfer hdt {};
+            hdt.condition  = (Condition)Bit::range(Mask::condition, word);
+            hdt.is_pre_idx = Bit::test(word, 24);
+            hdt.is_inc     = Bit::test(word, 23);
+            hdt.is_imm     = Bit::test(word, 22);
+            hdt.write_back = Bit::test(word, 21);
+            hdt.load       = Bit::test(word, 20);
+            hdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
+            hdt.rD         = Bit::range(Bit::Mask::between_inc<u32>(15, 12), word);
             assert(Bit::range(Bit::Mask::between_inc<u32>(5, 6), word) != 0);
-            signed_data = Bit::test(word, 6);
-            halfwords   = Bit::test(word, 5);
-            if(is_imm) {
-                ImmediateOperand.offset = (Bit::range(Bit::Mask::between_inc<u32>(11, 8), word) << 4)
-                                        | Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+            hdt.signed_data = Bit::test(word, 6);
+            hdt.halfwords   = Bit::test(word, 5);
+            if(hdt.is_imm) {
+                hdt.ImmediateOperand.offset = (Bit::range(Bit::Mask::between_inc<u32>(11, 8), word) << 4)
+                                            | Bit::mask(Bit::Mask::until_inc<u32>(3), word);
             } else {
-                rM = Bit::range(Bit::Mask::until_inc<u32>(3), word);
+                hdt.rM = Bit::range(Bit::Mask::until_inc<u32>(3), word);
             }
+            return hdt;
         }
 
-        explicit HalfwordDataTransfer(const std::string_view &s) {
+        static HalfwordDataTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return load ? Mnemonic::LDR : Mnemonic::STR; }
+        enum Mnemonic Mnemonic() const { return load ? Mnemonic::LDR : Mnemonic::STR; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | Bit::from_bool(is_pre_idx) << 24 | Bit::from_bool(is_inc) << 23
                  | Bit::from_bool(write_back) << 21 | Bit::from_bool(load) << 20 | (u8)rN << 16 | (u8)rD << 12
                  | Bit::Mask::bit<u32>(7) | Bit::from_bool(signed_data) | Bit::from_bool(halfwords)
                  | Bit::Mask::bit<u32>(4) | (u8)rM;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             ss << to_string(Mnemonic()) << to_string(condition) << (signed_data ? "S" : "") << (halfwords ? "H" : "B")
                << " ";
@@ -841,91 +789,84 @@ namespace Arm {
             }
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::HalfwordDataTransfer; }
     };
 
     /**
      * Block Data Transfer
      */
-    struct BlockDataTransfer : private InstructionDataBase {
-        Condition condition;
-        bool      is_pre_idx;
-        bool      is_inc;
-        bool      load_psr;
-        bool      write_back;
-        bool      load;
-        reg_t     rN;
-        u16       registers;
+    struct BlockDataTransfer {
+        Condition                condition;
+        bool                     is_pre_idx;
+        bool                     is_inc;
+        bool                     load_psr;
+        bool                     write_back;
+        bool                     load;
+        reg_t                    rN;
+        u16                      registers;
 
-    private:
-        friend struct Instruction;
-
-        explicit BlockDataTransfer(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            is_pre_idx = Bit::test(word, 24);
-            is_inc     = Bit::test(word, 23);
-            load_psr   = Bit::test(word, 22);
-            write_back = Bit::test(word, 21);
-            load       = Bit::test(word, 20);
-            rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
-            registers  = Bit::mask(Bit::Mask::until_inc<u32>(15), word);
+        static BlockDataTransfer Decode(u32 word) {
+            BlockDataTransfer bdt {};
+            bdt.condition  = (Condition)Bit::range(Mask::condition, word);
+            bdt.is_pre_idx = Bit::test(word, 24);
+            bdt.is_inc     = Bit::test(word, 23);
+            bdt.load_psr   = Bit::test(word, 22);
+            bdt.write_back = Bit::test(word, 21);
+            bdt.load       = Bit::test(word, 20);
+            bdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
+            bdt.registers  = Bit::mask(Bit::Mask::until_inc<u32>(15), word);
         }
 
-        explicit BlockDataTransfer(const std::string_view &s) {
+        static BlockDataTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return load ? Mnemonic::LDM : Mnemonic::STM; }
+        enum Mnemonic Mnemonic() const { return load ? Mnemonic::LDM : Mnemonic::STM; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | Bit::Mask::bit<u32>(27) | Bit::from_bool(is_pre_idx) << 24
                  | Bit::from_bool(is_inc) << 23 | Bit::from_bool(load_psr) | Bit::from_bool(write_back) << 21
                  | Bit::from_bool(load) << 20 | (u8)rN << 16 | registers;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             // TODO
             ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::BlockDataTransfer; }
     };
 
     /**
      * Swap
      */
-    struct Swap : private InstructionDataBase {
-        Condition condition;
-        bool      byte;
-        reg_t     rN, rD, rM;
+    struct Swap {
+        Condition   condition;
+        bool        byte;
+        reg_t       rN, rD, rM;
 
-    private:
-        friend struct Instruction;
-
-        explicit Swap(u32 word) {
-            condition = (Condition)Bit::range(Mask::condition, word);
-            byte      = Bit::test(word, 22);
-            rN        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
-            rD        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
-            rM        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
+        static Swap Decode(u32 word) {
+            Swap swp {};
+            swp.condition = (Condition)Bit::range(Mask::condition, word);
+            swp.byte      = Bit::test(word, 22);
+            swp.rN        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
+            swp.rD        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
+            swp.rM        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
+            return swp;
         }
 
-        explicit Swap(const std::string_view &s) {
+        static Swap Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return Mnemonic::SWP; }
+        enum Mnemonic Mnemonic() const { return Mnemonic::SWP; }
 
-        u32           Encode() const override {
+        u32           Encode() const {
             return 0_u32 | (u8)condition << 28 | 1 << 24 | (byte ? 1 : 0) << 22 | rN << 16 | rD << 12 | 0b1001 << 4
                  | rM;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
 
             ss << to_string(Mnemonic()) << to_string(condition) << (byte ? "B" : "") << " ";
@@ -933,341 +874,189 @@ namespace Arm {
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::Swap; }
     };
 
     /**
      * Software Interrupt
      */
-    struct SoftwareInterrupt : private InstructionDataBase {
-        Condition condition;
-        u32       comment;
+    struct SoftwareInterrupt {
+        Condition                condition;
+        u32                      value;
 
-    private:
-        friend struct Instruction;
-
-        explicit SoftwareInterrupt(u32 word) {
-            condition = (Condition)Bit::range(Mask::condition, word);
-            comment   = Bit::range(Mask::swi_comment, word);
+        static SoftwareInterrupt Decode(u32 word) {
+            SoftwareInterrupt swi {};
+            swi.condition = (Condition)Bit::range(Mask::condition, word);
+            swi.value     = Bit::range(Mask::swi_comment, word);
+            return swi;
         }
 
-        explicit SoftwareInterrupt(const std::string_view &s) {
+        static SoftwareInterrupt Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return Mnemonic::SWI; }
+        enum Mnemonic Mnemonic() const { return Mnemonic::SWI; }
 
-        u32 Encode() const override { return 0_u32 | (u8)condition << 28 | 0xF << 24 | comment & Mask::swi_comment; }
+        u32           Encode() const { return 0_u32 | (u8)condition << 28 | 0xF << 24 | value & Mask::swi_comment; }
 
-        std::string Disassemble() const override {
+        std::string   Disassemble() const {
             std::stringstream ss;
             // TODO
             ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::SoftwareInterrupt; }
     };
 
     /**
      * Coprocessor Data Operation
      */
-    struct CoprocessorDataOperation : private InstructionDataBase {
-        Condition condition;
+    struct CoprocessorDataOperation {
+        Condition                       condition;
 
-    private:
-        friend struct Instruction;
+        static CoprocessorDataOperation Decode(u32 word) {
+            CoprocessorDataOperation cdp {};
+            cdp.condition = (Condition)Bit::range(Mask::condition, word);
+            // TODO
+            return cdp;
+        }
 
-        explicit CoprocessorDataOperation(u32 word) {
-            condition = (Condition)Bit::range(Mask::condition, word);
+        static CoprocessorDataOperation Assemble(const std::string_view &s) {
             // TODO
         }
 
-        explicit CoprocessorDataOperation(const std::string_view &s) {
-            // TODO
-        }
+        enum Mnemonic Mnemonic() const { return Mnemonic::CDP; }
 
-        enum Mnemonic Mnemonic() const override { return Mnemonic::CDP; }
-
-        u32           Encode() const override {
+        u32           Encode() const {
             // TODO
             return 0;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             // TODO
             ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::CoprocessorDataOperation; }
     };
 
     /**
      * Coprocessor Data Transfer
      */
-    struct CoprocessorDataTransfer : private InstructionDataBase {
-        Condition condition;
-        bool      is_load;
+    struct CoprocessorDataTransfer {
+        Condition                      condition;
+        bool                           is_load;
 
-    private:
-        friend struct Instruction;
+        static CoprocessorDataTransfer Decode(u32 word) {
+            CoprocessorDataTransfer cdt {};
+            cdt.condition = (Condition)Bit::range(Mask::condition, word);
+            // TODO
+            return cdt;
+        }
 
-        explicit CoprocessorDataTransfer(u32 word) {
-            condition = (Condition)Bit::range(Mask::condition, word);
+        static CoprocessorDataTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        explicit CoprocessorDataTransfer(const std::string_view &s) {
-            // TODO
-        }
+        enum Mnemonic Mnemonic() const { return is_load ? Mnemonic::LDC : Mnemonic::STC; }
 
-        enum Mnemonic Mnemonic() const override { return is_load ? Mnemonic::LDC : Mnemonic::STC; }
-
-        u32           Encode() const override {
+        u32           Encode() const {
             // TODO
             return 0;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             // TODO
             ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::CoprocessorDataTransfer; }
     };
 
     /**
      * Coprocessor Register Transfer
      */
-    struct CoprocessorRegisterTransfer : private InstructionDataBase {
-        Condition condition;
-        bool      is_load;
+    struct CoprocessorRegisterTransfer {
+        Condition                          condition;
+        bool                               is_load;
 
-    private:
-        friend struct Instruction;
+        static CoprocessorRegisterTransfer Decode(u32 word) {
+            CoprocessorRegisterTransfer crt {};
+            crt.condition = (Condition)Bit::range(Mask::condition, word);
+            // TODO
+            return crt;
+        }
 
-        explicit CoprocessorRegisterTransfer(u32 word) {
-            condition = (Condition)Bit::range(Mask::condition, word);
+        static CoprocessorRegisterTransfer Assemble(const std::string_view &s) {
             // TODO
         }
 
-        explicit CoprocessorRegisterTransfer(const std::string_view &s) {
-            // TODO
-        }
+        enum Mnemonic Mnemonic() const { return is_load ? Mnemonic::MRC : Mnemonic::MCR; }
 
-        enum Mnemonic Mnemonic() const override { return is_load ? Mnemonic::MRC : Mnemonic::MCR; }
-
-        u32           Encode() const override {
+        u32           Encode() const {
             // TODO
             return 0;
         }
 
-        std::string Disassemble() const override {
+        std::string Disassemble() const {
             std::stringstream ss;
             // TODO
             ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::CoprocessorRegisterTransfer; }
     };
 
     /**
      * Undefined
      */
-    struct Undefined : private InstructionDataBase {
-        Condition condition;
-        u32       word;
+    struct Undefined {
+        Condition        condition;
+        u32              word;
 
-    private:
-        friend struct Instruction;
-
-        explicit Undefined(u32 word) {
-            condition  = (Condition)Bit::range(Mask::condition, word);
-            this->word = word;
+        static Undefined Decode(u32 word) {
+            Undefined undef {};
+            undef.condition = (Condition)Bit::range(Mask::condition, word);
+            undef.word      = word;
+            return undef;
         }
 
-        explicit Undefined(const std::string_view &s) {
+        static Undefined Assemble(const std::string_view &s) {
             // TODO
         }
 
-        enum Mnemonic Mnemonic() const override { return Mnemonic::Undefined; }
+        enum Mnemonic Mnemonic() const { return Mnemonic::Undefined; }
 
-        u32           Encode() const override { return word; }
+        u32           Encode() const { return word; }
 
-        std::string   Disassemble() const override {
+        std::string   Disassemble() const {
             std::stringstream ss;
 
             ss << "Undefined(" << as_hex(word) << ")" << to_string(condition);
 
             return ss.str();
         }
-
-        static constexpr InstructionType GetInstructionType() { return InstructionType::Undefined; }
     };
 
     /**
      * Unified Instruction Class
      */
-    struct Instruction {
-        static Instruction Decode(u32 word) { return Instruction(word); }
+    using Instruction = std::variant<
+            Undefined, Branch, BranchAndExchange, DataProcessing, PSRTransfer, Multiply, MultiplyLong,
+            SingleDataTransfer, HalfwordDataTransfer, BlockDataTransfer, Swap, SoftwareInterrupt,
+            CoprocessorDataOperation, CoprocessorDataTransfer, CoprocessorRegisterTransfer>;
 
-        InstructionType    Type() const { return type; }
+    std::string DisassembleArm(Instruction const &instr);
+    std::string DisassembleThumb(Instruction const &instr);
 
-        Mnemonic           Mnemonic() const {
-            ptr_preamble();
-            return get_variant_data_ptr()->Mnemonic();
-        }
+    Instruction AssembleArm(const std::string_view &s);
+    Instruction AssembleThumb(const std::string_view &s);
 
-        u32 Encode() const {
-            ptr_preamble();
-            return get_variant_data_ptr()->Encode();
-        }
+    u32         EncodeArm(Instruction const &instr);
+    u16         EncodeThumb(Instruction const &instr);
 
-        std::string Disassemble() const {
-            ptr_preamble();
-            return get_variant_data_ptr()->Disassemble();
-        }
+    Instruction DecodeArm(u32 word);
+    Instruction DecodeThumb(u32 word);
 
-        template<typename T>
-        const T &InstructionData() {
-            return std::get<T>(data);
-        }
-
-    protected:
-        std::variant<
-                // TODO: this is required to make the variant default-constructible but it also makes it able to be
-                // empty!! figure out a better way to have complex logic to construct this variant without default
-                // construction
-                std::monostate, Undefined, Branch, BranchAndExchange, DataProcessing, PSRTransfer, Multiply,
-                MultiplyLong, SingleDataTransfer, HalfwordDataTransfer, BlockDataTransfer, Swap, SoftwareInterrupt,
-                CoprocessorDataOperation, CoprocessorDataTransfer, CoprocessorRegisterTransfer>
-                             data;
-        // sure, /technically/ taking a pointer to variant data "bypasses its type-safety protections" and "defeats its
-        // entire purpose", but it's so much cooler this way plus we get easy function calls for Encode(),
-        // Disassemble(), and Mnemonic()
-        InstructionDataBase *data_ptr = nullptr;
-        InstructionType      type;
-
-        template<typename T, typename... A>
-        constexpr void set_variant_data(A... a) {
-            data     = T(a...);
-
-            data_ptr = &std::get<T>(data);
-            type     = T::GetInstructionType();
-        }
-
-        [[nodiscard]] InstructionDataBase *get_variant_data_ptr() const {
-            return reinterpret_cast<InstructionDataBase *>(data_ptr);
-        }
-
-        void ptr_preamble() const {
-            assert(data_ptr != nullptr);
-            assert(!std::holds_alternative<std::monostate>(data));
-        }
-
-        explicit Instruction(const u32 word) :
-            type(InstructionType::Undefined) {
-            switch(Bit::range(Bit::Mask::between_inc<u32>(24, 27), word)) {
-            // Class 1 instructions
-            case 0x0:
-            case 0x1:
-            case 0x2:
-            case 0x3: {
-                // clang-format off
-                //        31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 09 08 07 06 05 04 03 02 01 00
-                // dp     [Cond     ] 0  0  I  [OpCode   ] S  [Rn       ] [Rd       ] [Operand 2                        ]
-                // psr    [Cond     ] 0  0  I  1  0  P  D  0  [ID       ] [Rm       ] [Operand 2                        ]
-                // mul    [Cond     ] 0  0  0  0  0  0  A  S  [Rn       ] [Rd       ] [Rs       ] 1  0  0  1  [Rm       ]
-                // mull   [Cond     ] 0  0  0  0  1  U  A  S  [H-Rd     ] [L-Rd     ] [Rn       ] 1  0  0  1  [Rm       ]
-                // swap   [Cond     ] 0  0  0  1  0  B  0  0  [Rn       ] [Rd       ] X  X  X  X  1  0  0  1  [Rm       ]
-                // bex    [Cond     ] 0  0  0  1  0  0  1  0  1  1  1  1  1  1  1  1  1  1  1  1  0  0  0  1  [Rn       ]
-                // hdt    [Cond     ] 0  0  0  P  U  I  W  L  [Rn       ] [Rd       ] [0/Offset ] 1  S  H  1  [Rn/Offset]
-                // clang-format on
-
-                // if 25 is set, it can only be DP or PSR
-                if(!Bit::test(word, 25)) {
-                    // check bex early since it doesn't fit smoothly with everything else
-                    if(Bit::range(Mask::bex_const, word) == Literal::BEX_CONSTANT) {
-                        set_variant_data<Branch>(word);
-                        break;
-                    }
-
-                    // check the 4,7 bits to see if it could be something other than data processing...
-                    if(Bit::test(word, 4) && Bit::test(word, 7)) {
-                        //...Yep
-
-                        // if 4 or 5 are set then this is a HalfwordTransfer
-                        if(Bit::test(word, 4) || Bit::test(word, 5)) {
-                            set_variant_data<HalfwordDataTransfer>(word);
-                            break;
-                        }
-
-                        // if bit 24 is checked, then this is  a swap
-                        if(Bit::test(word, 24)) {
-                            set_variant_data<Swap>(word);
-                            break;
-                        }
-
-                        // if we made it here then it's likely this is a multiply, determine which one
-                        if(Bit::test(word, 23)) {
-                            set_variant_data<MultiplyLong>(word);
-                        } else {
-                            set_variant_data<Multiply>(word);
-                        }
-
-                        break;
-                    }
-                }
-
-                using DPI   = DataProcessing;
-                bool is_psr = bounded(Bit::range(DPI::BitMask::OpCode, word),
-                                      (uint)DPI::OperationCode::TST,
-                                      (uint)DPI::OperationCode::CMN)
-                           && !Bit::mask(word, DPI::BitMask::isSetFlags);
-
-                if(is_psr) {
-                    set_variant_data<PSRTransfer>(word);
-                    break;
-                }
-
-                set_variant_data<DataProcessing>(word);
-                break;
-            }
-
-            // Class 2 Instructions
-            case 0x4:
-            case 0x5:
-            case 0x6:
-            case 0x7: set_variant_data<SingleDataTransfer>(word); break;
-            case 0x8:
-            case 0x9: set_variant_data<BlockDataTransfer>(word); break;
-            case 0xA:
-            case 0xB: set_variant_data<Branch>(word); break;
-            case 0xC:
-            case 0xD: set_variant_data<CoprocessorDataTransfer>(word); break;
-            case 0xE: {
-                bool is_crt = Bit::range(Mask::cp_is_crt, word);
-
-                if(is_crt) {
-                    set_variant_data<CoprocessorRegisterTransfer>(word);
-                } else {
-                    set_variant_data<CoprocessorDataOperation>(word);
-                }
-                break;
-            }
-            case 0xF: set_variant_data<SoftwareInterrupt>(word); break;
-            default:  unreachable();
-            }
-        }
-    };
-} // namespace Arm
+};

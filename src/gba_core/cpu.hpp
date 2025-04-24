@@ -32,24 +32,24 @@ private:
     bool    EvaluateCondition(Arm::Condition condition);
 
     // arm op interpreters
-    void    branch(Arm::Instruction instr);
-    void    branch_and_exchange(Arm::Instruction instr);
-    void    psr_transfer(Arm::Instruction instr);
-    void    data_proc_reg(Arm::Instruction instr);
-    void    data_proc_shifted_reg(Arm::Instruction instr);
-    void    data_proc_immediate(Arm::Instruction instr);
-    void    single_data_transfer_shifted_reg(Arm::Instruction instr);
-    void    single_data_transfer_immediate(Arm::Instruction instr);
-    void    halfword_data_transfer_shifted_reg(Arm::Instruction instr);
-    void    halfword_data_transfer_immediate(Arm::Instruction instr);
-    void    block_data_transfer(Arm::Instruction instr);
-    void    swap(Arm::Instruction instr);
+    void    branch(Arm::Branch const &i);
+    void    branch_and_exchange(Arm::BranchAndExchange const &i);
+    void    data_proc_reg(Arm::DataProcessing const &i);
+    void    psr_transfer(Arm::PSRTransfer const &i);
+    void    data_proc_shifted_reg(Arm::DataProcessing const &i);
+    void    data_proc_immediate(Arm::DataProcessing const &i);
+    void    single_data_transfer_shifted_reg(Arm::SingleDataTransfer const &i);
+    void    single_data_transfer_immediate(Arm::SingleDataTransfer const &i);
+    void    halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i);
+    void    halfword_data_transfer_immediate(Arm::HalfwordDataTransfer const &i);
+    void    block_data_transfer(Arm::BlockDataTransfer const &i);
+    void    swap(Arm::Swap const &i);
 
-    void    exec_dp_op(Arm::Instruction instr, u32 shift_operand, bool shift_carry_out);
-    void    exec_sdt_load_op(Arm::Instruction instr, u32 offset);
-    void    exec_sdt_store_op(Arm::Instruction instr, u32 offset);
-    void    exec_hwsd_load_op(Arm::Instruction instr, u32 offset);
-    void    exec_hwsd_store_op(Arm::Instruction instr, u32 offset);
-    void    exec_bdt_load_op(Arm::Instruction instr);
-    void    exec_bdt_store_op(Arm::Instruction instr);
+    void    exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, bool shift_carry_out);
+    void    exec_sdt_load_op(Arm::SingleDataTransfer const &i, u32 offset);
+    void    exec_sdt_store_op(Arm::SingleDataTransfer const &i, u32 offset);
+    void    exec_hwsd_load_op(Arm::HalfwordDataTransfer const &i, u32 offset);
+    void    exec_hwsd_store_op(Arm::HalfwordDataTransfer const &i, u32 offset);
+    void    exec_bdt_load_op(Arm::BlockDataTransfer const &i);
+    void    exec_bdt_store_op(Arm::BlockDataTransfer const &i);
 };
