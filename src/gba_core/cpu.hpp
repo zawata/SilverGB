@@ -20,10 +20,8 @@ private:
 
     u32     op1;
     u32     op2;
-    void    prefetch16();
-    void    prefetch16(u16 dest);
-    void    prefetch32();
-    void    prefetch32(u32 dest);
+    void    prefetch();
+    void    prefetch(u32 dest);
     void    compute_flags(bool set_flags, u32 value);
     void    execute();
 

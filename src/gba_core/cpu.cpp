@@ -11,28 +11,23 @@
 #include "util/bit.hpp"
 #include "util/flags.hpp"
 
-u32 gen_regs[16];
-u32 psr_regs[6]; // CPSR + SPSR*5
-
-#define REG(X)   (gen_regs[(X)])
-#define PSR(X)   (psr_regs[(X)])
-
-#define LR       14
-#define PC       15
-
-#define REG_LR   (REG(LR))
-#define REG_PC   (REG(PC))
-
-#define CPSR     0
-
-#define REG_CPSR (PSR(CPSR))
+struct Registers {
+    u32 low_regs[8];
+    u32 hi_regs[5];
+    u32 fiq_hi_regs[5];
+    u32 lr[6];
+    u32 sp[6];
+    u32 pc;
+    u32 cpsr;
+    u32 spsr[5];
+} regs;
 
 #define make_reg_funcs(name, bit) \
-    [[maybe_unused]] __force_inline bool get_##name() { return Bit::test(REG_CPSR, bit); } \
-    [[maybe_unused]] __force_inline void set_##name() { Bit::set(&PSR(CPSR), bit); } \
-    [[maybe_unused]] __force_inline void change_##name(bool state) { Bit::set_cond(REG_CPSR, bit, state); } \
-    [[maybe_unused]] __force_inline void reset_##name() { Bit::reset(&PSR(CPSR), bit); } \
-    [[maybe_unused]] __force_inline void flip_##name() { Bit::toggle(REG_CPSR, bit); };
+    [[maybe_unused]] __force_inline bool get_##name() { return Bit::test(regs.cpsr, bit); } \
+    [[maybe_unused]] __force_inline void set_##name() { Bit::set(&regs.cpsr, bit); } \
+    [[maybe_unused]] __force_inline void change_##name(bool state) { Bit::set_cond(regs.cpsr, bit, state); } \
+    [[maybe_unused]] __force_inline void reset_##name() { Bit::reset(&regs.cpsr, bit); } \
+    [[maybe_unused]] __force_inline void flip_##name() { Bit::toggle(regs.cpsr, bit); };
 
 make_reg_funcs(cpsr_N, 31);
 make_reg_funcs(cpsr_Z, 30);
@@ -51,6 +46,14 @@ __force_inline bool check_carry_32(u32 x, u32 y, u64 r) { return (x ^ y ^ r) & 0
 __force_inline bool check_carry_32(u32 x, u32 y, u32 z, u64 r) { return (x ^ y ^ z ^ r) & 0x100000000; }
 __force_inline bool check_overflow_32(s32 x, s32 y, s64 r) { return (x ^ y ^ r) & 0x80000000; }
 __force_inline bool check_overflow_32(s32 x, s32 y, s32 z, s64 r) { return (x ^ y ^ z ^ r) & 0x80000000; }
+
+enum Size : u8 {
+    Byte     = 1,
+    Halfword = 2,
+    Word     = 4,
+};
+
+__force_inline u32 getWordSize() { return get_thumb_mode() ? Size::Halfword : Size::Word; }
 
 enum struct OperatingMode {
     FIQ,
@@ -71,16 +74,51 @@ enum struct OperatingMode {
 } current_mode
         = OperatingMode::User; // for the time being: force user mode
 
+u8 getSPLRIndexForCurrentMode() {
+    if(current_mode == OperatingMode::SYS) {
+        // system and usr share an SP/LR register bank
+        return (u8)OperatingMode::USR;
+    } else {
+        return (u8)current_mode;
+    }
+}
+
 u8 getSPSRIndexForCurrentMode() {
     assert(bounded((u8)current_mode, (u8)OperatingMode::FIQ, (u8)OperatingMode::UND));
     return (u8)current_mode;
 }
 
+u32 *getReg(u8 reg) {
+    if(reg < 8) {
+        return &regs.low_regs[reg];
+    } else if(reg < 13) {
+        if(current_mode == OperatingMode::FIQ) {
+            return &regs.fiq_hi_regs[reg - 8];
+        } else {
+            return &regs.hi_regs[reg - 8];
+        }
+    } else if(reg == 13) {
+        return &regs.lr[getSPLRIndexForCurrentMode()];
+    } else if(reg == 14) {
+        return &regs.lr[getSPSRIndexForCurrentMode()];
+    } else if(reg == 15) {
+        return &regs.pc;
+    }
+
+    assert(false);
+}
+
+u32 *getLR() { return getReg(13); }
+u32 *getSP() { return getReg(14); }
+u32 *getPC() { return getReg(15); }
+u32 *getCPSR() { return &regs.cpsr; }
+u32 *getSPSR() { return &regs.spsr[getSPSRIndexForCurrentMode()]; }
+
 CPU::CPU(IO_Bus *io, bool bootrom_enabled) :
     io(io) {
     // fill the instruction pipeline
-    prefetch32();
-    prefetch32();
+    prefetch();
+    prefetch();
 }
 
 CPU::~CPU() { }
@@ -127,24 +165,13 @@ bool CPU::EvaluateCondition(Arm::Condition condition) {
     return conditions[(u8)condition]();
 }
 
-void CPU::prefetch16() {
+void CPU::prefetch() {
     op2 = op1;
-    op1 = io->read(REG_PC);
-    REG_PC += 2;
+    op1 = io->read(*getPC());
+    *getPC() += getWordSize();
 }
 
-void CPU::prefetch16(u16 dest) {
-    op2 = op1;
-    op1 = io->read(dest);
-}
-
-void CPU::prefetch32() {
-    op2 = op1;
-    op1 = io->read(REG_PC);
-    REG_PC += 4;
-}
-
-void CPU::prefetch32(u32 dest) {
+void CPU::prefetch(u32 dest) {
     op2 = op1;
     op1 = io->read(dest);
 }
@@ -231,25 +258,25 @@ void CPU::branch(Arm::Branch const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
 
     if(EvaluateCondition(i.condition)) {
         // offset is shifted by instruction parser
-        u32 ret = REG_PC;
-        REG_PC += i.offset - 4; // TODO: why -4 ?
+        u32 ret = *getPC();
+        *getPC() += i.offset - 4; // TODO: why -4 ?
 
         // cycle 2
         io->tick();
-        prefetch32();
+        prefetch();
         if(i.link) {
-            REG_LR = ret;
+            *getLR() = ret;
         }
 
         // cycle 3
         io->tick();
-        prefetch32();
+        prefetch();
         if(i.link) {
-            REG_LR -= 4;
+            *getLR() -= 4;
         }
     }
 }
@@ -264,27 +291,20 @@ void CPU::branch_and_exchange(Arm::BranchAndExchange const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
-        // TODO: not exactly sure where PC gets set. its either:
-        //  - in cycle 1 so the LR register is updated with a temp former PC value in cycle 2
-        //  - in cycle 2 so the second 2 prefetches are performed from PC
-        //  - in cycle 3 so the prefetches are computed from the alu result
-        //  the last one seems cleanest imo
-
         // offset is shifted by instruction parser
-        u32 dest = REG_PC + REG(i.rN);
+        *getPC() += *getReg(i.rN);
         nowide::cout << "switching to thumb mode" << std::endl;
         set_thumb_mode();
 
         // cycle 2
         io->tick();
-        prefetch16(dest);
+        prefetch();
 
         // cycle 3
         io->tick();
-        prefetch16(dest + 4);
-        REG_PC = dest;
+        prefetch();
     }
 }
 
@@ -299,7 +319,7 @@ void CPU::data_proc_reg(Arm::DataProcessing const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         bool shift_carry_out;
         u32  shift_operand = calc_shift_operand(
@@ -309,14 +329,14 @@ void CPU::data_proc_reg(Arm::DataProcessing const &i) {
                 &shift_carry_out);
         exec_dp_op(i, shift_operand, shift_carry_out);
 
-        if(i.rD == PC) {
+        if(i.rD == Arm::Registers::PC) {
             // cycle 2
             io->tick();
-            prefetch32();
+            prefetch();
 
             // cycle 3
             io->tick();
-            prefetch32();
+            prefetch();
         }
     }
 }
@@ -334,7 +354,7 @@ void CPU::data_proc_shifted_reg(Arm::DataProcessing const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         // cycle 2
         io->tick();
@@ -343,19 +363,19 @@ void CPU::data_proc_shifted_reg(Arm::DataProcessing const &i) {
         bool shift_carry_out;
         u32  shift_operand = calc_shift_operand(
                 i.ShiftedRegisterOperand.shift_type,
-                REG(i.ShiftedRegisterOperand.rS),
+                *getReg(i.ShiftedRegisterOperand.rS),
                 i.ShiftedRegisterOperand.rM,
                 &shift_carry_out);
         exec_dp_op(i, shift_operand, shift_carry_out);
 
-        if(i.rD == PC) {
+        if(i.rD == Arm::Registers::PC) {
             // cycle 3
             io->tick();
-            prefetch32();
+            prefetch();
 
             // cycle 4
             io->tick();
-            prefetch32();
+            prefetch();
         }
     }
 }
@@ -371,21 +391,21 @@ void CPU::data_proc_immediate(Arm::DataProcessing const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         bool shift_carry_out;
         u32  shift_operand = Bit::ShiftWithCarry::rotate_right<u32>(
                 i.ImmediateOperand.immediate, 1 << i.ImmediateOperand.rotate, &shift_carry_out);
         exec_dp_op(i, shift_operand, shift_carry_out);
 
-        if(i.rD == PC) {
+        if(i.rD == Arm::Registers::PC) {
             // cycle 2
             io->tick();
-            prefetch32();
+            prefetch();
 
             // cycle 3
             io->tick();
-            prefetch32();
+            prefetch();
         }
     }
 }
@@ -401,14 +421,14 @@ void CPU::psr_transfer(Arm::PSRTransfer const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         switch(i.type) {
         case Arm::PSRTransfer::Type::PSRToRegister:
-            REG(i.PSRToRegister.rD) = PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR);
+            *getReg(i.PSRToRegister.rD) = *(i.use_spsr ? getSPSR() : getCPSR());
             break;
         case Arm::PSRTransfer::Type::RegisterToPSR:
-            PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR) = REG(i.PSRToRegister.rD);
+            *(i.use_spsr ? getSPSR() : getCPSR()) = *getReg(i.PSRToRegister.rD);
             break;
         case Arm::PSRTransfer::Type::RegisterToPSRF:
             u32 operand;
@@ -418,9 +438,9 @@ void CPU::psr_transfer(Arm::PSRTransfer const &i) {
                         1 << i.RegisterToPSRF.ImmediateOperand.rotation,
                         nullptr);
             } else {
-                operand = REG(i.RegisterToPSRF.RegisterOperand.rM);
+                operand = *getReg(i.RegisterToPSRF.RegisterOperand.rM);
             }
-            PSR(i.use_spsr ? getSPSRIndexForCurrentMode() : CPSR) |= (operand & (0xF << 28));
+            *(i.use_spsr ? getSPSR() : getCPSR()) |= (operand & (0xF << 28));
             break;
         default: assert(false);
         }
@@ -448,7 +468,7 @@ void CPU::single_data_transfer_shifted_reg(Arm::SingleDataTransfer const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         u32 shift_operand = calc_shift_operand(
                 i.ShiftedRegisterOperand.shift_type,
@@ -464,19 +484,19 @@ void CPU::single_data_transfer_shifted_reg(Arm::SingleDataTransfer const &i) {
             // this will perform cycle 3
             exec_sdt_load_op(i, shift_operand);
 
-            if(i.rD == PC) {
+            if(i.rD == Arm::Registers::PC) {
                 // cycle 4
                 io->tick();
-                prefetch32();
+                prefetch();
 
                 // cycle 5
                 io->tick();
-                prefetch32();
+                prefetch();
             }
         } else {
             // cycle 2
             io->tick();
-            prefetch32();
+            prefetch();
             exec_sdt_store_op(i, shift_operand);
         }
     }
@@ -503,7 +523,7 @@ void CPU::single_data_transfer_immediate(Arm::SingleDataTransfer const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         if(i.load) {
             // cycle 2
@@ -513,19 +533,19 @@ void CPU::single_data_transfer_immediate(Arm::SingleDataTransfer const &i) {
             // this will perform cycle 3
             exec_sdt_load_op(i, i.ImmediateOperand.offset);
 
-            if(i.rD == PC) {
+            if(i.rD == Arm::Registers::PC) {
                 // cycle 4
                 io->tick();
-                prefetch32();
+                prefetch();
 
                 // cycle 5
                 io->tick();
-                prefetch32();
+                prefetch();
             }
         } else {
             // cycle 2
             io->tick();
-            prefetch32();
+            prefetch();
             exec_sdt_store_op(i, i.ImmediateOperand.offset);
         }
     }
@@ -552,7 +572,7 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i)
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         if(i.load) {
             // cycle 2
@@ -560,22 +580,22 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i)
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_hwsd_load_op(i, REG(i.rM));
+            exec_hwsd_load_op(i, *getReg(i.rM));
 
-            if(i.rD == PC) {
+            if(i.rD == Arm::Registers::PC) {
                 // cycle 4
                 io->tick();
-                prefetch32();
+                prefetch();
 
                 // cycle 5
                 io->tick();
-                prefetch32();
+                prefetch();
             }
         } else {
             // cycle 2
             io->tick();
-            prefetch32();
-            exec_hwsd_store_op(i, REG(i.rM));
+            prefetch();
+            exec_hwsd_store_op(i, *getReg(i.rM));
         }
     }
 }
@@ -601,7 +621,7 @@ void CPU::halfword_data_transfer_immediate(Arm::HalfwordDataTransfer const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         if(i.load) {
             // cycle 2
@@ -611,20 +631,20 @@ void CPU::halfword_data_transfer_immediate(Arm::HalfwordDataTransfer const &i) {
             // this will perform cycle 3
             exec_hwsd_load_op(i, i.ImmediateOperand.offset);
 
-            if(i.rD == PC) {
+            if(i.rD == Arm::Registers::PC) {
                 // cycle 4
                 io->tick();
-                prefetch32();
+                prefetch();
 
                 // cycle 5
                 io->tick();
-                prefetch32();
+                prefetch();
             }
         } else {
             // cycle 2
             io->tick();
-            prefetch32();
-            exec_hwsd_store_op(i, REG(i.rM));
+            prefetch();
+            exec_hwsd_store_op(i, *getReg(i.rM));
         }
     }
 }
@@ -634,7 +654,7 @@ void CPU::block_data_transfer(Arm::BlockDataTransfer const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         if(i.load) {
             // cycle 2
@@ -645,14 +665,14 @@ void CPU::block_data_transfer(Arm::BlockDataTransfer const &i) {
             // cycle 3-N
             exec_bdt_load_op(i);
 
-            if(Bit::test(i.registers, PC)) {
+            if(Bit::test(i.registers, Arm::Registers::PC)) {
                 // cycle N + 1
                 io->tick();
-                prefetch32();
+                prefetch();
 
                 // cycle N + 2
                 io->tick();
-                prefetch32();
+                prefetch();
             }
         } else {
             // cycle 2 - N
@@ -672,20 +692,20 @@ void CPU::swap(Arm::Swap const &i) {
 
     // cycle 1
     io->tick();
-    prefetch32();
+    prefetch();
     if(EvaluateCondition(i.condition)) {
         // cycle 2
         io->tick();
         // internal cycle, no prefetch
 
-        if(i.rD == PC) {
+        if(i.rD == Arm::Registers::PC) {
             // cycle 4
             io->tick();
-            prefetch32();
+            prefetch();
 
             // cycle 5
             io->tick();
-            prefetch32();
+            prefetch();
         }
     }
 }
@@ -693,11 +713,12 @@ void CPU::swap(Arm::Swap const &i) {
 inline u32 CPU::calc_shift_operand(Arm::ShiftType shift_type, u8 amount, u8 reg_M, bool *carry_out) {
     switch(shift_type) {
     case Arm::ShiftType::LogicalLeft:
-        return Bit::ShiftWithCarry::logical_left<u32>(REG(reg_M), amount, get_cpsr_C(), carry_out);
-    case Arm::ShiftType::LogicalRight: return Bit::ShiftWithCarry::logical_right<u32>(REG(reg_M), amount, carry_out);
+        return Bit::ShiftWithCarry::logical_left<u32>(*getReg(reg_M), amount, get_cpsr_C(), carry_out);
+    case Arm::ShiftType::LogicalRight:
+        return Bit::ShiftWithCarry::logical_right<u32>(*getReg(reg_M), amount, carry_out);
     case Arm::ShiftType::ArithmeticRight:
-        return Bit::ShiftWithCarry::arithmetic_right<u32>(REG(reg_M), amount, carry_out);
-    case Arm::ShiftType::RotateRight: return Bit::ShiftWithCarry::rotate_right<u32>(REG(reg_M), amount, carry_out);
+        return Bit::ShiftWithCarry::arithmetic_right<u32>(*getReg(reg_M), amount, carry_out);
+    case Arm::ShiftType::RotateRight: return Bit::ShiftWithCarry::rotate_right<u32>(*getReg(reg_M), amount, carry_out);
     default:                          assert(false);
     }
 }
@@ -707,99 +728,99 @@ inline void CPU::exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, boo
 
     switch(i.operation_code) {
     case OpCode::AND: {
-        REG(i.rD) = REG(i.rN) & shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) & shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
         break;
     }
     case OpCode::EOR: {
-        REG(i.rD) = REG(i.rN) ^ shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) ^ shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
         break;
     }
     case OpCode::SUB: {
-        REG(i.rD) = REG(i.rN) - shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) - shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand));
-            change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(!check_carry_32(*getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand));
+            change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand));
         }
         break;
     }
     case OpCode::RSB: {
-        REG(i.rD) = shift_operand - REG(i.rN);
+        *getReg(i.rD) = shift_operand - *getReg(i.rN);
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN)));
-            change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN)));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(!check_carry_32(*getReg(i.rN), shift_operand, shift_operand - *getReg(i.rN)));
+            change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, shift_operand - *getReg(i.rN)));
         }
         break;
     }
     case OpCode::ADD: {
-        REG(i.rD) = REG(i.rN) + shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) + shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(check_carry_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
-            change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(check_carry_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
+            change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
         }
         break;
     }
     case OpCode::ADC: {
-        REG(i.rD) = REG(i.rN) + shift_operand + (get_cpsr_C() ? 1 : 0);
+        *getReg(i.rD) = *getReg(i.rN) + shift_operand + (get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(check_carry_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
-            change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(check_carry_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
+            change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
         }
         break;
     }
     case OpCode::SBC: {
-        REG(i.rD) = REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0);
+        *getReg(i.rD) = *getReg(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(
-                    !check_carry_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0)));
-            change_cpsr_V(
-                    check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0)));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(!check_carry_32(
+                    *getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0)));
+            change_cpsr_V(check_overflow_32(
+                    *getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand - (!get_cpsr_C() ? 1 : 0)));
         }
         break;
     }
     case OpCode::RSC: {
-        REG(i.rD) = shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0);
+        *getReg(i.rD) = shift_operand - *getReg(i.rN) - (!get_cpsr_C() ? 1 : 0);
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
-            change_cpsr_C(
-                    !check_carry_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0)));
-            change_cpsr_V(
-                    check_overflow_32(REG(i.rN), shift_operand, shift_operand - REG(i.rN) - (!get_cpsr_C() ? 1 : 0)));
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
+            change_cpsr_C(!check_carry_32(
+                    *getReg(i.rN), shift_operand, shift_operand - *getReg(i.rN) - (!get_cpsr_C() ? 1 : 0)));
+            change_cpsr_V(check_overflow_32(
+                    *getReg(i.rN), shift_operand, shift_operand - *getReg(i.rN) - (!get_cpsr_C() ? 1 : 0)));
         }
         break;
     }
     case OpCode::TST: {
-        u32 alu_out = REG(i.rN) - shift_operand;
+        u32 alu_out = *getReg(i.rN) - shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
         change_cpsr_Z(alu_out == 0);
@@ -808,7 +829,7 @@ inline void CPU::exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, boo
         break;
     }
     case OpCode::TEQ: {
-        u32 alu_out = REG(i.rN) - shift_operand;
+        u32 alu_out = *getReg(i.rN) - shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
         change_cpsr_Z(alu_out == 0);
@@ -817,61 +838,61 @@ inline void CPU::exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, boo
         break;
     }
     case OpCode::CMP: {
-        u32 alu_out = REG(i.rN) - shift_operand;
+        u32 alu_out = *getReg(i.rN) - shift_operand;
         change_cpsr_N(Bit::test(alu_out, 31));
         change_cpsr_Z(alu_out == 0);
-        change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand));
-        change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) - shift_operand));
+        change_cpsr_C(!check_carry_32(*getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand));
+        change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, *getReg(i.rN) - shift_operand));
         break;
     }
     case OpCode::CMN: {
-        u32 alu_out = REG(i.rN) + shift_operand;
+        u32 alu_out = *getReg(i.rN) + shift_operand;
 
         change_cpsr_N(Bit::test(alu_out, 31));
         change_cpsr_Z(alu_out == 0);
-        change_cpsr_C(!check_carry_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
-        change_cpsr_V(check_overflow_32(REG(i.rN), shift_operand, REG(i.rN) + shift_operand));
+        change_cpsr_C(!check_carry_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
+        change_cpsr_V(check_overflow_32(*getReg(i.rN), shift_operand, *getReg(i.rN) + shift_operand));
         break;
     }
     case OpCode::ORR: {
-        REG(i.rD) = REG(i.rN) | shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) | shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
         break;
     }
     case OpCode::MOV: {
-        REG(i.rN) = shift_operand;
+        *getReg(i.rN) = shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rN), 31));
-            change_cpsr_Z(REG(i.rN) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rN), 31));
+            change_cpsr_Z(*getReg(i.rN) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
         break;
     }
     case OpCode::BIC: {
-        REG(i.rD) = REG(i.rN) & ~shift_operand;
+        *getReg(i.rD) = *getReg(i.rN) & ~shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rD), 31));
-            change_cpsr_Z(REG(i.rD) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rD), 31));
+            change_cpsr_Z(*getReg(i.rD) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
         break;
     }
     case OpCode::MVN: {
-        REG(i.rN) = ~shift_operand;
+        *getReg(i.rN) = ~shift_operand;
 
         if(i.set_flags) {
-            change_cpsr_N(Bit::test(REG(i.rN), 31));
-            change_cpsr_Z(REG(i.rN) == 0);
+            change_cpsr_N(Bit::test(*getReg(i.rN), 31));
+            change_cpsr_Z(*getReg(i.rN) == 0);
             change_cpsr_C(shift_carry_out);
             // V unaffected
         }
@@ -881,33 +902,33 @@ inline void CPU::exec_dp_op(Arm::DataProcessing const &i, u32 shift_operand, boo
 }
 
 inline void CPU::exec_sdt_load_op(Arm::SingleDataTransfer const &i, u32 offset) {
-#define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
-#define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
+#define calc_sub_idx(reg, offset)          (*getReg(i.rN) - offset)
+#define calc_add_idx(reg, offset)          (*getReg(i.rN) + offset)
 #define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
-        if(!i.is_byte && (index % 4) != 0) {
+        if(!i.is_byte && (index % getWordSize()) != 0) {
             throw_data_abort();
         }
         if(i.write_back) {
-            REG(i.rN) = index;
+            *getReg(i.rN) = index;
         }
     } else {
-        index = REG(i.rN);
+        index = *getReg(i.rN);
     }
 
     // cycle 3
     io->tick();
-    prefetch32();
-    REG(i.rD) = io->read(index) & (!i.is_byte ? 0xFFFFFFFF : 0xFF);
+    prefetch();
+    *getReg(i.rD) = io->read(index) & (!i.is_byte ? 0xFFFFFFFF : 0xFF);
 
     if(!i.is_pre_idx) {
-        index     = calc_auto_idx(i.rN, offset, i.is_inc);
+        index         = calc_auto_idx(i.rN, offset, i.is_inc);
 
         // base reg is always written on a post-idx
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
 #undef calc_auto_idx
@@ -916,30 +937,30 @@ inline void CPU::exec_sdt_load_op(Arm::SingleDataTransfer const &i, u32 offset) 
 }
 
 inline void CPU::exec_sdt_store_op(Arm::SingleDataTransfer const &i, u32 offset) {
-#define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
-#define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
-#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+#define calc_sub_idx(reg, offset)          (*getReg(reg) - (offset))
+#define calc_add_idx(reg, offset)          (*getReg(reg) + (offset))
+#define calc_auto_idx(reg, offset, is_add) ((is_add) ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     u32 index;
     if(i.is_pre_idx) {
         index = calc_auto_idx(i.rN, offset, i.is_inc);
-        if(!i.is_byte && (index % 4) != 0) {
+        if(!i.is_byte && (index % getWordSize()) != 0) {
             throw_data_abort();
         }
         if(i.write_back) {
-            REG(i.rN) = index;
+            *getReg(i.rN) = index;
         }
     } else {
-        index = REG(i.rN);
+        index = *getReg(i.rN);
     }
 
-    io->write(index, REG(i.rD));
+    io->write(index, *getReg(i.rD));
 
     if(!i.is_pre_idx) {
-        index     = calc_auto_idx(i.rN, offset, i.is_inc);
+        index         = calc_auto_idx(i.rN, offset, i.is_inc);
 
         // base reg is always written on a post-idx
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
 #undef calc_auto_idx
@@ -960,9 +981,9 @@ inline u32 compute_hwsd_result(u32 data, bool halfwords, bool signed_data) {
 }
 
 inline void CPU::exec_hwsd_load_op(Arm::HalfwordDataTransfer const &i, u32 offset) {
-#define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
-#define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
-#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+#define calc_sub_idx(reg, offset)          (*getReg(reg) - (offset))
+#define calc_add_idx(reg, offset)          (*getReg(reg) + (offset))
+#define calc_auto_idx(reg, offset, is_add) ((is_add) ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     u32 index;
     if(i.is_pre_idx) {
@@ -971,23 +992,23 @@ inline void CPU::exec_hwsd_load_op(Arm::HalfwordDataTransfer const &i, u32 offse
             throw_data_abort(); // TODO: unpredictable behavior
         }
         if(i.write_back) {
-            REG(i.rN) = index;
+            *getReg(i.rN) = index;
         }
     } else {
-        index = REG(i.rN);
+        index = *getReg(i.rN);
     }
 
     // cycle 3
     io->tick();
-    prefetch32();
+    prefetch();
 
-    REG(i.rD) = compute_hwsd_result(io->read(index), i.halfwords, i.signed_data);
+    *getReg(i.rD) = compute_hwsd_result(io->read(index), i.halfwords, i.signed_data);
 
     if(!i.is_pre_idx) {
-        index     = calc_auto_idx(i.rN, offset, i.is_inc);
+        index         = calc_auto_idx(i.rN, offset, i.is_inc);
 
         // base reg is always written on a post-idx?
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
 #undef calc_auto_idx
@@ -996,9 +1017,9 @@ inline void CPU::exec_hwsd_load_op(Arm::HalfwordDataTransfer const &i, u32 offse
 }
 
 inline void CPU::exec_hwsd_store_op(Arm::HalfwordDataTransfer const &i, u32 offset) {
-#define calc_sub_idx(reg, offset)          (REG(i.rN) - offset)
-#define calc_add_idx(reg, offset)          (REG(i.rN) + offset)
-#define calc_auto_idx(reg, offset, is_add) (is_add ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
+#define calc_sub_idx(reg, offset)          (*getReg(reg) - (offset))
+#define calc_add_idx(reg, offset)          (*getReg(reg) + (offset))
+#define calc_auto_idx(reg, offset, is_add) ((is_add) ? calc_add_idx(reg, offset) : calc_sub_idx(reg, offset))
 
     u32 index;
     if(i.is_pre_idx) {
@@ -1007,23 +1028,23 @@ inline void CPU::exec_hwsd_store_op(Arm::HalfwordDataTransfer const &i, u32 offs
             throw_data_abort(); // TODO: unpredictable behavior
         }
         if(i.write_back) {
-            REG(i.rN) = index;
+            *getReg(i.rN) = index;
         }
     } else {
-        index = REG(i.rN);
+        index = *getReg(i.rN);
     }
 
     // cycle 3
     io->tick();
-    prefetch32();
+    prefetch();
 
-    io->write(index, compute_hwsd_result(REG(i.rD), i.halfwords, i.signed_data));
+    io->write(index, compute_hwsd_result(*getReg(i.rD), i.halfwords, i.signed_data));
 
     if(!i.is_pre_idx) {
-        index     = calc_auto_idx(i.rN, offset, i.is_inc);
+        index         = calc_auto_idx(i.rN, offset, i.is_inc);
 
         // base reg is always written on a post-idx?
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
 #undef calc_auto_idx
@@ -1038,25 +1059,25 @@ inline void CPU::exec_bdt_store_op(Arm::BlockDataTransfer const &i) {
     u32 index;
 
     if(i.is_inc) {
-        index       = REG(i.rN) + (reg_count << 2);
-        start_index = REG(i.rN);
+        index       = *getReg(i.rN) + (reg_count << 2);
+        start_index = *getReg(i.rN);
         if(i.is_pre_idx) {
-            start_index += 4;
+            start_index += getWordSize();
         }
     } else {
-        index       = REG(i.rN) - (reg_count << 2);
+        index       = *getReg(i.rN) - (reg_count << 2);
         start_index = index;
         if(!i.is_pre_idx) {
-            start_index += 4;
+            start_index += getWordSize();
         }
     }
 
-    if((start_index % 4) != 0) {
+    if((start_index % getWordSize()) != 0) {
         throw_data_abort();
     }
 
     if(i.write_back) {
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
     u16 registers = i.registers;
@@ -1066,13 +1087,13 @@ inline void CPU::exec_bdt_store_op(Arm::BlockDataTransfer const &i) {
         }
 
         if(j == 15 && i.load_psr) {
-            REG_CPSR = PSR(getSPSRIndexForCurrentMode());
+            *getCPSR() = *getSPSR();
         }
 
         io->tick();
-        prefetch32();
+        prefetch();
 
-        io->write(start_index + (j << 2), REG(j));
+        io->write(start_index + (j << 2), *getReg(j));
     }
 }
 
@@ -1083,25 +1104,25 @@ inline void CPU::exec_bdt_load_op(Arm::BlockDataTransfer const &i) {
     u32 index;
 
     if(i.is_inc) {
-        index       = REG(i.rN) + (reg_count << 2);
-        start_index = REG(i.rN);
+        index       = *getReg(i.rN) + (reg_count << 2);
+        start_index = *getReg(i.rN);
         if(i.is_pre_idx) {
-            start_index += 4;
+            start_index += getWordSize();
         }
     } else {
-        index       = REG(i.rN) - (reg_count << 2);
+        index       = *getReg(i.rN) - (reg_count << 2);
         start_index = index;
         if(!i.is_pre_idx) {
-            start_index += 4;
+            start_index += getWordSize();
         }
     }
 
-    if((start_index % 4) != 0) {
+    if((start_index % getWordSize()) != 0) {
         throw_data_abort();
     }
 
     if(i.write_back) {
-        REG(i.rN) = index;
+        *getReg(i.rN) = index;
     }
 
     u16 registers = i.registers;
@@ -1111,12 +1132,12 @@ inline void CPU::exec_bdt_load_op(Arm::BlockDataTransfer const &i) {
         }
 
         if(j == 15 && i.load_psr) {
-            REG_CPSR = PSR(getSPSRIndexForCurrentMode());
+            *getCPSR() = *getSPSR();
         }
 
         io->tick();
-        prefetch32();
+        prefetch();
 
-        REG(j) = io->read(start_index + (j << 2));
+        *getReg(j) = io->read(start_index + (j << 2));
     }
 }

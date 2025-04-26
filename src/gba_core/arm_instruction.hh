@@ -30,6 +30,12 @@ namespace Arm {
 
     inline std::ostream &operator<< (std::ostream &o, reg_t r) { return o << r.to_string(); }
 
+    namespace Registers {
+        const static reg_t SP = 13;
+        const static reg_t LR = 14;
+        const static reg_t PC = 15;
+    }
+
     namespace Mask {
         using namespace Bit::Mask;
 
