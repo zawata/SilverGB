@@ -2,17 +2,11 @@
 
 namespace Arm {
     std::string DisassembleArm(Instruction const &instr) {
-        return std::visit(
-                // static_assert(InstructionConcept<std::decay_t<decltype(arg)>>); // Optional: check concept
-                [](const auto &instr) { return instr.Disassemble(); },
-                instr);
+        return std::visit([](const auto &instr) { return instr.Disassemble(); }, instr);
     }
 
     std::string DisassembleThumb(Instruction const &instr) {
-        // return std::visit(
-        //         // static_assert(InstructionConcept<std::decay_t<decltype(arg)>>); // Optional: check concept
-        //         [](const auto &instr) { return instr.DisassembleThumb(); },
-        //         instr);
+        return std::visit([](const auto &instr) { return instr.DisassembleThumb(); }, instr);
     }
 
     Instruction DecodeThumb(const u16 word) {
@@ -44,10 +38,24 @@ namespace Arm {
         case 0x2:
         case 0x3:
             // MOV/comp/add/sub
+            return DataProcessing::DecodeThumb(word);
         case 0x4:
-            // alu
-            // HRO/BX
-            // PC-relative load
+            if(Bit::test(word, 11)) {
+                if(!Bit::test(word, 10)) {
+                    // alu
+                    return DataProcessing::DecodeThumb(word);
+                } else {
+                    // HRO/BX
+                    if(Bit::range(Bit::Mask::between_inc<u16>(8, 9), word) == 0b11) {
+                        // BX
+                        return BranchAndExchange::DecodeThumb(word);
+                    } else {
+                        return DataProcessing::DecodeThumb(word);
+                    }
+                }
+            } else {
+                // PC-relative load
+            }
         case 0x5:
             // LS with reg off
             // LS with sign-ext
@@ -62,18 +70,24 @@ namespace Arm {
             // load addr
             break;
         case 0xb:
-            // add off
-            // push/pop
-        case 0xc:
-            // multiple LS
-            break;
+            if(Bit::test(word, 10)) {
+                // push/pop
+                return BlockDataTransfer::DecodeThumb(word);
+            } else {
+                // add off
+                return decode_add_off(word);
+            }
+        case 0xc: return BlockDataTransfer::DecodeThumb(word);
         case 0xd:
-            // SWI
-            // cond branch
+            if(Bit::range(Bit::Mask::between_inc<u16>(8, 11), word) == 0b1111) {
+                // SWI
+                return SoftwareInterrupt::DecodeThumb(word);
+            } else {
+                // cond branch
+                return Branch::DecodeThumb(word);
+            }
             break;
-        case 0xe:
-            // branch
-            break;
+        case 0xe: return Branch::DecodeThumb(word);
         case 0xf:
             // long branch/link
             break;

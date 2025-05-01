@@ -22,6 +22,8 @@ namespace Arm {
         [[maybe_unused]] reg_t(u8 v) :
             v(v) { }
 
+        explicit reg_t(u8 reg, bool high_bit = false) { v = Bit::set_cond(reg, 4, high_bit); }
+
         operator u8 () const { return v; }
 
         std::string to_string() const { return "R" + std::to_string(v); }
@@ -179,6 +181,13 @@ namespace Arm {
             return bex;
         }
 
+        static BranchAndExchange DecodeThumb(u16 word) {
+            BranchAndExchange bex {};
+            bex.condition = Condition::Always;
+            bex.rN        = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), Bit::test(word, 6)};
+            return bex;
+        }
+
         static BranchAndExchange Assemble(const std::string_view &s) {
             // TODO
         }
@@ -193,6 +202,13 @@ namespace Arm {
             ss << to_string(Mnemonic()) << to_string(condition) << " " << rN;
             return ss.str();
         };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+
+            ss << to_string(Mnemonic()) << " " << rN;
+            return ss.str();
+        };
     };
 
     /**
@@ -203,6 +219,9 @@ namespace Arm {
         Condition     condition;
         bool          link;
         s32           offset;
+
+        bool          isThumbLongBranch;
+        bool          isThumbLongBranchFirstInstruction;
 
         static Branch Decode(u32 word) {
             Branch b {};
@@ -216,6 +235,54 @@ namespace Arm {
             b.offset       = Bit::sign_extend(raw_offset << 2, 25);
 
             return b;
+        }
+
+        static Branch DecodeThumb(u16 word) {
+            if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0xD) {
+                // conditional Branch
+
+                Branch b {};
+                b.condition = (Condition)Bit::range(Bit::Mask::between_inc<u16>(8, 11), word);
+                b.link      = false;
+
+                // The branch offset is left shifted by 1 then sign-extended.
+                // The offset is 0-10bits + 1 for the shift, making the sign bit 11
+                b.offset    = Bit::sign_extend(Bit::mask<u16>(0xFF, word) << 1, 9);
+
+                return b;
+            } else if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0xE) {
+                // unconditional branch
+                Branch b {};
+                b.condition = Condition::Always;
+                b.link      = false;
+
+                // The branch offset is left shifted by 1 then sign-extended.
+                // The offset is 0-10bits + 1 for the shift, making the sign bit 11
+                b.offset    = Bit::sign_extend(Bit::mask(0xFF_u16, word) << 1, 11);
+
+                return b;
+            } else if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0xF) {
+                // long branch/link
+                Branch b {};
+                b.condition                         = Condition::Always;
+                b.link                              = true;
+                b.isThumbLongBranch                 = true;
+                b.isThumbLongBranchFirstInstruction = Bit::test(word, 11);
+
+                if(b.isThumbLongBranchFirstInstruction) {
+                    b.offset = Bit::range(Bit::Mask::between_inc<u16>(0, 10), word);
+                } else {
+                    b.offset = Bit::range(Bit::Mask::between_inc<u16>(0, 10), word) << 1;
+                }
+
+                // The branch offset is left shifted by 1 then sign-extended.
+                // The offset is 0-10bits + 1 for the shift, making the sign bit 11
+                b.offset = Bit::sign_extend(Bit::mask(0xFF_u16, word) << 1, 11);
+
+                return b;
+            }
+
+            assert(false);
         }
 
         static Branch Assemble(const std::string_view &s) {
@@ -237,6 +304,17 @@ namespace Arm {
             // The branch offset must take account of the prefetch operation, which causes the PC to be 2 words (8
             // bytes) ahead of the current instruction. account for this visually
             ss << (offset + 8);
+            return ss.str();
+        };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+
+            ss << to_string(Mnemonic()) << " ";
+            // From the ISA Doc:
+            // The branch offset must take account of the prefetch operation, which causes the PC to be 2 words (8
+            // bytes) ahead of the current instruction. account for this visually
+            ss << (offset + 4);
             return ss.str();
         };
     };
@@ -332,6 +410,109 @@ namespace Arm {
             return dp;
         }
 
+        static DataProcessing DecodeThumb(u16 word) {
+
+            switch(Bit::range(Bit::Mask::between_inc<u16>(11, 14), word)) {
+            case 0x0:
+            case 0x1:
+            case 0x2: {
+                // move shifted register
+                DataProcessing dp {};
+                dp.condition      = Condition::Always;
+                dp.operation_code = OperationCode::MOV;
+                dp.is_imm         = false;
+                dp.set_flags      = false;
+                dp.rN             = 0;
+                dp.rD             = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+                dp.ShiftedRegisterOperand.is_reg     = false;
+                dp.ShiftedRegisterOperand.shift_type = (ShiftType)Bit::range(Bit::Mask::between_inc<u16>(11, 12), word);
+                dp.ShiftedRegisterOperand.shift_amount = Bit::range(Bit::Mask::between_inc<u16>(6, 10), word);
+                dp.ShiftedRegisterOperand.rM           = Bit::range(Bit::Mask::between_inc<u16>(3, 5), word);
+
+                return dp;
+            }
+            case 0x3: {
+                // add/subtract
+                DataProcessing dp {};
+                dp.condition      = Condition::Always;
+                dp.operation_code = Bit::test(word, 9) ? OperationCode::SUB : OperationCode::ADD;
+                dp.is_imm         = Bit::test(word, 10);
+                dp.set_flags      = true;
+                dp.rN             = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), false};
+                dp.rD             = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+                if(dp.is_imm) {
+                    dp.ImmediateOperand.immediate = Bit::range(Bit::Mask::between_inc<u16>(6, 8), word);
+                    dp.ImmediateOperand.rotate    = 0;
+                } else {
+                    dp.ShiftedRegisterOperand.is_reg       = true;
+                    dp.ShiftedRegisterOperand.shift_amount = 0;
+                    dp.ShiftedRegisterOperand.rM           = Bit::range(Bit::Mask::between_inc<u16>(6, 8), word);
+                };
+                return dp;
+            }
+
+            case 0x4:
+            case 0x5:
+            case 0x6:
+            case 0x7: {
+                // move/compare/add/subtract immediate
+                DataProcessing dp {};
+                dp.condition = Condition::Always;
+                u16 opBits   = Bit::range(Bit::Mask::between_inc<u16>(11, 12), word);
+                if(opBits == 0x0) {
+                    dp.operation_code = OperationCode::MOV;
+                } else if(opBits == 0x1) {
+                    dp.operation_code = OperationCode::CMP;
+                } else if(opBits == 0x2) {
+                    dp.operation_code = OperationCode::ADD;
+                } else if(opBits == 0x3) {
+                    dp.operation_code = OperationCode::SUB;
+                } else {
+                    assert(false);
+                }
+                dp.is_imm                     = true;
+                dp.set_flags                  = true;
+                dp.rN                         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(8, 10), word), false};
+                dp.rD                         = dp.rN;
+                dp.ImmediateOperand.immediate = Bit::range(Bit::Mask::between_inc<u16>(0, 8), word);
+                dp.ImmediateOperand.rotate    = 0;
+                return dp;
+            }
+            case 0x8: {
+                if(!Bit::test(word, 10)) {
+                    // ALU Operations
+                } else {
+                    // Hi Register Operations
+                    DataProcessing dp {};
+                    dp.condition                           = Condition::Always;
+                    dp.is_imm                              = false;
+                    dp.ShiftedRegisterOperand.is_reg       = false;
+                    dp.ShiftedRegisterOperand.shift_amount = 0;
+                    dp.rD = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), Bit::test(word, 7)};
+                    dp.ShiftedRegisterOperand.rM
+                            = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), Bit::test(word, 8)};
+
+                    u16 op = Bit::range(Bit::Mask::between_inc<u16>(8, 9), word);
+                    if(op == 0) {
+                        dp.operation_code = OperationCode::ADD;
+                        dp.rN             = dp.ShiftedRegisterOperand.rM;
+                        dp.set_flags      = false;
+                    } else if(op == 1) {
+                        dp.operation_code = OperationCode::CMP;
+                        dp.set_flags      = true;
+                    } else if(op == 2) {
+                        dp.operation_code = OperationCode::MOV;
+                        dp.set_flags      = false;
+                    }
+
+                    return dp;
+                }
+            }
+            }
+
+            assert(false);
+        }
+
         // Assemble
         static DataProcessing Assemble(const std::string_view &s) {
             // TODO
@@ -410,6 +591,19 @@ namespace Arm {
                     ss << "#" << as_hex(ShiftedRegisterOperand.shift_amount);
                 }
             }
+
+            return ss.str();
+        };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+
+            ss << to_string(Mnemonic()) << " " << rD.to_string() << ", ";
+            if(Mnemonic() == Mnemonic::ADD) {
+                ss << rN << ", ";
+            }
+
+            ss << ShiftedRegisterOperand.rM.to_string();
 
             return ss.str();
         };
@@ -530,6 +724,13 @@ namespace Arm {
 
             return ss.str();
         };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -575,6 +776,13 @@ namespace Arm {
             }
             return ss.str();
         };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -617,6 +825,13 @@ namespace Arm {
             ss << (_signed ? "U" : "S");
             ss << to_string(Mnemonic()) << to_string(condition) << (set_flags ? "S" : "") << " ";
             ss << rDLo.to_string() << ", " << rDHi.to_string() << ", " << rM.to_string() << ", " << rS.to_string();
+            return ss.str();
+        };
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
             return ss.str();
         };
     };
@@ -705,6 +920,13 @@ namespace Arm {
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -795,6 +1017,13 @@ namespace Arm {
             }
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -822,6 +1051,41 @@ namespace Arm {
             bdt.registers  = Bit::mask(Bit::Mask::until_inc<u32>(15), word);
         }
 
+        static BlockDataTransfer DecodeThumb(u16 word) {
+            u8 thumb_id = Bit::range<u16>(0xF000, word);
+            if(thumb_id == 0b1011) {
+                // push/pop
+                BlockDataTransfer bdt {};
+                bdt.condition  = Condition::Always;
+                bool load      = Bit::test(word, 11);
+                bool set_pc_lr = Bit::test(word, 8);
+                bdt.is_pre_idx = load;
+                bdt.is_inc     = load;
+                bdt.load_psr   = false;
+                bdt.write_back = true;
+                bdt.load       = load;
+                bdt.rN         = Registers::SP;
+                bdt.registers  = Bit::range<u16>(0xF, word);
+                if(set_pc_lr) {
+                    Bit::set(bdt.registers, load ? 15 : 14);
+                }
+
+                return bdt;
+            } else if(thumb_id == 0b1100) {
+                // multiple LS
+                BlockDataTransfer bdt {};
+                bdt.condition  = Condition::Always;
+                bool load      = Bit::test(word, 11);
+                bdt.is_pre_idx = load;
+                bdt.is_inc     = load;
+                bdt.load_psr   = false;
+                bdt.write_back = true;
+                bdt.load       = load;
+                bdt.rN         = Bit::range<u16>(0x0F00, word);
+                bdt.registers  = Bit::range<u16>(0xFF, word);
+            }
+        }
+
         static BlockDataTransfer Assemble(const std::string_view &s) {
             // TODO
         }
@@ -837,10 +1101,27 @@ namespace Arm {
         std::string Disassemble() const {
             std::stringstream ss;
             // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            ss << to_string(Mnemonic()) << to_string(condition) << " {";
+
+            // loop through the register bitfield and print set bits
+            for(u8 i = 0; i < 16; ++i) {
+                if(Bit::test(registers, i)) {
+                    reg_t r = i;
+                    ss << r.to_string() << ", ";
+                }
+            }
+
+            ss << "}";
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -880,6 +1161,13 @@ namespace Arm {
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -896,6 +1184,13 @@ namespace Arm {
             return swi;
         }
 
+        static SoftwareInterrupt DecodeThumb(u16 word) {
+            SoftwareInterrupt swi {};
+            swi.condition = Condition::Always;
+            swi.value     = Bit::range<u16>(0x0FF, word);
+            return swi;
+        }
+
         static SoftwareInterrupt Assemble(const std::string_view &s) {
             // TODO
         }
@@ -907,8 +1202,15 @@ namespace Arm {
         std::string   Disassemble() const {
             std::stringstream ss;
             // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            ss << to_string(Mnemonic()) << to_string(condition) << " " << value;
 
+            return ss.str();
+        }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+
+            ss << to_string(Mnemonic()) << " " << value;
             return ss.str();
         }
     };
@@ -944,6 +1246,13 @@ namespace Arm {
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -978,6 +1287,13 @@ namespace Arm {
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -1012,6 +1328,13 @@ namespace Arm {
 
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            // TODO
+            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+            return ss.str();
+        };
     };
 
     /**
@@ -1038,11 +1361,15 @@ namespace Arm {
 
         std::string   Disassemble() const {
             std::stringstream ss;
-
             ss << "Undefined(" << as_hex(word) << ")" << to_string(condition);
-
             return ss.str();
         }
+
+        std::string DisassembleThumb() const {
+            std::stringstream ss;
+            ss << "Undefined(" << as_hex(word) << ")";
+            return ss.str();
+        };
     };
 
     /**
