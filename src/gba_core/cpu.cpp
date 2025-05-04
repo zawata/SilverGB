@@ -580,7 +580,7 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i)
             // internal cycle, no prefetch
 
             // this will perform cycle 3
-            exec_hwsd_load_op(i, *getReg(i.rM));
+            exec_hwsd_load_op(i, *getReg(i.RegisterOperand.rM));
 
             if(i.rD == Arm::Registers::PC) {
                 // cycle 4
@@ -595,7 +595,7 @@ void CPU::halfword_data_transfer_shifted_reg(Arm::HalfwordDataTransfer const &i)
             // cycle 2
             io->tick();
             prefetch();
-            exec_hwsd_store_op(i, *getReg(i.rM));
+            exec_hwsd_store_op(i, *getReg(i.RegisterOperand.rM));
         }
     }
 }
@@ -644,7 +644,7 @@ void CPU::halfword_data_transfer_immediate(Arm::HalfwordDataTransfer const &i) {
             // cycle 2
             io->tick();
             prefetch();
-            exec_hwsd_store_op(i, *getReg(i.rM));
+            exec_hwsd_store_op(i, i.ImmediateOperand.offset);
         }
     }
 }

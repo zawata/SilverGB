@@ -6,7 +6,6 @@
 
 #include "util/bit.hpp"
 #include "util/decl.hpp"
-#include "util/flags.hpp"
 #include "util/types/primitives.hpp"
 #include "util/util.hpp"
 
@@ -19,9 +18,6 @@ namespace Arm {
         reg_t() :
             v(0) { }
 
-        [[maybe_unused]] reg_t(u8 v) :
-            v(v) { }
-
         explicit reg_t(u8 reg, bool high_bit = false) { v = Bit::set_cond(reg, 4, high_bit); }
 
         operator u8 () const { return v; }
@@ -33,9 +29,9 @@ namespace Arm {
     inline std::ostream &operator<< (std::ostream &o, reg_t r) { return o << r.to_string(); }
 
     namespace Registers {
-        const static reg_t SP = 13;
-        const static reg_t LR = 14;
-        const static reg_t PC = 15;
+        const static reg_t SP = reg_t {13};
+        const static reg_t LR = reg_t {14};
+        const static reg_t PC = reg_t {15};
     }
 
     namespace Mask {
@@ -177,7 +173,7 @@ namespace Arm {
         static BranchAndExchange Decode(u32 word) {
             BranchAndExchange bex {};
             bex.condition = (Condition)Bit::range<u32>(Mask::condition, word);
-            bex.rN        = (u8)Bit::range(Mask::bex_reg_N, word);
+            bex.rN        = reg_t {(u8)Bit::range(Mask::bex_reg_N, word)};
             return bex;
         }
 
@@ -390,8 +386,8 @@ namespace Arm {
             dp.operation_code = (OperationCode)Bit::range(BitMask::OpCode, word);
             dp.is_imm         = Bit::range(BitMask::isImmediate, word);
             dp.set_flags      = Bit::range(BitMask::isSetFlags, word);
-            dp.rN             = Bit::range(BitMask::Reg_N, word);
-            dp.rD             = Bit::range(BitMask::Reg_D, word);
+            dp.rN             = reg_t {(u8)Bit::range(BitMask::Reg_N, word)};
+            dp.rD             = reg_t {(u8)Bit::range(BitMask::Reg_D, word)};
 
             if(dp.is_imm) {
                 dp.ImmediateOperand.rotate    = Bit::range(BitMask::ImmediateRotation, word);
@@ -400,11 +396,11 @@ namespace Arm {
                 dp.ShiftedRegisterOperand.is_reg     = Bit::range(BitMask::RegisterShiftValue, word);
                 dp.ShiftedRegisterOperand.shift_type = (ShiftType)Bit::range(BitMask::RegisterShiftType, word);
                 if(dp.ShiftedRegisterOperand.is_reg) {
-                    dp.ShiftedRegisterOperand.rS = Bit::range(BitMask::Reg_S, word);
+                    dp.ShiftedRegisterOperand.rS = reg_t {(u8)Bit::range(BitMask::Reg_S, word)};
                 } else {
                     dp.ShiftedRegisterOperand.shift_amount = Bit::range(BitMask::RegisterShiftImmediate, word);
                 }
-                dp.ShiftedRegisterOperand.rM = Bit::range(BitMask::Reg_M, word);
+                dp.ShiftedRegisterOperand.rM = reg_t {(u8)Bit::range(BitMask::Reg_M, word)};
             }
 
             return dp;
@@ -412,7 +408,7 @@ namespace Arm {
 
         static DataProcessing DecodeThumb(u16 word) {
 
-            switch(Bit::range(Bit::Mask::between_inc<u16>(11, 14), word)) {
+            switch(Bit::range(Bit::Mask::between_inc<u16>(11, 15), word)) {
             case 0x0:
             case 0x1:
             case 0x2: {
@@ -422,12 +418,12 @@ namespace Arm {
                 dp.operation_code = OperationCode::MOV;
                 dp.is_imm         = false;
                 dp.set_flags      = false;
-                dp.rN             = 0;
+                dp.rN             = reg_t {};
                 dp.rD             = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
                 dp.ShiftedRegisterOperand.is_reg     = false;
                 dp.ShiftedRegisterOperand.shift_type = (ShiftType)Bit::range(Bit::Mask::between_inc<u16>(11, 12), word);
                 dp.ShiftedRegisterOperand.shift_amount = Bit::range(Bit::Mask::between_inc<u16>(6, 10), word);
-                dp.ShiftedRegisterOperand.rM           = Bit::range(Bit::Mask::between_inc<u16>(3, 5), word);
+                dp.ShiftedRegisterOperand.rM = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word)};
 
                 return dp;
             }
@@ -446,7 +442,7 @@ namespace Arm {
                 } else {
                     dp.ShiftedRegisterOperand.is_reg       = true;
                     dp.ShiftedRegisterOperand.shift_amount = 0;
-                    dp.ShiftedRegisterOperand.rM           = Bit::range(Bit::Mask::between_inc<u16>(6, 8), word);
+                    dp.ShiftedRegisterOperand.rM = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(6, 8), word)};
                 };
                 return dp;
             }
@@ -481,6 +477,136 @@ namespace Arm {
             case 0x8: {
                 if(!Bit::test(word, 10)) {
                     // ALU Operations
+                    DataProcessing dp {};
+                    dp.condition = Condition::Always;
+                    dp.is_imm    = false;
+                    dp.set_flags = true;
+                    reg_t reg1   = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+                    reg_t reg2 {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), false};
+
+                    switch(Bit::range(Bit::Mask::between_inc<u16>(3, 5), word)) {
+                    case 0x0: // AND
+                        dp.operation_code                      = OperationCode::AND;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0x1: // EOR
+                        dp.operation_code                      = OperationCode::EOR;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0x2: // LSL
+                        dp.operation_code                    = OperationCode::MOV;
+                        dp.rD                                = reg1;
+                        dp.ShiftedRegisterOperand.is_reg     = true;
+                        dp.ShiftedRegisterOperand.rM         = reg1;
+                        dp.ShiftedRegisterOperand.shift_type = ShiftType::LogicalLeft;
+                        dp.ShiftedRegisterOperand.rS         = reg2;
+                        break;
+                    case 0x3: // LSR
+                        dp.operation_code                    = OperationCode::MOV;
+                        dp.rD                                = reg1;
+                        dp.ShiftedRegisterOperand.is_reg     = true;
+                        dp.ShiftedRegisterOperand.rM         = reg1;
+                        dp.ShiftedRegisterOperand.shift_type = ShiftType::LogicalRight;
+                        dp.ShiftedRegisterOperand.rS         = reg2;
+                        break;
+                    case 0x4: // ASR
+                        dp.operation_code                    = OperationCode::MOV;
+                        dp.rD                                = reg1;
+                        dp.ShiftedRegisterOperand.is_reg     = true;
+                        dp.ShiftedRegisterOperand.rM         = reg1;
+                        dp.ShiftedRegisterOperand.shift_type = ShiftType::ArithmeticRight;
+                        dp.ShiftedRegisterOperand.rS         = reg2;
+                        break;
+                    case 0x5: // ADC
+                        dp.operation_code                      = OperationCode::ADC;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0x6: // SBC
+                        dp.operation_code                      = OperationCode::SBC;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0x7: // ROR
+                        dp.operation_code                    = OperationCode::MOV;
+                        dp.rD                                = reg1;
+                        dp.ShiftedRegisterOperand.is_reg     = true;
+                        dp.ShiftedRegisterOperand.rM         = reg1;
+                        dp.ShiftedRegisterOperand.shift_type = ShiftType::RotateRight;
+                        dp.ShiftedRegisterOperand.rS         = reg2;
+                        break;
+                    case 0x8: // TST
+                        dp.operation_code                      = OperationCode::TST;
+                        dp.rD                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0x9: // NEG
+                        dp.operation_code             = OperationCode::RSB;
+                        dp.rD                         = reg1;
+                        dp.rN                         = reg2;
+                        dp.is_imm                     = true;
+                        dp.ImmediateOperand.immediate = 0;
+                        break;
+                    case 0xA: // CMP
+                        dp.operation_code                      = OperationCode::CMP;
+                        dp.rD                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0xB: // CMN
+                        dp.operation_code                      = OperationCode::CMN;
+                        dp.rD                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0xC: // ORR
+                        dp.operation_code                      = OperationCode::ORR;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    case 0xD: // MUL
+                        // implemented elsewhere
+                        assert(false);
+                    case 0xE: // BIC
+                        dp.operation_code                      = OperationCode::BIC;
+                        dp.rD                                  = reg1;
+                        dp.rN                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+
+                    case 0xF: // MVN
+                        dp.operation_code                      = OperationCode::MVN;
+                        dp.rD                                  = reg1;
+                        dp.ShiftedRegisterOperand.is_reg       = false;
+                        dp.ShiftedRegisterOperand.rM           = reg2;
+                        dp.ShiftedRegisterOperand.shift_amount = 0;
+                        break;
+                    }
+
+                    return dp;
                 } else {
                     // Hi Register Operations
                     DataProcessing dp {};
@@ -507,6 +633,31 @@ namespace Arm {
 
                     return dp;
                 }
+            }
+            case 0x14:
+            case 0x15: {
+                // load address
+                DataProcessing dp {};
+                dp.condition                  = Condition::Always;
+                dp.is_imm                     = true;
+                dp.set_flags                  = false;
+                dp.rD                         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(8, 10), word), false};
+                dp.rN                         = Bit::test(word, 11) ? Registers::SP : Registers::PC;
+                dp.ImmediateOperand.immediate = Bit::range(Bit::Mask::between_inc<u16>(0, 7), word) << 2;
+                dp.ImmediateOperand.rotate    = 0;
+                return dp;
+            }
+            case 0x16: {
+                // add offset to stack pointer
+                DataProcessing dp {};
+                dp.condition                  = Condition::Always;
+                dp.is_imm                     = true;
+                dp.set_flags                  = false;
+                dp.rD                         = Registers::SP;
+                dp.rN                         = Registers::SP;
+                dp.ImmediateOperand.immediate = Bit::range(Bit::Mask::between_inc<u16>(0, 7), word) << 2;
+                dp.ImmediateOperand.rotate    = 0;
+                return dp;
             }
             }
 
@@ -654,10 +805,10 @@ namespace Arm {
             u32 psr_type  = Bit::range(Bit::Mask::between_inc<u32>(16, 21), word);
             if(psr_type == Literal::MRS_CONSTANT) {
                 psr.type             = Type::PSRToRegister;
-                psr.PSRToRegister.rD = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+                psr.PSRToRegister.rD = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(12, 15), word)};
             } else if(psr_type == Literal::MSR_CONSTANT) {
                 psr.type             = Type::RegisterToPSR;
-                psr.PSRToRegister.rD = Bit::mask(Bit::Mask::until<u32>(3), word);
+                psr.PSRToRegister.rD = reg_t {(u8)Bit::mask(Bit::Mask::until<u32>(3), word)};
             } else if(psr_type == Literal::MSRF_CONSTANT) {
                 psr.type                  = Type::RegisterToPSRF;
                 psr.RegisterToPSRF.is_imm = Bit::test(word, 25);
@@ -665,7 +816,7 @@ namespace Arm {
                     psr.RegisterToPSRF.ImmediateOperand.rotation = Bit::range(Bit::Mask::between_inc<u32>(8, 11), word);
                     psr.RegisterToPSRF.ImmediateOperand.value    = Bit::mask(Bit::Mask::until_inc<u32>(7), word);
                 } else {
-                    psr.RegisterToPSRF.RegisterOperand.rM = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+                    psr.RegisterToPSRF.RegisterOperand.rM = reg_t {(u8)Bit::mask(Bit::Mask::until_inc<u32>(3), word)};
                 }
             }
 
@@ -745,13 +896,24 @@ namespace Arm {
         static Multiply Decode(u32 word) {
             Multiply mul {};
             mul.condition  = (Condition)Bit::range(Mask::condition, word);
-            mul.accumulate = Bit::range(Mask::mul_accum, word);
+            mul.accumulate = Bit::test(word, 21);
+            mul.set_flags  = Bit::test(word, 20);
+            mul.rD         = reg_t {(u8)Bit::range(Mask::mul_reg_D, word)};
+            mul.rN         = reg_t {(u8)Bit::range(Mask::mul_reg_N, word)};
+            mul.rS         = reg_t {(u8)Bit::range(Mask::mul_reg_S, word)};
+            mul.rM         = reg_t {(u8)Bit::range(Mask::mul_reg_M, word)};
+            return mul;
+        }
 
-            mul.set_flags  = Bit::range(Mask::mul_accum, word);
-            mul.rD         = Bit::range(Mask::mul_reg_D, word);
-            mul.rN         = Bit::range(Mask::mul_reg_N, word);
-            mul.rS         = Bit::range(Mask::mul_reg_S, word);
-            mul.rM         = Bit::range(Mask::mul_reg_M, word);
+        static Multiply DecodeThumb(u16 word) {
+            Multiply mul {};
+            mul.condition  = Condition::Always;
+            mul.accumulate = false;
+            mul.set_flags  = true;
+            mul.rD         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+            mul.rM         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), false};
+            mul.rS         = mul.rD;
+
             return mul;
         }
 
@@ -777,12 +939,7 @@ namespace Arm {
             return ss.str();
         };
 
-        std::string DisassembleThumb() const {
-            std::stringstream ss;
-            // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
-            return ss.str();
-        };
+        std::string DisassembleThumb() const { return this->Disassemble(); };
     };
 
     /**
@@ -801,10 +958,10 @@ namespace Arm {
             mul._signed    = Bit::test(word, 22);
             mul.accumulate = Bit::test(word, 21);
             mul.set_flags  = Bit::test(word, 20);
-            mul.rDHi       = Bit::range(Mask::mul_reg_D, word);
-            mul.rDLo       = Bit::range(Mask::mul_reg_N, word);
-            mul.rS         = Bit::range(Mask::mul_reg_S, word);
-            mul.rM         = Bit::range(Mask::mul_reg_M, word);
+            mul.rDHi       = reg_t {(u8)Bit::range(Mask::mul_reg_D, word)};
+            mul.rDLo       = reg_t {(u8)Bit::range(Mask::mul_reg_N, word)};
+            mul.rS         = reg_t {(u8)Bit::range(Mask::mul_reg_S, word)};
+            mul.rM         = reg_t {(u8)Bit::range(Mask::mul_reg_M, word)};
             return mul;
         }
 
@@ -828,12 +985,7 @@ namespace Arm {
             return ss.str();
         };
 
-        std::string DisassembleThumb() const {
-            std::stringstream ss;
-            // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
-            return ss.str();
-        };
+        std::string DisassembleThumb() const { assert(false); };
     };
 
     /**
@@ -870,15 +1022,66 @@ namespace Arm {
             sdt.is_byte    = Bit::test(word, 22);
             sdt.write_back = Bit::test(word, 21);
             sdt.load       = Bit::test(word, 20);
-            sdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(16, 19), word);
-            sdt.rD         = Bit::range(Bit::Mask::between_inc<u32>(12, 15), word);
+            sdt.rN         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(16, 19), word)};
+            sdt.rD         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(12, 15), word)};
             if(sdt.is_imm) {
                 sdt.ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u32>(11), word);
             } else {
                 sdt.ShiftedRegisterOperand.shift_amount = Bit::mask(Bit::Mask::between_inc<u32>(4, 11), word);
-                sdt.ShiftedRegisterOperand.rM           = Bit::mask(Bit::Mask::until_inc<u32>(3), word);
+                sdt.ShiftedRegisterOperand.rM           = reg_t {(u8)Bit::mask(Bit::Mask::until_inc<u32>(3), word)};
             }
             return sdt;
+        }
+
+        static SingleDataTransfer DecodeThumb(u16 word) {
+            if(Bit::range(Bit::Mask::between_inc<u16>(11, 15), word) == 0b01001) {
+                // PC relative load
+                SingleDataTransfer sdt {};
+                sdt.condition               = Condition::Always;
+                sdt.is_imm                  = true;
+                sdt.is_pre_idx              = true;
+                sdt.is_inc                  = true;
+                sdt.is_byte                 = false;
+                sdt.write_back              = false;
+                sdt.load                    = true;
+                sdt.rN                      = Registers::PC;
+                sdt.rD                      = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(8, 10), word), false};
+                sdt.ImmediateOperand.offset = Bit::mask(Bit::Mask::until_inc<u16>(7), word) << 2;
+                return sdt;
+            } else if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0b0101 && !Bit::test(word, 9)) {
+                // LS with register offset
+                SingleDataTransfer sdt {};
+                sdt.condition  = Condition::Always;
+                sdt.is_imm     = true;
+                sdt.is_pre_idx = true;
+                sdt.is_inc     = true;
+                sdt.is_byte    = Bit::test(word, 10);
+                sdt.write_back = false;
+                sdt.load       = Bit::test(word, 11);
+                sdt.rN         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), false};
+                sdt.rD         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+                sdt.ShiftedRegisterOperand.shift_amount = 0;
+                sdt.ShiftedRegisterOperand.rM = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(6, 8), word), false};
+                return sdt;
+            } else if(Bit::range(Bit::Mask::between_inc<u16>(13, 15), word) == 0b011) {
+                // LS with immediate offset
+                SingleDataTransfer sdt {};
+                sdt.condition               = Condition::Always;
+                sdt.is_imm                  = true;
+                sdt.is_pre_idx              = true;
+                sdt.is_inc                  = true;
+                sdt.is_byte                 = Bit::test(word, 12);
+                sdt.write_back              = false;
+                sdt.load                    = Bit::test(word, 11);
+                sdt.rN                      = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word), false};
+                sdt.rD                      = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word), false};
+                sdt.ImmediateOperand.offset = Bit::mask(Bit::Mask::between_inc<u16>(6, 10), word);
+                if(!sdt.is_byte) {
+                    sdt.ImmediateOperand.offset <<= 2;
+                }
+            }
+
+            assert(false);
         }
 
         static SingleDataTransfer Assemble(const std::string_view &s) {
@@ -921,12 +1124,7 @@ namespace Arm {
             return ss.str();
         }
 
-        std::string DisassembleThumb() const {
-            std::stringstream ss;
-            // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
-            return ss.str();
-        };
+        std::string DisassembleThumb() const { return this->Disassemble(); };
     };
 
     /**
@@ -954,8 +1152,6 @@ namespace Arm {
             } ImmediateOperand {};
         };
 
-        reg_t                       rM;
-
         static HalfwordDataTransfer Decode(u32 word) {
             HalfwordDataTransfer hdt {};
             hdt.condition  = (Condition)Bit::range(Mask::condition, word);
@@ -964,8 +1160,8 @@ namespace Arm {
             hdt.is_imm     = Bit::test(word, 22);
             hdt.write_back = Bit::test(word, 21);
             hdt.load       = Bit::test(word, 20);
-            hdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
-            hdt.rD         = Bit::range(Bit::Mask::between_inc<u32>(15, 12), word);
+            hdt.rN         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(19, 16), word)};
+            hdt.rD         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(15, 12), word)};
             assert(Bit::range(Bit::Mask::between_inc<u32>(5, 6), word) != 0);
             hdt.signed_data = Bit::test(word, 6);
             hdt.halfwords   = Bit::test(word, 5);
@@ -973,9 +1169,54 @@ namespace Arm {
                 hdt.ImmediateOperand.offset = (Bit::range(Bit::Mask::between_inc<u32>(11, 8), word) << 4)
                                             | Bit::mask(Bit::Mask::until_inc<u32>(3), word);
             } else {
-                hdt.rM = Bit::range(Bit::Mask::until_inc<u32>(3), word);
+                hdt.RegisterOperand.rM = reg_t {(u8)Bit::range(Bit::Mask::until_inc<u32>(3), word)};
             }
             return hdt;
+        }
+
+        static HalfwordDataTransfer DecodeThumb(u16 word) {
+            u8 bits = Bit::range(Bit::Mask::between_inc<u16>(12, 15), word);
+            if(bits == 0b0101 && Bit::test(word, 9)) {
+                // LS Sign-Extended byte/halfword
+                HalfwordDataTransfer hdt {};
+                hdt.condition  = Condition::Always;
+                hdt.is_pre_idx = true;
+                hdt.is_inc     = true;
+                hdt.is_imm     = false;
+                hdt.write_back = false;
+                if(Bit::test(word, 10)) {
+                    hdt.load        = Bit::test(word, 11);
+                    hdt.signed_data = false;
+                    hdt.halfwords   = true;
+                } else {
+                    hdt.load        = true;
+                    hdt.signed_data = true;
+                    hdt.halfwords   = Bit::test(word, 11);
+                }
+
+                hdt.rD                 = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word)};
+                hdt.rN                 = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word)};
+                hdt.RegisterOperand.rM = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(6, 8), word)};
+                return hdt;
+
+            } else if(bits == 0b1000) {
+                // LS halfword
+                HalfwordDataTransfer hdt {};
+                hdt.condition               = Condition::Always;
+                hdt.is_pre_idx              = true;
+                hdt.is_inc                  = true;
+                hdt.is_imm                  = true;
+                hdt.write_back              = false;
+                hdt.load                    = Bit::test(word, 11);
+                hdt.signed_data             = false;
+                hdt.halfwords               = false;
+                hdt.rD                      = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(0, 2), word)};
+                hdt.rN                      = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u16>(3, 5), word)};
+                hdt.ImmediateOperand.offset = Bit::range(Bit::Mask::between_inc<u16>(6, 10), word) << 1;
+                return hdt;
+            }
+
+            assert(false);
         }
 
         static HalfwordDataTransfer Assemble(const std::string_view &s) {
@@ -985,10 +1226,12 @@ namespace Arm {
         enum Mnemonic Mnemonic() const { return load ? Mnemonic::LDR : Mnemonic::STR; }
 
         u32           Encode() const {
+            u8 highNibble = (is_imm ? (ImmediateOperand.offset >> 5) : 0) & 0xF;
+            u8 lowNibble  = (is_imm ? (ImmediateOperand.offset >> 1) : (u8)RegisterOperand.rM) & 0xF;
             return 0_u32 | (u8)condition << 28 | Bit::from_bool(is_pre_idx) << 24 | Bit::from_bool(is_inc) << 23
                  | Bit::from_bool(write_back) << 21 | Bit::from_bool(load) << 20 | (u8)rN << 16 | (u8)rD << 12
-                 | Bit::Mask::bit<u32>(7) | Bit::from_bool(signed_data) | Bit::from_bool(halfwords)
-                 | Bit::Mask::bit<u32>(4) | (u8)rM;
+                 | highNibble << 8 | Bit::Mask::bit<u32>(7) | Bit::from_bool(signed_data) << 6
+                 | Bit::from_bool(halfwords) << 5 | Bit::Mask::bit<u32>(4) | lowNibble;
         }
 
         std::string Disassemble() const {
@@ -1018,12 +1261,7 @@ namespace Arm {
             return ss.str();
         }
 
-        std::string DisassembleThumb() const {
-            std::stringstream ss;
-            // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
-            return ss.str();
-        };
+        std::string DisassembleThumb() const { return this->Disassemble(); };
     };
 
     /**
@@ -1047,7 +1285,7 @@ namespace Arm {
             bdt.load_psr   = Bit::test(word, 22);
             bdt.write_back = Bit::test(word, 21);
             bdt.load       = Bit::test(word, 20);
-            bdt.rN         = Bit::range(Bit::Mask::between_inc<u32>(19, 16), word);
+            bdt.rN         = reg_t {(u8)Bit::range(Bit::Mask::between_inc<u32>(19, 16), word)};
             bdt.registers  = Bit::mask(Bit::Mask::until_inc<u32>(15), word);
         }
 
@@ -1081,9 +1319,11 @@ namespace Arm {
                 bdt.load_psr   = false;
                 bdt.write_back = true;
                 bdt.load       = load;
-                bdt.rN         = Bit::range<u16>(0x0F00, word);
+                bdt.rN         = reg_t {(u8)Bit::range<u16>(0x0F00, word)};
                 bdt.registers  = Bit::range<u16>(0xFF, word);
             }
+
+            assert(false);
         }
 
         static BlockDataTransfer Assemble(const std::string_view &s) {
@@ -1106,7 +1346,7 @@ namespace Arm {
             // loop through the register bitfield and print set bits
             for(u8 i = 0; i < 16; ++i) {
                 if(Bit::test(registers, i)) {
-                    reg_t r = i;
+                    reg_t r {i};
                     ss << r.to_string() << ", ";
                 }
             }
@@ -1118,8 +1358,25 @@ namespace Arm {
 
         std::string DisassembleThumb() const {
             std::stringstream ss;
-            // TODO
-            ss << to_string(Mnemonic()) << to_string(condition) << " ;TODO";
+
+            if(rN == Registers::SP) {
+                if(load) {
+                    ss << "PUSH";
+                } else {
+                    ss << "POP";
+                }
+            } else {
+                ss << to_string(Mnemonic());
+            }
+            ss << " ";
+
+            // loop through the register bitfield and print set bits
+            for(u8 i = 0; i < 16; ++i) {
+                if(Bit::test(registers, i)) {
+                    reg_t r {i};
+                    ss << r.to_string() << ", ";
+                }
+            }
             return ss.str();
         };
     };
@@ -1136,9 +1393,9 @@ namespace Arm {
             Swap swp {};
             swp.condition = (Condition)Bit::range(Mask::condition, word);
             swp.byte      = Bit::test(word, 22);
-            swp.rN        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
-            swp.rD        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
-            swp.rM        = Bit::range(word, Bit::Mask::between<u32>(16, 19));
+            swp.rN        = reg_t {(u8)Bit::range(word, Bit::Mask::between<u32>(16, 19))};
+            swp.rD        = reg_t {(u8)Bit::range(word, Bit::Mask::between<u32>(16, 19))};
+            swp.rM        = reg_t {(u8)Bit::range(word, Bit::Mask::between<u32>(16, 19))};
             return swp;
         }
 
@@ -1391,5 +1648,4 @@ namespace Arm {
 
     Instruction DecodeArm(u32 word);
     Instruction DecodeThumb(u32 word);
-
 };

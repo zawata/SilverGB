@@ -1,5 +1,7 @@
 #include "arm_instruction.hh"
 
+#include "util/bit.hpp"
+
 namespace Arm {
     std::string DisassembleArm(Instruction const &instr) {
         return std::visit([](const auto &instr) { return instr.Disassemble(); }, instr);
@@ -40,10 +42,15 @@ namespace Arm {
             // MOV/comp/add/sub
             return DataProcessing::DecodeThumb(word);
         case 0x4:
-            if(Bit::test(word, 11)) {
+            if(!Bit::test(word, 11)) {
                 if(!Bit::test(word, 10)) {
-                    // alu
-                    return DataProcessing::DecodeThumb(word);
+                    if(Bit::range(Bit::Mask::between_inc<u16>(6, 9), word) == 0xD) {
+                        // 0xD is a special case for the multiply instruction
+                        return Multiply::DecodeThumb(word);
+                    } else {
+                        // alu operation
+                        return DataProcessing::DecodeThumb(word);
+                    }
                 } else {
                     // HRO/BX
                     if(Bit::range(Bit::Mask::between_inc<u16>(8, 9), word) == 0b11) {
@@ -54,20 +61,30 @@ namespace Arm {
                     }
                 }
             } else {
-                // PC-relative load
+                // pc-relative load
+                return SingleDataTransfer::DecodeThumb(word);
             }
         case 0x5:
-            // LS with reg off
-            // LS with sign-ext
+            if(!Bit::test(word, 9)) {
+                // LS with reg off
+                return SingleDataTransfer::DecodeThumb(word);
+            } else {
+                // LS with sign-ext
+                return HalfwordDataTransfer::DecodeThumb(word);
+            }
         case 0x6:
         case 0x7:
             // LS with imm off
+            return SingleDataTransfer::DecodeThumb(word);
         case 0x8:
             // LS halfword
+            return HalfwordDataTransfer::DecodeThumb(word);
         case 0x9:
             // SP-relative LS
+            return SingleDataTransfer::DecodeThumb(word);
         case 0xa:
             // load addr
+            return DataProcessing::DecodeThumb(word);
             break;
         case 0xb:
             if(Bit::test(word, 10)) {
@@ -75,9 +92,11 @@ namespace Arm {
                 return BlockDataTransfer::DecodeThumb(word);
             } else {
                 // add off
-                return decode_add_off(word);
+                return DataProcessing::DecodeThumb(word);
             }
-        case 0xc: return BlockDataTransfer::DecodeThumb(word);
+        case 0xc:
+            // multiple LS
+            return BlockDataTransfer::DecodeThumb(word);
         case 0xd:
             if(Bit::range(Bit::Mask::between_inc<u16>(8, 11), word) == 0b1111) {
                 // SWI
@@ -87,11 +106,14 @@ namespace Arm {
                 return Branch::DecodeThumb(word);
             }
             break;
-        case 0xe: return Branch::DecodeThumb(word);
+        case 0xe:
+            // branch
         case 0xf:
             // long branch/link
-            break;
+            return Branch::DecodeThumb(word);
         }
+
+        assert(false);
     }
 
     Instruction DecodeArm(const u32 word) {
