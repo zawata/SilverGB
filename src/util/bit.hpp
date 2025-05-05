@@ -218,6 +218,8 @@ namespace Bit {
         if(c) {
             return set(v, i);
         }
+
+        return v;
     }
 
     /**
