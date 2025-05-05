@@ -47,7 +47,7 @@ struct MBC3_Controller: public MBC1_Base {
                 active_reg = data - 0x8;
             } else {
                 read_ram = true;
-                set_ram_bank(data & 0x3);
+                set_ram_bank(data & 0x7);
             }
         } else if(bounded(offset, 0x6000_u16, 0x7FFF_u16)) {
             static bool latch     = false;

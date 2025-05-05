@@ -26,7 +26,7 @@ struct MBC1_Base: public MemoryBankController {
 
     virtual void set_ram_enable(bool ram_enable = true) { this->ram_enable = ram_enable; }
 
-    virtual u8   read(u16 offset) override {
+    u8           read(u16 offset) override {
         if(bounded(offset, CART_ROM_BANK0_START, CART_ROM_BANK0_END)) {
             u32 addr = (u32)offset + (rom_0_bank * ROM_BANK_SIZE);
 
@@ -61,7 +61,7 @@ struct MBC1_Base: public MemoryBankController {
         }
     }
 
-    virtual void write(u16 offset, u8 data) override {
+    void write(u16 offset, u8 data) override {
         if(bounded(offset, CART_RAM_START, CART_RAM_END)) {
             offset -= CART_RAM_START;
 
