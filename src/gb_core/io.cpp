@@ -111,7 +111,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         return cart->read(offset); // cart will handle banking
     } else if(offset <= VIDEO_RAM_END) {
         // 8KB ppu RAM (VRAM)
-        return mem->read_vram(offset);
+        return mem->read_vram(offset, bypass);
     } else if(offset <= CART_RAM_END) {
         // 8KB External RAM
         return cart->read(offset);
@@ -126,7 +126,7 @@ u8 IO_Bus::read(u16 offset, bool bypass) {
         return mem->read_ram(offset - ECHO_RAM_START + WORK_RAM_BANK0_START);
     } else if(offset <= OBJECT_RAM_END) {
         // Sprite attribute table (OAM)
-        return mem->read_oam(offset);
+        return mem->read_oam(offset, bypass);
     } else if(offset <= UNMAPPED_END) {
         // Not Usable
         return 0;
@@ -310,18 +310,21 @@ void IO_Bus::write_reg(u8 loc, u8 data) {
         bootrom_mode = false;
         return;
     case HDMA5_REG:
-        LogDebug("IO_Bus") << "starting " << (Bit::test(data, 7) ? "HDMA" : "GDMA");
         if(hdma_active) {
             hdma_active = false;
             if(Bit::test(data, 7)) {
+                LogDebug("IO_Bus") << "restarting HDMA";
                 hdma_start = true;
             } else {
+                LogDebug("IO_Bus") << "stopping HDMA";
                 data |= 0x80;
             }
         } else {
             if(Bit::test(data, 7)) {
+                LogDebug("IO_Bus") << "starting HDMA";
                 hdma_start = true;
             } else {
+                LogDebug("IO_Bus") << "starting GDMA";
                 gdma_start = true;
             }
         }
@@ -380,10 +383,8 @@ void IO_Bus::gdma_tick() {
         }
         gdma_tick_cnt++;
 
-        if(reg(HDMA5) == 0x7F) {
-            gdma_active = false;
-            reg(HDMA5) |= 0x80;
-
+        if(reg(HDMA5) == 0xFF) {
+            gdma_active   = false;
             gdma_tick_cnt = 0;
         }
     }
@@ -434,12 +435,12 @@ void IO_Bus::gbc_dma_copy_block() {
     u16 src  = regs_to_u16(HDMA1, HDMA2);
     u16 dest = regs_to_u16(HDMA3, HDMA4);
     for(int i = 0; i < 0x10; i++) {
-        write(dest + i, read(src + i));
+        write(0x8000 + dest + i, read(src + i, true));
     }
     regs_from_u16(HDMA1, HDMA2, src + 0x10);
     regs_from_u16(HDMA3, HDMA4, dest + 0x10);
 
-    reg(HDMA5) = (reg(HDMA5) & 0x80) | ((reg(HDMA5) - 1) & 0x7F);
+    reg(HDMA5) -= 1;
 
 #undef regs_from_u16
 #undef regs_to_u16
