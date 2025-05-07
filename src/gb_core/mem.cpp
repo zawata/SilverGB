@@ -273,6 +273,7 @@ void Memory::write_vram(u16 offset, u8 data, bool bypass, bool bypass_bank1) {
 
     if(bypass) {
         ppu_ram[(DMG_VRAM_SIZE * (bypass_bank1 ? 1 : 0)) + offset] = data;
+        return;
     }
 
     if(dev_is_GBC(device) && !get_dmg_compat_mode() && (registers.VBK & VBK_WRITE_MASK)) {

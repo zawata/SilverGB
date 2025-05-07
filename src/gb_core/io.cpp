@@ -391,6 +391,7 @@ void IO_Bus::gdma_tick() {
     if(gdma_start) {
         if(gdma_tick_cnt % 4 == 0) {
             gdma_start    = false;
+            gdma_active   = true;
             gdma_tick_cnt = 0;
         }
         gdma_tick_cnt++;
