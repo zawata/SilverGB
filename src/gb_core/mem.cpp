@@ -31,9 +31,10 @@ Memory::Memory(gb_device_t device, bool bootrom_enabled) :
             memcpy(ppu_ram.data(), ppu_ram_CGB_initial_state, ppu_ram.size());
             memcpy(high_ram.data(), high_ram_CGB_initial_state, high_ram.size());
             memcpy(work_ram.data(), work_ram_CGB_initial_state, work_ram.size());
-        } else {
-            // TODO:
         }
+
+        // TODO:
+        registers = {};
     }
 }
 
