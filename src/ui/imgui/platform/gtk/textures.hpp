@@ -1,14 +1,12 @@
 #pragma once
 
-#include <epoxy/gl.h>
-
-#include "gb_core/core.hpp"
-
 #include "util/types/primitives.hpp"
 
 #include "gtk_application.hpp"
 
 struct GenericTexture {
+    virtual ~GenericTexture() = default;
+
     using SizeType                          = std::pair<u16, u16>;
 
     virtual void    *getTextureId()         = 0;

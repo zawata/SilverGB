@@ -54,7 +54,8 @@ if (APPLE)
             SDL2::SDL2)
 elseif (UNIX)
     target_compile_definitions(gb_main_imgui PRIVATE
-            "-DUSE_SDLINPUT")
+            "-DUSE_SDLINPUT"
+            "-DIMGUI_IMPL_OPENGL_ES3")
 
     target_sources(gb_main_imgui PRIVATE
             "../common/input/gamepad_sdlinput.cpp"
@@ -66,11 +67,13 @@ elseif (UNIX)
     )
 
     pkg_check_modules(GTKMM_VARS REQUIRED IMPORTED_TARGET gtkmm-4.0)
+    pkg_check_modules(EPOXY_VARS REQUIRED IMPORTED_TARGET epoxy)
 
     find_package(SDL2 CONFIG REQUIRED)
 
     target_link_libraries(gb_main_imgui PRIVATE
             PkgConfig::GTKMM_VARS
+            PkgConfig::EPOXY_VARS
             SDL2::SDL2
     )
 elseif (WIN32)

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <memory>
-
 #include "util/file.hpp"
 #include "util/types/pixel.hpp"
 #include "util/types/ringbuffer.hpp"

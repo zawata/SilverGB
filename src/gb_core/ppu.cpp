@@ -1,5 +1,6 @@
 #include "ppu.hpp"
 
+#include <array>
 #include <cassert>
 #include <cstring>
 #include <vector>
@@ -391,6 +392,33 @@ PPU::obj_sprite_t PPU::oam_fetch_sprite(int index) {
             mem->read_oam(loc + 3, true)};
 }
 
+void PPU::process_tile_line(std::array<fifo_color_t, 8> &arr, u8 byte_1, u8 byte_2, u8 bg_attr) {
+    for(int i = 0; i < 8; i++) {
+        u8 x_pixel  = (this->isGBCAllowed() && BG_X_FLIP(bg_attr)) ? (i) : (7 - i);
+
+        u8 tile_idx = ((byte_1 >> x_pixel) & 1);
+        tile_idx |= ((byte_2 >> x_pixel) & 1) << 1;
+
+        fifo_color_t color {};
+        u8           palette_idx;
+        if(this->isGBCAllowed()) {
+            color.priority  = BG_PRIORITY(bg_attr);
+            palette_idx     = BG_PALETTE(bg_attr);
+            color.color_idx = tile_idx & 0x3_u8;
+        } else {
+            tile_idx <<= 1;
+            color.priority  = false;
+            palette_idx     = 0;
+            color.color_idx = (reg(BGP) >> tile_idx) & 0x3_u8;
+        }
+
+        color.palette        = &bg_palettes[palette_idx];
+        color.is_transparent = false;
+
+        arr[i] = color;
+    }
+}
+
 void PPU::enqueue_sprite_data(PPU::obj_sprite_t const &curr_sprite) {
     s8 pixel_line = y_cntr - (curr_sprite.pos_y - 16);
     u8 tile_num   = curr_sprite.tile_num & (LCDC_BIG_SPRITES ? ~1 : ~0);
@@ -607,29 +635,10 @@ void PPU::ppu_tick_vram() {
         // TODO: this should be moved out of the idle clocking as it makes
         // the first fetch 2 clock cycles too long
         if(bg_fifo->size() == 0) {
-            for(int i = 0; i < 8; i++) {
-                u8 x_pixel  = (this->isGBCAllowed() && BG_X_FLIP(attr_byte)) ? (i) : (7 - i);
-
-                u8 tile_idx = ((tile_byte_1 >> x_pixel) & 1);
-                tile_idx |= ((tile_byte_2 >> x_pixel) & 1) << 1;
-
-                fifo_color_t color {};
-                u8           palette_idx;
-                if(this->isGBCAllowed()) {
-                    color.priority  = BG_PRIORITY(attr_byte);
-                    palette_idx     = BG_PALETTE(attr_byte);
-                    color.color_idx = tile_idx & 0x3_u8;
-                } else {
-                    tile_idx <<= 1;
-                    color.priority  = false;
-                    palette_idx     = 0;
-                    color.color_idx = (reg(BGP) >> tile_idx) & 0x3_u8;
-                }
-
-                color.palette        = &bg_palettes[palette_idx];
-                color.is_transparent = false;
-
-                bg_fifo->enqueue(color);
+            std::array<fifo_color_t, 8> arr = { 0 };
+            this->process_tile_line(arr, tile_byte_1, tile_byte_2, attr_byte);
+            for(const fifo_color_t pixel : arr) {
+                bg_fifo->enqueue(pixel);
             }
 
             if(in_window) {

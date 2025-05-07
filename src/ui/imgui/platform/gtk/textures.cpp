@@ -1,5 +1,9 @@
 #include "textures.hpp"
 
+#include <epoxy/gl.h>
+
+#include "gb_core/core.hpp"
+
 struct ScreenTexture: public GenericTexture {
     ScreenTexture() {
         glGenTextures(1, &this->screen_texture);
@@ -52,15 +56,15 @@ private:
 struct BackgroundDebugTexture: public GenericTexture {
     BackgroundDebugTexture() {
         glGenTextures(1, &this->bg_debug_texture);
-        GLuint debug_bg_texture;
-        glGenTextures(1, &debug_bg_texture);
-        glBindTexture(GL_TEXTURE_2D, debug_bg_texture);
+        glBindTexture(GL_TEXTURE_2D, this->bg_debug_texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
         glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        pixelBuf.reserve(256 * 256);
     }
 
     void *getTextureId() override {
@@ -76,9 +80,10 @@ struct BackgroundDebugTexture: public GenericTexture {
             return;
         }
 
+        pixelBuf.clear();
         gtkApp->app->core->getBGBuffer(pixelBuf);
         Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGB>(
-                debug_buffer, Silver::Core::native_pixel_count * 3, pixelBuf);
+                debug_buffer, 256 * 256 * 3, pixelBuf);
 
         // draw screen to texture
         glBindTexture(GL_TEXTURE_2D, this->bg_debug_texture);
@@ -96,15 +101,15 @@ struct VRAMTileDebugTexture: public GenericTexture {
     VRAMTileDebugTexture(int sectionIdx, bool bank1) :
         sectionIdx(sectionIdx), bank1(bank1) {
         glGenTextures(1, &this->vram_debug_texture);
-        GLuint debug_bg_texture;
-        glGenTextures(1, &debug_bg_texture);
-        glBindTexture(GL_TEXTURE_2D, debug_bg_texture);
+        glBindTexture(GL_TEXTURE_2D, this->vram_debug_texture);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 256, 256);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, 128, 64);
         glBindTexture(GL_TEXTURE_2D, 0);
+
+        pixelBuf.reserve(128 * 64);
     }
 
     void *getTextureId() override {
@@ -120,6 +125,7 @@ struct VRAMTileDebugTexture: public GenericTexture {
             return;
         }
 
+        pixelBuf.clear();
         gtkApp->app->core->getVRAMBuffer(pixelBuf, sectionIdx, bank1);
         Silver::PixelBufferEncoder<u8>::encodePixelBuffer<Silver::PixelFormat::RGB>(
                 debug_buffer, 128 * 64 * 3, pixelBuf);
@@ -134,8 +140,8 @@ private:
     u8                         sectionIdx;
     bool                       bank1;
 
-    GLuint                     vram_debug_texture          = 0;
-    u8                         debug_buffer[256 * 256 * 3] = {0};
+    GLuint                     vram_debug_texture         = 0;
+    u8                         debug_buffer[128 * 64 * 3] = {0};
     std::vector<Silver::Pixel> pixelBuf;
 };
 
@@ -146,11 +152,12 @@ void buildTextures(GtkApp *gtkApp) {
     gtkApp->app->debug_bg_texture_id = gtkApp->backgroundDebugTex->getTextureId();
 
     for(int i = 0; i < 3; i++) {
-        int idx                                      = i << 1;
-        gtkApp->vramDebugTex[idx]                    = new VRAMTileDebugTexture(i, false);
-        gtkApp->app->vram_debug_texture_ids[idx]     = gtkApp->vramDebugTex[idx]->getTextureId();
-        gtkApp->vramDebugTex[idx + 1]                = new VRAMTileDebugTexture(i, true);
-        gtkApp->app->vram_debug_texture_ids[idx + 1] = gtkApp->vramDebugTex[idx + 1]->getTextureId();
+        int idx                                  = i << 1;
+        gtkApp->vramDebugTex[idx]                = new VRAMTileDebugTexture(i, false);
+        gtkApp->app->vram_debug_texture_ids[idx] = gtkApp->vramDebugTex[idx]->getTextureId();
+        idx++;
+        gtkApp->vramDebugTex[idx]                = new VRAMTileDebugTexture(i, true);
+        gtkApp->app->vram_debug_texture_ids[idx] = gtkApp->vramDebugTex[idx]->getTextureId();
     }
 }
 
