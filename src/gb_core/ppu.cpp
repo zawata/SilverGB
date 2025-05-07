@@ -198,8 +198,6 @@ PPU::PPU(Cartridge *cart, Memory *mem, gb_device_t device, bool bootrom_enabled 
         obj_priority_mode = false;
     }
 
-    bool cgb_mode = this->isGBCAllowed() && cart->isCGBCart();
-
     if(!bootrom_enabled) {
         LogWarn("PPU") << "Starting PPU without bootrom not fully supported!";
 
@@ -209,7 +207,7 @@ PPU::PPU(Cartridge *cart, Memory *mem, gb_device_t device, bool bootrom_enabled 
         } else if(this->isGBCAllowed()) {
             if(cart->isCGBCart()) {
                 for(auto &bg_palette : bg_palettes) {
-                    bg_palette = {0x7F, 0x7F, 0x7F, 0x7F};
+                    bg_palette = {0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF};
                 }
             } else {
                 // set dmg-style object priority
@@ -365,7 +363,7 @@ u8   PPU::read_bg_color_data() { return get_color_data(&reg(BCPS), bg_palettes);
 
 void PPU::write_obj_color_data(u8 data) { set_color_data(&reg(OCPS), obj_palettes, data); }
 
-u8   PPU::read_obj_color_data() { return get_color_data(&reg(BCPS), bg_palettes); }
+u8   PPU::read_obj_color_data() { return get_color_data(&reg(OCPS), obj_palettes); }
 
 void PPU::set_obj_priority(bool obj_has_priority) {
     // true on DMG and CGB Compat Mode
@@ -402,11 +400,8 @@ void PPU::enqueue_sprite_data(PPU::obj_sprite_t const &curr_sprite) {
     }
 
     u16  addr          = 0x8000 | (tile_num << 4) | (pixel_line << 1);
-
     bool bank1         = this->isGBCAllowed() && OBJ_GBC_VRAM_BANK(curr_sprite);
-
     u8   sprite_tile_1 = mem->read_vram(addr, true, bank1), sprite_tile_2 = mem->read_vram(addr + 1, true, bank1);
-
     u8   palette = !OBJ_GB_PALETTE(curr_sprite) ? reg(OBP0) : reg(OBP1);
 
     for(int i = 0; i < 8; i++) {
