@@ -40,6 +40,10 @@
     {
       "name": "gtkmm",
       "platform": "linux"
+    },
+    {
+      "name": "libepoxy",
+      "platform": "linux"
     }
   ]
 }

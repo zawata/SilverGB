@@ -138,7 +138,18 @@ void buildDebugWindow(Silver::Application *app) {
         }
 
         if(im::BeginTabItem("Tiles")) {
-            im::Image(app->vram_debug_texture_ids[0], {128, 64});
+            if(ImGui::BeginTable("table1", 3)) {
+                for(int i = 0; i < 3; i++) {
+                    ImGui::TableNextRow();
+
+                    int row = i << 1;
+                    ImGui::TableSetColumnIndex(0);
+                    im::Image(app->vram_debug_texture_ids[row], {128, 64});
+                    ImGui::TableSetColumnIndex(1);
+                    im::Image(app->vram_debug_texture_ids[row + 1], {128, 64});
+                }
+                ImGui::EndTable();
+            }
             im::EndTabItem();
         }
 

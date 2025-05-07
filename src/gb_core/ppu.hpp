@@ -85,18 +85,20 @@ public:
     PPU(Cartridge *cart, Memory *mem, gb_device_t device, bool bootrom_enabled);
     ~PPU();
 
-    bool                              tick();
-    obj_sprite_t                      oam_fetch_sprite(int index);
-    void                              write_bg_color_data(u8 data);
-    u8                                read_bg_color_data();
-    void                              write_obj_color_data(u8 data);
-    u8                                read_obj_color_data();
+    bool         tick();
+    obj_sprite_t oam_fetch_sprite(int index);
+    void         process_tile_line(std::array<fifo_color_t, 8> &arr, u8 byte_1, u8 byte_2, u8 bg_attr);
+    void         write_bg_color_data(u8 data);
+    u8           read_bg_color_data();
+    void         write_obj_color_data(u8 data);
+    u8           read_obj_color_data();
 
-    void                              set_obj_priority(bool obj_has_priority);
+    void         set_obj_priority(bool obj_has_priority);
 
     const std::vector<Silver::Pixel> &getPixelBuffer();
 
-    // public because core needs access //TODO: befriend core maybe?
+    // public because core needs access
+    // TODO: befriend core maybe?
     palette_t                         bg_palettes[8];
     palette_t                         obj_palettes[8];
 

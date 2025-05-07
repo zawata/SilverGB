@@ -3,14 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
-#include <memory>
-#include <ratio>
 #include <vector>
 
 #include "util/bit.hpp"
 #include "util/log.hpp"
 #include "util/types/pixel.hpp"
-#include "util/util.hpp"
 
 #include "defs.hpp"
 #include "joy.hpp"
@@ -281,29 +278,6 @@ namespace Silver {
         return {mem->read_vram(addr, true, bank1), mem->read_vram(addr + 1, true, bank1)};
     }
 
-    void Core::parseTileLine(std::array<Silver::Pixel, 8> &arr, u8 byte_1, u8 byte_2, u8 bg_attr) {
-        for(int tile_x = 0; tile_x < 8; tile_x++) {
-            u8 tile_x_bit = ((dev_is_GBC(device) && BG_X_FLIP(bg_attr)) ? (tile_x) : (7 - tile_x));
-
-            u8 tile_idx   = ((byte_1 >> tile_x_bit) & 1);
-            tile_idx |= ((byte_2 >> tile_x_bit) & 1) << 1;
-
-            u8 color_idx;
-            u8 palette_idx;
-            if(dev_is_GBC(device)) {
-                color_idx   = tile_idx & 0x3_u8;
-                palette_idx = BG_PALETTE(bg_attr);
-            } else {
-                tile_idx <<= 1;
-                color_idx   = (reg(BGP) >> (tile_idx << 1)) & 0x3_u8;
-                palette_idx = 0;
-            }
-
-            auto p      = Silver::Pixel::makeFromRGB15(ppu->bg_palettes[palette_idx].colors[color_idx]);
-            arr[tile_x] = p;
-        }
-    }
-
     // 16x8 tiles, 128x64 pixels
     void Core::getVRAMBuffer(std::vector<Pixel> &vec, u8 vramIdx, bool vramBank) {
         u16 baseAddr = 0x8000;
@@ -315,16 +289,20 @@ namespace Silver {
         }
 
         for(u8 y = 0; y < 64; y++) {
-            for(u8 x_tile = 0; x_tile <= 16; x_tile++) {
-                u8  y_tile = y >> 3;
-                u16 addr   = baseAddr | (y_tile << 8) | x_tile;
+            for(u8 x_tile = 0; x_tile < 16; x_tile++) {
+                u8  y_tile      = y >> 3;
+                u8  tile_idx    = (y_tile << 4) + x_tile;
+                u8  tile_y_line = y & 0x7;
+                u16 addr        = baseAddr;
+                addr += ((tile_idx & 0x7F) << 4) | (tile_y_line << 1);
 
-                u8  byte_1, byte_2;
-                std::tie(byte_1, byte_2) = getTileLineByAddr(addr, vramBank);
+                u8 byte_1, byte_2;
+                std::tie(byte_1, byte_2)             = getTileLineByAddr(addr, vramBank);
 
-                std::array<Pixel, 8> arr;
-                parseTileLine(arr, byte_1, byte_2, 0);
-                for(const auto &pixel : arr) {
+                std::array<PPU::fifo_color_t, 8> arr = {0};
+                ppu->process_tile_line(arr, byte_1, byte_2, 0);
+                for(const auto &color : arr) {
+                    auto pixel = Silver::Pixel::makeFromRGB15(color.palette->colors[color.color_idx]);
                     vec.push_back(pixel);
                 }
             }
@@ -333,8 +311,6 @@ namespace Silver {
 
     // 32 x 32 tiles, 256x256 pixels
     void Core::getBGBuffer(std::vector<Pixel> &vec) {
-        vec.clear();
-        vec.reserve(256 * 256);
         for(int y = 0; y < 256; y++) {
             for(int x_tile = 0; x_tile < 32; x_tile++) {
                 u16 tile_addr;
@@ -342,11 +318,12 @@ namespace Silver {
                 std::tie(tile_addr, bg_attr) = calcTileAddrForCoordinate(false, x_tile, y);
 
                 u8 byte_1, byte_2;
-                std::tie(byte_1, byte_2) = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
+                std::tie(byte_1, byte_2)             = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
 
-                std::array<Pixel, 8> arr;
-                parseTileLine(arr, byte_1, byte_2, bg_attr);
-                for(const auto &pixel : arr) {
+                std::array<PPU::fifo_color_t, 8> arr = {0};
+                ppu->process_tile_line(arr, byte_1, byte_2, bg_attr);
+                for(const auto &color : arr) {
+                    auto pixel = Silver::Pixel::makeFromRGB15(color.palette->colors[color.color_idx]);
                     vec.push_back(pixel);
                 }
             }
@@ -354,19 +331,19 @@ namespace Silver {
     }
 
     // void Core::getWNDBuffer(std::vector<Pixel> &vec) {
-    //     vec.clear();
-    //     vec.reserve(256*256);
     //     for(int y = 0; y < 256; y++) {
     //         for(int x_tile = 0; x_tile < 32; x_tile++) {
     //             u16 tile_addr;
-    //             u8 bg_attr;
-    //             std::tie(tile_addr, bg_attr) = calcTileAddrForCoordinate(true, x_tile, y);
-
+    //             u8  bg_attr;
+    //             std::tie(tile_addr, bg_attr) = calcTileAddrForCoordinate(false, x_tile, y);
+    //
     //             u8 byte_1, byte_2;
-    //             std::tie(byte_1, byte_2) = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
-    //             std::array<Pixel, 8> arr;
-    //             parseTileLine(arr, byte_1, byte_2, bg_attr);
-    //             for(const auto &pixel : arr) {
+    //             std::tie(byte_1, byte_2)             = getTileLineByAddr(tile_addr, BG_VRAM_BANK(bg_attr));
+    //
+    //             std::array<PPU::fifo_color_t, 8> arr = {0};
+    //             ppu->process_tile_line(arr, byte_1, byte_2, bg_attr);
+    //             for(const auto &color : arr) {
+    //                 auto pixel = Silver::Pixel::makeFromRGB15(color.palette->colors[color.color_idx]);
     //                 vec.push_back(pixel);
     //             }
     //         }
