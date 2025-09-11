@@ -1,0 +1,72 @@
+# https://clang.llvm.org/docs/ClangFormat.html
+# https://clang-format-configurator.site/
+---
+BasedOnStyle: WebKit
+AlignAfterOpenBracket: AlwaysBreak
+AlignArrayOfStructures: Right
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  PadOperators: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  PadOperators: true
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  PadOperators: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+AlignEscapedNewlines: DontAlign
+AlignOperands: AlignAfterOperator
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+AllowShortCaseLabelsOnASingleLine: true
+AttributeMacros:
+  - __force_inline
+BinPackArguments: false
+BracedInitializerIndentWidth: 4
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: AfterColon
+BreakInheritanceList: AfterColon
+BreakTemplateDeclarations: Yes
+ColumnLimit: 120
+ContinuationIndentWidth: 8
+Cpp11BracedListStyle: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: ^<[^\/]*?>
+    Priority: 1
+  - Regex: ^<.+>
+    Priority: 2
+  - Regex: ^"(gb_core|gba_core)/
+    Priority: 3
+  - Regex: ^"(util)/
+    Priority: 4
+  - Regex: .*
+    Priority: 5
+InsertBraces: true
+NamespaceIndentation: All
+PackConstructorInitializers: NextLineOnly
+PointerAlignment: Right
+SpaceAfterTemplateKeyword: false
+SpaceBeforeInheritanceColon: false
+SpaceBeforeParens: Custom
+SpaceBeforeParensOptions:
+  AfterControlStatements: false
+  AfterForeachMacros: false
+  AfterIfMacros: false
+  AfterOverloadedOperator: true
+TabWidth: 4
+

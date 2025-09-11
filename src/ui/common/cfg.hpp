@@ -9,18 +9,18 @@
 
 // Turns out win32 isn't the only OS to give me a headache 🙃
 #if defined(_X11_XLIB_H_)
-    #undef Bool
-    #undef Status
-    #undef False
-    #undef True
+#undef Bool
+#undef Status
+#undef False
+#undef True
 #endif
 
 #if defined(X_H)
-    #undef None
+#undef None
 #endif
 
 #if defined(_OBJC_OBJC_H_)
-    #undef Nil
+#undef Nil
 #endif
 
 #include <nop/serializer.h>
@@ -29,9 +29,11 @@
 
 class FileReader {
     Silver::File *file;
-    u32 pos = 0;
+    u32           pos = 0;
+
 public:
-    FileReader(Silver::File *file) : file(file), pos(0) {}
+    FileReader(Silver::File *file) :
+        file(file), pos(0) { }
 
     nop::Status<void> Ensure(std::size_t size) {
         if((pos + size) >= file->getSize()) {
@@ -40,15 +42,17 @@ public:
         return nop::ErrorStatus::None;
     }
 
-    nop::Status<void> Read(std::uint8_t* byte) {
-        if(pos == file->getSize()) return nop::ErrorStatus::ReadLimitReached;
+    nop::Status<void> Read(std::uint8_t *byte) {
+        if(pos == file->getSize()) {
+            return nop::ErrorStatus::ReadLimitReached;
+        }
         *byte = file->getByte(pos++);
         return nop::ErrorStatus::None;
     }
 
-    nop::Status<void> Read(void* begin, void* end) {
+    nop::Status<void> Read(void *begin, void *end) {
         size_t sz = intptr_t(end) - intptr_t(begin);
-        file->getBuffer(pos, (u8*)begin, sz);
+        file->getBuffer(pos, (u8 *)begin, sz);
         if((pos + sz) >= file->getSize()) {
             pos = file->getSize();
             return nop::ErrorStatus::ReadLimitReached;
@@ -68,13 +72,13 @@ public:
 
 class FileWriter {
     Silver::File *file;
-    u32 pos = 0;
-public:
-    FileWriter(Silver::File *file) : file(file), pos(0) {}
+    u32           pos = 0;
 
-    nop::Status<void> Prepare(std::size_t size) {
-        return nop::ErrorStatus::None;
-    }
+public:
+    FileWriter(Silver::File *file) :
+        file(file), pos(0) { }
+
+    nop::Status<void> Prepare(std::size_t size) { return nop::ErrorStatus::None; }
 
     nop::Status<void> Write(std::uint8_t byte) {
         file->setByte(pos, byte);
@@ -82,7 +86,7 @@ public:
         return nop::ErrorStatus::None;
     }
 
-    nop::Status<void> Write(const void* begin, const void* end) {
+    nop::Status<void> Write(const void *begin, const void *end) {
         size_t sz = intptr_t(end) - intptr_t(begin);
         file->setBuffer(pos, (u8 *)begin, sz);
         pos += sz;
@@ -105,61 +109,49 @@ struct _Config_Section_Base {
     virtual void setDefaults() = 0;
 };
 
-
 struct Config_FileSettings: _Config_Section_Base {
-    //abs path
-    std::string recent_dir;
-    //abs path + filename
+    // abs path
+    std::string              recent_dir;
+    // abs path + filename
     std::vector<std::string> recent_files;
 
-    void setDefaults() {
+    void                     setDefaults() {
         recent_dir = "";
         recent_files.clear();
     }
 
-    NOP_STRUCTURE(Config_FileSettings,
-            recent_dir,
-            recent_files);
+    NOP_STRUCTURE(Config_FileSettings, recent_dir, recent_files);
 };
 
 struct Config_ViewSettings: _Config_Section_Base {
     // greater than zero
     unsigned int size;
 
-    void setDefaults() {
-        size = 2;
-    }
+    void         setDefaults() { size = 2; }
 
-    NOP_STRUCTURE(Config_ViewSettings,
-            size);
+    NOP_STRUCTURE(Config_ViewSettings, size);
 };
 
 struct Config_EmulationSettings: _Config_Section_Base {
-    //abs path + filename
+    // abs path + filename
     std::string bios_file;
 
-    void setDefaults() {
-        bios_file = "";
-    }
+    void        setDefaults() { bios_file = ""; }
 
-    NOP_STRUCTURE(Config_EmulationSettings,
-            bios_file);
+    NOP_STRUCTURE(Config_EmulationSettings, bios_file);
 };
 
 class Config {
     static constexpr const char *filename = "Silver.cfg";
+
 public:
-    Config_FileSettings fileSettings;
-    Config_ViewSettings viewSettings;
+    Config_FileSettings      fileSettings;
+    Config_ViewSettings      viewSettings;
     Config_EmulationSettings emulationSettings;
 
-    Config() {
-        Load();
-    }
+    Config() { Load(); }
 
-    ~Config() {
-        Save();
-    }
+    ~Config() { Save(); }
 
     void Load() {
         if(Silver::File::fileExists(filename)) {
@@ -173,16 +165,13 @@ public:
             viewSettings.setDefaults();
             emulationSettings.setDefaults();
         }
-
-
     }
 
     void Save() {
         Silver::File *file;
         if(Silver::File::fileExists(filename)) {
             file = Silver::File::openFile(filename, true, true);
-        }
-        else {
+        } else {
             file = Silver::File::createFile(filename);
         }
         nop::Serializer<FileWriter> serializer(file);

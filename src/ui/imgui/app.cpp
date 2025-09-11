@@ -1,12 +1,14 @@
-#include <chrono>
+#include "app.hpp"
+
 #include <argparse/argparse.hpp>
+#include <chrono>
 #include <memory>
 
-#include "app.hpp"
+#include "util/log.hpp"
+
 #include "gui.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "util/log.hpp"
 
 /**
  * Called as early as possible when the app starts
@@ -19,27 +21,21 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
     /**
      * Argument Declaration
      */
-    program.add_argument("-f", "--file")
-            .help("open file")
-            .default_value(std::string(""));
+    program.add_argument("-f", "--file").help("open file").default_value(std::string(""));
 
     program.add_argument("-l", "--log-level")
             .help("Log Level")
             .choices("debug", "info", "warn", "error", "fatal")
             .default_value("warn");
 
-    program.add_argument("-e", "--emu-bios")
-            .help("use eumlated bios")
-            .default_value(false)
-            .implicit_value(true);
+    program.add_argument("-e", "--emu-bios").help("use eumlated bios").default_value(false).implicit_value(true);
 
     /**
      * Argument Parsing
      */
     try {
         program.parse_args(argc, argv);
-    }
-    catch (const std::runtime_error &err) {
+    } catch(const std::runtime_error &err) {
         LogFatal("argparse") << err.what();
         LogFatal("argparse") << program;
         exit(-1);
@@ -47,12 +43,12 @@ void Silver::Application::onInit(int argc, const char *argv[]) {
 
     Silver::getLogger().setLogLevel(program.get<std::string>("--log-level"));
 
-    this->config = std::make_shared<Config>();
-    this->binding = std::make_shared<Binding::Tracker>();
+    this->config         = std::make_shared<Config>();
+    this->binding        = std::make_shared<Binding::Tracker>();
     this->gamepadManager = std::make_shared<GamepadManager>();
 
     // config->BIOS.set_bios_enabled(!program.get<bool>("--emu-bios"));
-    auto filename = program.get<std::string>("--file");
+    auto filename        = program.get<std::string>("--file");
     this->onLoadRomFile(filename);
 }
 
@@ -67,12 +63,9 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
     auto fileMenu = Menu();
     fileMenu.addItem<CallbackMenuItem>("Open file", [this](const CallbackMenuItem &, void *) {
         this->window_cb.openFileDialog(
-                "Open Rom",
-                "Gameboy ROM:gb;Gameboy Color ROM:gbc;bin",
-                [this](const std::string &filepath) {
+                "Open Rom", "Gameboy ROM:gb;Gameboy Color ROM:gbc;bin", [this](const std::string &filepath) {
                     this->onLoadRomFile(filepath);
-                }
-        );
+                });
     });
     fileMenu.addSeparator();
     fileMenu.addItem<CallbackMenuItem>("Exit", [this](const CallbackMenuItem &, void *) {
@@ -84,13 +77,18 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
      * Emulation
      */
     auto emulationMenu = Menu();
-    emulationMenu.addItem<CallbackMenuItem>("Reset", [this](const CallbackMenuItem &, void *) {
-        // TODO: not sure this is safe
-        this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
-    }, nullptr);
-    emulationMenu.addItem<ToggleMenuItem>("Paused", [this](const ToggleMenuItem &, bool new_state, void *) {
-        this->app_state.game.running = !new_state;
-    }, nullptr, false);
+    emulationMenu.addItem<CallbackMenuItem>(
+            "Reset",
+            [this](const CallbackMenuItem &, void *) {
+                // TODO: not sure this is safe
+                this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
+            },
+            nullptr);
+    emulationMenu.addItem<ToggleMenuItem>(
+            "Paused",
+            [this](const ToggleMenuItem &, bool new_state, void *) { this->app_state.game.running = !new_state; },
+            nullptr,
+            false);
     menubar->addItem<Silver::SubMenuItem>("Emulation", emulationMenu);
 
     /**
@@ -114,8 +112,8 @@ void Silver::Application::onLoadRomFile(const std::string &filePath) {
         return;
     }
 
-    this->rom_file = Silver::File::openFile(filePath);
-    this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
+    this->rom_file               = Silver::File::openFile(filePath);
+    this->core                   = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
     this->app_state.game.running = true;
 }
 
@@ -130,15 +128,15 @@ void Silver::Application::onLoadBootRomFile(const std::string &filePath) {
 float get_calc_fps() {
     using Clock = std::chrono::high_resolution_clock;
     static Clock::time_point last_invocation;
-    static u64 rollingDeltaMicroseconds = 0;
+    static u64               rollingDeltaMicroseconds = 0;
 
-    u64 nsDelta = (Clock::now() - last_invocation).count();
+    u64                      nsDelta                  = (Clock::now() - last_invocation).count();
 
     rollingDeltaMicroseconds += (nsDelta / 1000);
     rollingDeltaMicroseconds >>= 1;
 
     last_invocation = Clock::now();
-    return 1000000.0f / (float) rollingDeltaMicroseconds;
+    return 1000000.0f / (float)rollingDeltaMicroseconds;
 }
 
 void Silver::Application::onUpdate() {
@@ -147,15 +145,15 @@ void Silver::Application::onUpdate() {
     // run periodic updates
     gamepadManager->updateGamepads(this->binding);
 
-    bool isOptionsComboPressed = binding->isButtonPressed(Binding::Button::Start)
-            && binding->isButtonPressed(Binding::Button::Select);
+    bool isOptionsComboPressed
+            = binding->isButtonPressed(Binding::Button::Start) && binding->isButtonPressed(Binding::Button::Select);
     if(isOptionsComboPressed) {
         this->app_state.ui.show_options = !this->app_state.ui.show_options;
     }
 
     if(this->core) {
         // update inputs
-        Joypad::button_states_t buttonsState{};
+        Joypad::button_states_t buttonsState {};
         binding->getButtonStates(buttonsState);
         this->core->set_input_state(buttonsState);
 
@@ -179,17 +177,17 @@ void Silver::Application::onUpdate() {
         buildFpsWindow(fps);
     }
 
-    if (this->app_state.debug.enabled) {
+    if(this->app_state.debug.enabled) {
         buildDebugWindow(this);
     }
 }
 
 void Silver::Application::onClose() {
-    //TODO
+    // TODO
     exit(0);
 }
 
 Silver::Application *Silver::getApp() {
-    static Silver::Application app{};
+    static Silver::Application app {};
     return &app;
 }

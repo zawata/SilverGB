@@ -1,35 +1,31 @@
-#include "portaudio.h"
-
 #include "audio.hpp"
 
 #include "util/log.hpp"
 
+#include "portaudio.h"
+
 int _audio_callback(
-    const void *inputBuffer,
-    void *outputBuffer,
-    unsigned long nBufferFrames,
-    const PaStreamCallbackTimeInfo *timeInfo,
-    PaStreamCallbackFlags statusFlags,
-    void *userData
-) {
-    //NOTE: nBufferFrames is equal to
-    // buff_size / channel_count / sizeof(float)
+        const void *inputBuffer, void *outputBuffer, unsigned long nBufferFrames,
+        const PaStreamCallbackTimeInfo *timeInfo, PaStreamCallbackFlags statusFlags, void *userData) {
+    // NOTE: nBufferFrames is equal to
+    //  buff_size / channel_count / sizeof(float)
     static_cast<Silver::Core *>(userData)->do_audio_callback((float *)outputBuffer, nBufferFrames);
     return 0;
 }
 
-Silver::AudioManager::AudioManager(void *audio_dev): audio_dev(audio_dev) {}
+Silver::AudioManager::AudioManager(void *audio_dev) :
+    audio_dev(audio_dev) { }
 
 Silver::AudioManager *Silver::AudioManager::init_audio(Silver::Core *core) {
     PaStream *stream;
 
-    PaError err = Pa_Initialize();
+    PaError   err = Pa_Initialize();
     if(err != paNoError) {
         LogError("AudioManager/PortAudio") << "Error Initializing: " << Pa_GetErrorText(err);
         return nullptr;
     }
 
-    //TODO: input/output parameters with Pa_OpenStream
+    // TODO: input/output parameters with Pa_OpenStream
     err = Pa_OpenDefaultStream(
             &stream,         // stream Device
             0,               // no input channels
@@ -59,7 +55,6 @@ Silver::AudioManager::~AudioManager() {
         LogError("AudioManager/PortAudio") << "Error Terminating: " << Pa_GetErrorText(err);
     }
 }
-
 
 void Silver::AudioManager::start_audio() {
     PaError err = Pa_StartStream(static_cast<PaStream *>(this->audio_dev));

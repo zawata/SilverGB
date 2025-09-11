@@ -1,21 +1,19 @@
-#include <cassert>
-#include <vector>
-
-#include <nowide/iostream.hpp>
-
 #include "gba_core/cart.hpp"
 
+#include <cassert>
+#include <nowide/iostream.hpp>
+#include <vector>
+
+#include "util/bit.hpp"
 #include "util/file.hpp"
 #include "util/util.hpp"
-#include "util/primitives.hpp"
-#include "util/bit.hpp"
 
 /**
  * Cartridge Data
  */
-std::string get_ram_file_name(std::string rom_file_name) {
+std::string get_ram_file_name(const std::string &rom_file_name) {
     std::string ram_file_name = rom_file_name;
-    auto ext = rom_file_name.find_last_of('.') + 1;
+    auto        ext           = rom_file_name.find_last_of('.') + 1;
 
     ram_file_name.erase(ext, std::string::npos);
     ram_file_name.append("sav");
@@ -23,7 +21,7 @@ std::string get_ram_file_name(std::string rom_file_name) {
     return ram_file_name;
 }
 
-bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u32> &ram_buffer) {
+bool Cartridge::loadRAMFile(const std::string &ram_file_name, std::vector<u32> &ram_buffer) {
     if(!Silver::File::fileExists(ram_file_name)) {
         nowide::cout << "SAV File: does not exist" << std::endl;
         return false;
@@ -46,12 +44,11 @@ bool Cartridge::loadRAMFile(std::string ram_file_name, std::vector<u32> &ram_buf
     return true;
 }
 
-bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u32> const& ram_buffer) {
+bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u32> const &ram_buffer) {
     Silver::File *ram_file;
     if(Silver::File::fileExists(ram_file_name)) {
         ram_file = Silver::File::openFile(ram_file_name, true, true);
-    }
-    else {
+    } else {
         ram_file = Silver::File::createFile(ram_file_name);
     }
 
@@ -67,15 +64,16 @@ bool Cartridge::saveRAMFile(std::string ram_file_name, std::vector<u32> const& r
 }
 
 Cartridge::Cartridge(Silver::File *f) :
-rom_file(f) {
+    rom_file(f) {
     f->toVector<u32>(rom);
 
-    //TODO: Cartridge RAM
+    // TODO: Cartridge RAM
 }
 
-Cartridge::~Cartridge() {};
+Cartridge::~Cartridge() = default;
 
-u32   Cartridge::read(u32 offset)  { return rom.at(offset); }
+u32  Cartridge::read(u32 offset) const { return rom.at(offset >> 2); }
+
 void Cartridge::write(u32 offset, u32 data) {
     nowide::cout << "tried to write " << as_hex(data) << " to " << as_hex(offset) << std::endl;
 }

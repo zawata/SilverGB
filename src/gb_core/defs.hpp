@@ -1,52 +1,52 @@
 #pragma once
 
-#include "util/types/primitives.hpp"
 #include "util/flags.hpp"
+#include "util/types/primitives.hpp"
 
-#define GB_BOOTROM_SZ 0x0100
-#define GBC_BOOTROM_SZ 0x0900
+#define GB_BOOTROM_SZ   0x0100
+#define GBC_BOOTROM_SZ  0x0900
 
 #define TICKS_PER_FRAME 70224
 
-//inclusive
+// inclusive
 enum gb_mem_map_t : u16 {
-  GB_BOOTROM_START = 0,
-  GB_BOOTROM_END   = 0xFF,
-  GBC_BOOTROM_START = 0x200,
-  GBC_BOOTROM_END   = 0x8FF,
+    GB_BOOTROM_START     = 0,
+    GB_BOOTROM_END       = 0xFF,
+    GBC_BOOTROM_START    = 0x200,
+    GBC_BOOTROM_END      = 0x8FF,
 
-  CART_ROM_BANK0_START = 0,
-  CART_ROM_BANK0_END   = 0x3FFF,
-  CART_ROM_BANK1_START = 0x4000,
-  CART_ROM_BANK1_END   = 0x7FFF,
+    CART_ROM_BANK0_START = 0,
+    CART_ROM_BANK0_END   = 0x3FFF,
+    CART_ROM_BANK1_START = 0x4000,
+    CART_ROM_BANK1_END   = 0x7FFF,
 
-  VIDEO_RAM_START = 0x8000,
-  VIDEO_RAM_END   = 0x9FFF,
+    VIDEO_RAM_START      = 0x8000,
+    VIDEO_RAM_END        = 0x9FFF,
 
-  CART_RAM_START = 0xA000,
-  CART_RAM_END   = 0xBFFF,
+    CART_RAM_START       = 0xA000,
+    CART_RAM_END         = 0xBFFF,
 
-  WORK_RAM_BANK0_START = 0xC000,
-  WORK_RAM_BANK0_END   = 0xCFFF,
-  WORK_RAM_BANK1_START = 0xD000,
-  WORK_RAM_BANK1_END   = 0xDFFF,
+    WORK_RAM_BANK0_START = 0xC000,
+    WORK_RAM_BANK0_END   = 0xCFFF,
+    WORK_RAM_BANK1_START = 0xD000,
+    WORK_RAM_BANK1_END   = 0xDFFF,
 
-  ECHO_RAM_START = 0xE000,
-  ECHO_RAM_END   = 0xFDFF,
+    ECHO_RAM_START       = 0xE000,
+    ECHO_RAM_END         = 0xFDFF,
 
-  OBJECT_RAM_START = 0xFE00,
-  OBJECT_RAM_END   = 0xFE9F,
+    OBJECT_RAM_START     = 0xFE00,
+    OBJECT_RAM_END       = 0xFE9F,
 
-  UNMAPPED_START = 0xFEA0,
-  UNMAPPED_END   = 0xFEFF,
+    UNMAPPED_START       = 0xFEA0,
+    UNMAPPED_END         = 0xFEFF,
 
-  IO_REGS_START = 0xFF00,
-  IO_REGS_END   = 0xFF7F,
+    IO_REGS_START        = 0xFF00,
+    IO_REGS_END          = 0xFF7F,
 
-  HIGH_RAM_START = 0xFF80,
-  HIGH_RAM_END   = 0xFFFE,
+    HIGH_RAM_START       = 0xFF80,
+    HIGH_RAM_END         = 0xFFFE,
 
-  IE_REG_OFFSET = 0xFFFF
+    IE_REG_OFFSET        = 0xFFFF
 };
 
 enum gb_device_t {
@@ -55,15 +55,15 @@ enum gb_device_t {
     device_GB_cpu_dmg,
     device_GB = device_GB_cpu_dmg,
 
-    //Gameboy Pocket
+    // Gameboy Pocket
     device_MGB_cpu_mgb,
     device_MGB = device_MGB_cpu_mgb,
 
-    //Super Gameboy
+    // Super Gameboy
     device_SGB_cpu_sgb,
     device_SGB = device_SGB_cpu_sgb,
 
-    //Super Gameboy 2
+    // Super Gameboy 2
     device_SGB2_cpu_sgb2,
     device_SGB2 = device_SGB2_cpu_sgb2,
 
@@ -74,38 +74,17 @@ enum gb_device_t {
     device_GBC = device_GBC_cpu_cgb,
 };
 
-constexpr const char *cpu_names[] = {
-    "dmg0",
-    "dmg",
-    "mgb",
-    "gb",
-    "sgb2",
-    "cgb0",
-    "cgb",
-    "cgb_agb"
-};
+constexpr const char *cpu_names[] = {"dmg0", "dmg", "mgb", "gb", "sgb2", "cgb0", "cgb", "cgb_agb"};
 
-#define dev_is_GB(x) (          \
-  (x) == device_GB_cpu_dmg0 ||  \
-  (x) == device_GB_cpu_dmg ||   \
-  (x) == device_MGB_cpu_mgb)
+#define dev_is_GB(x)  ((x) == device_GB_cpu_dmg0 || (x) == device_GB_cpu_dmg || (x) == device_MGB_cpu_mgb)
 
-#define dev_is_SGB(x) (         \
-  (x) == device_SGB_cpu_sgb ||  \
-  (x) == device_SGB2_cpu_sgb2)
+#define dev_is_SGB(x) ((x) == device_SGB_cpu_sgb || (x) == device_SGB2_cpu_sgb2)
 
-#define dev_is_GBC(x) (         \
-  (x) == device_GBC_cpu_cgb0 || \
-  (x) == device_GBC_cpu_cgb ||  \
-  (x) == device_GBC_cpu_cgb_agb)
+#define dev_is_GBC(x) ((x) == device_GBC_cpu_cgb0 || (x) == device_GBC_cpu_cgb || (x) == device_GBC_cpu_cgb_agb)
 
+enum bootrom_crc_ { DMG_BOOTROM_CRC = 0x59c8598e };
 
-enum bootrom_crc_ {
-  DMG_BOOTROM_CRC = 0x59c8598e
-};
-
-
-extern u8 get_default_idx(gb_device_t device);
+extern u8       get_default_idx(gb_device_t device);
 
 extern const u8 default_reg_values[55][4];
 extern const u8 oam_ram_CGB_initial_state[];
@@ -113,10 +92,10 @@ extern const u8 ppu_ram_CGB_initial_state[];
 extern const u8 high_ram_CGB_initial_state[];
 extern const u8 work_ram_CGB_initial_state[];
 
-//Every register has defined its:
-// - Location from the IO Offset
-// - Bits that can be written in the form of a mask
-// - Bits that can be read in the form of a mask
+// Every register has defined its:
+//  - Location from the IO Offset
+//  - Bits that can be written in the form of a mask
+//  - Bits that can be read in the form of a mask
 
 // Ports Register
 #define P1_REG           0x00
@@ -129,9 +108,9 @@ extern const u8 work_ram_CGB_initial_state[];
 #define SB_WRITE_MASK    0xFF
 #define SB_READ_MASK     SB_WRITE_MASK
 
-//Serial Clock
+// Serial Clock
 #define SC_REG           0x02
-#define SC_WRITE_MASK    0x81 //TODO: CGB Clock Speed
+#define SC_WRITE_MASK    0x81 // TODO: CGB Clock Speed
 #define SC_READ_MASK     SC_WRITE_MASK
 #define SC_DEFAULTS      ~SC_WRITE_MASK
 
@@ -421,9 +400,9 @@ extern const u8 work_ram_CGB_initial_state[];
 #define OPRI_READ_MASK   OPRI_WRITE_MASK
 
 // WRAM Bank Select
-#define SVBK_REG        0x70
-#define SVBK_WRITE_MASK 0x07
-#define SVBK_READ_MASK  SVBK_WRITE_MASK
+#define SVBK_REG         0x70
+#define SVBK_WRITE_MASK  0x07
+#define SVBK_READ_MASK   SVBK_WRITE_MASK
 
 // Interrupt Enable
 #define IE_REG           0xFF

@@ -16,7 +16,7 @@ if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 endif()
 message("Using Toolchain file at: ${CMAKE_TOOLCHAIN_FILE}")
 
-option(BUILD_SDL_UI "Build the SDL UI" ON)
+option(BUILD_SDL_UI "Build the SDL UI" OFF)
 option(BUILD_IMGUI_UI "Build the ImGui UI" ON)
 option(BUILD_WITH_ASAN "Build with AddressSanitizer enabled" OFF)
 

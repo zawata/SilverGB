@@ -1,31 +1,29 @@
+#include "gui.hpp"
+
 #include <cmath>
 
 #include "imgui.h"
-#include "gui.hpp"
 
 GUI::GUI(Config *config) :
-        config(config) {
-}
+    config(config) { }
 
-GUI::~GUI() {
-    delete config;
-}
+GUI::~GUI() { delete config; }
 
 static void get_screen_area(const ImVec2 &win_bounds, ImVec2 &top_left, ImVec2 &bottom_right) {
-    //auto screen sizing and placement code
-    float scaling_factor =
-            std::fmin(win_bounds.x / Silver::Core::native_width, win_bounds.y / Silver::Core::native_height);
-    float width = scaling_factor * Silver::Core::native_width;
-    float height = scaling_factor * Silver::Core::native_height;
+    // auto screen sizing and placement code
+    float scaling_factor
+            = std::fmin(win_bounds.x / Silver::Core::native_width, win_bounds.y / Silver::Core::native_height);
+    float width      = scaling_factor * Silver::Core::native_width;
+    float height     = scaling_factor * Silver::Core::native_height;
     float wRemainder = win_bounds.x - width;
     float hRemainder = win_bounds.y - height;
 
-    top_left = {wRemainder / 2.0f, hRemainder / 2.0f};
-    bottom_right = {top_left.x + width, top_left.y + height};
+    top_left         = {wRemainder / 2.0f, hRemainder / 2.0f};
+    bottom_right     = {top_left.x + width, top_left.y + height};
 }
 
 void buildScreenView(Silver::Application *app) {
-    namespace im = ImGui;
+    namespace im          = ImGui;
     bool drawToBackground = true;
 
     if(app->app_state.debug.enabled) {
@@ -35,13 +33,13 @@ void buildScreenView(Silver::Application *app) {
     if(drawToBackground) {
         ImVec2 top_left, bottom_right;
         get_screen_area(ImGui::GetMainViewport()->WorkSize, top_left, bottom_right);
-        ImGui::GetBackgroundDrawList()->AddImage((void *) app->screen_texture_id, top_left, bottom_right);
+        ImGui::GetBackgroundDrawList()->AddImage((void *)app->screen_texture_id, top_left, bottom_right);
     } else {
         // TODO: set the sive of this better
         if(im::Begin("Game")) {
             ImVec2 size = im::GetWindowSize();
             im::BeginChild("##Render");
-            im::Image((void *) app->screen_texture_id, size);
+            im::Image((void *)app->screen_texture_id, size);
             im::EndChild();
         }
 
@@ -55,21 +53,17 @@ void buildFpsWindow(float fps) {
     im::PushStyleVar(ImGuiStyleVar_WindowRounding, 2.0f);
     im::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
     im::PushStyleVar(ImGuiStyleVar_WindowMinSize, {20, 20});
-    im::Begin("FPS", nullptr,
-              ImGuiWindowFlags_NoTitleBar |
-                      ImGuiWindowFlags_NoResize |
-                      ImGuiWindowFlags_NoMove |
-                      ImGuiWindowFlags_NoScrollbar |
-                      ImGuiWindowFlags_NoScrollWithMouse |
-                      ImGuiWindowFlags_NoCollapse |
-                      ImGuiWindowFlags_NoSavedSettings |
-                      ImGuiWindowFlags_NoInputs
-    );
+    im::Begin(
+            "FPS",
+            nullptr,
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                    | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse
+                    | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoInputs);
 
     im::Text("%0.1f", fps);
 
     auto viewport_width = im::GetMainViewport()->Size.x;
-    auto window_width = im::GetWindowWidth();
+    auto window_width   = im::GetWindowWidth();
 
     im::SetWindowPos({viewport_width - (window_width + 5), 5});
 
@@ -83,12 +77,11 @@ void buildOptionsWindow(Silver::Application *app) {
     im::SetNextWindowSize(im::GetMainViewport()->Size);
     im::SetNextWindowPos({0, 0});
     im::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-    im::Begin("Options", nullptr, 0 |
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse
-    );
+    im::Begin(
+            "Options",
+            nullptr,
+            0 | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                    | ImGuiWindowFlags_NoCollapse);
 
     if(im::CollapsingHeader("Input")) {
         if(im::BeginTable("inputs", 3, ImGuiTableFlags_NoHostExtendX)) {
@@ -96,18 +89,18 @@ void buildOptionsWindow(Silver::Application *app) {
             im::TableSetupColumn("Input");
             im::TableSetupColumn("Clear");
 
-            for(int button = (int) Silver::Binding::Button::A; button < (int) Silver::Binding::Button::_End; button++) {
+            for(int button = (int)Silver::Binding::Button::A; button < (int)Silver::Binding::Button::_End; button++) {
                 im::TableNextRow();
                 // Button Name
                 im::TableSetColumnIndex(0);
-                im::Text("%s", Silver::Binding::getButtonName((Silver::Binding::Button) button));
+                im::Text("%s", Silver::Binding::getButtonName((Silver::Binding::Button)button));
 
                 // Button mapping
                 im::TableSetColumnIndex(1);
 
-                bool isRecording = app->binding->isRecordingForButton((Silver::Binding::Button) button);
+                bool        isRecording = app->binding->isRecordingForButton((Silver::Binding::Button)button);
 
-                auto maybeAction = app->binding->getInputForButton((Silver::Binding::Button) button);
+                auto        maybeAction = app->binding->getInputForButton((Silver::Binding::Button)button);
                 std::string button_label;
                 if(isRecording) {
                     button_label = "Recording";
@@ -118,7 +111,7 @@ void buildOptionsWindow(Silver::Application *app) {
                 }
 
                 if(im::Button(button_label.c_str())) {
-                    app->binding->startRecording((Silver::Binding::Button) button);
+                    app->binding->startRecording((Silver::Binding::Button)button);
                 }
             }
 
@@ -171,13 +164,14 @@ void buildCPURegisterWindow(Silver::Core *core) {
         bool HL;
     } reg_flags;
 
-    CPU::registers_t regs{};
-    if(core)
+    CPU::registers_t regs {};
+    if(core) {
         regs = core->getRegistersFromCPU();
-    else
+    } else {
         regs = {0};
+    }
 
-    //The Indentation on this window is very sensitive...
+    // The Indentation on this window is very sensitive...
     SetNextWindowSize({120, 0});
     Begin("Registers", nullptr, ImGuiWindowFlags_NoResize);
     Unindent(10.0);
@@ -203,7 +197,7 @@ void buildCPURegisterWindow(Silver::Core *core) {
         Indent(15.0);
         TreePop();
     } else {
-        reg_flags.F = false;
+        reg_flags.F  = false;
         reg_flags.AF = false;
     }
 
@@ -251,44 +245,44 @@ void buildCPURegisterWindow(Silver::Core *core) {
     NextColumn();
     SetColumnWidth(-1, 50);
 
-    //AF
+    // AF
     Text("0x%s", itoh(regs.AF, 4).c_str());
     if(reg_flags.AF) {
-        Text("0x%s", itoh(regs.AF >> 8, 2).c_str());  //A
-        Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); //F
+        Text("0x%s", itoh(regs.AF >> 8, 2).c_str());   // A
+        Text("0x%s", itoh(regs.AF & 0xFF, 2).c_str()); // F
         if(reg_flags.F) {
-            Text("%u", Bit::test(regs.AF, 7)); //Z
-            Text("%u", Bit::test(regs.AF, 6)); //N
-            Text("%u", Bit::test(regs.AF, 5)); //H
-            Text("%u", Bit::test(regs.AF, 4)); //C
+            Text("%u", Bit::test(regs.AF, 7));         // Z
+            Text("%u", Bit::test(regs.AF, 6));         // N
+            Text("%u", Bit::test(regs.AF, 5));         // H
+            Text("%u", Bit::test(regs.AF, 4));         // C
         }
     }
 
-    //BC
+    // BC
     Text("0x%s", itoh(regs.BC, 4).c_str());
     if(reg_flags.BC) {
-        Text("0x%s", itoh(regs.BC >> 8, 2).c_str());  //B
-        Text("0x%s", itoh(regs.BC & 0xFF, 2).c_str()); //C
+        Text("0x%s", itoh(regs.BC >> 8, 2).c_str());   // B
+        Text("0x%s", itoh(regs.BC & 0xFF, 2).c_str()); // C
     }
 
-    //DE
+    // DE
     Text("0x%s", itoh(regs.DE, 4).c_str());
     if(reg_flags.DE) {
-        Text("0x%s", itoh(regs.DE >> 8, 2).c_str());  //D
-        Text("0x%s", itoh(regs.DE & 0xFF, 2).c_str()); //E
+        Text("0x%s", itoh(regs.DE >> 8, 2).c_str());   // D
+        Text("0x%s", itoh(regs.DE & 0xFF, 2).c_str()); // E
     }
 
-    //HL
+    // HL
     Text("0x%s", itoh(regs.HL, 4).c_str());
     if(reg_flags.HL) {
-        Text("0x%s", itoh(regs.HL >> 8, 2).c_str());  //H
-        Text("0x%s", itoh(regs.HL & 0xFF, 2).c_str()); //L
+        Text("0x%s", itoh(regs.HL >> 8, 2).c_str());   // H
+        Text("0x%s", itoh(regs.HL & 0xFF, 2).c_str()); // L
     }
 
-    //PC
+    // PC
     Text("0x%s", itoh(regs.PC, 4).c_str());
 
-    //SP
+    // SP
     Text("0x%s", itoh(regs.SP, 4).c_str());
     End();
 }
@@ -296,11 +290,12 @@ void buildCPURegisterWindow(Silver::Core *core) {
 void buildIORegisterWindow(Silver::Core *core) {
     using namespace ImGui;
 
-    Memory::io_registers_t regs{};
-    if(core)
+    Memory::io_registers_t regs {};
+    if(core) {
         regs = core->getregistersfromIO();
-    else
+    } else {
         regs = {0};
+    }
 
     // The Indentation on this window is very sensitive...
     SetNextWindowSize({120, 0});
@@ -463,13 +458,15 @@ void GUI::buildDisassemblyWindow() {
 
 //                     if(start_floor + 0x10 < end_int) {
 //                         for(int i = start_floor_diff; i < 0x10; i++) {
-//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2,
+//                             true).c_str(), 3);
 //                             *++c_index = ' ';
 //                             c_index++;
 //                         }
 //                     } else {
 //                         for(int i = start_floor_diff; i < end_int; i++) {
-//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2, true).c_str(), 3);
+//                             memcpy(c_index++, itoh(core->getByteFromIO(start_int - start_floor_diff + i), 2,
+//                             true).c_str(), 3);
 //                             *++c_index = ' ';
 //                             c_index++;
 //                         }
@@ -510,22 +507,20 @@ void GUI::buildDisassemblyWindow() {
 //     PopStyleColor(3);
 // }
 
-//TODO: fix
+// TODO: fix
 void buildBreakpointWindow(Silver::Core *core) {
     using namespace ImGui;
 
-    ImGuiInputTextCallback text_func =
-            [](ImGuiInputTextCallbackData *data) -> int {
-                switch(data->EventChar) {
-                case '0' ... '9':break;
-                case 'a' ... 'f':data->EventChar -= ('a' - 'A');
-                    break;
-                case 'A' ... 'F':break;
-                default:return 1;
-                }
+    ImGuiInputTextCallback text_func = [](ImGuiInputTextCallbackData *data) -> int {
+        switch(data->EventChar) {
+        case '0' ... '9': break;
+        case 'a' ... 'f': data->EventChar -= ('a' - 'A'); break;
+        case 'A' ... 'F': break;
+        default:          return 1;
+        }
 
-                return 0;
-            };
+        return 0;
+    };
 
     static char buf[5] = "";
 

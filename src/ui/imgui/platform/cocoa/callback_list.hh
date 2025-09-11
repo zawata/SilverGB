@@ -4,12 +4,12 @@
 
 #include "menu.hpp"
 
-void add_menu_callback(int, std::pair<Silver::MenuItem *, std::function<void (Silver::MenuItem *)>>);
+void       add_menu_callback(int, std::pair<Silver::MenuItem *, std::function<void(Silver::MenuItem *)>>);
 
-@interface MenuActionItem : NSObject {
+@interface MenuActionItem: NSObject {
     int menu_id;
 }
 
--(id)init:(int)menu_id;
--(void)onMenuCallback:(id)sender;
+- (id)init:(int)menu_id;
+- (void)onMenuCallback:(id)sender;
 @end

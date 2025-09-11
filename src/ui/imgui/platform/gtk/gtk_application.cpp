@@ -1,8 +1,4 @@
-#include <iostream>
-#include <memory>
-#include <regex>
-#include <sstream>
-#include <string>
+#include "gtk_application.hpp"
 
 #include <epoxy/gl.h>
 #include <gdkmm/enums.h>
@@ -16,18 +12,23 @@
 #include <gtkmm/filefilter.h>
 #include <gtkmm/glarea.h>
 #include <gtkmm/messagedialog.h>
+#include <iostream>
+#include <memory>
+#include <regex>
 #include <sigc++/adaptors/retype_return.h>
 #include <sigc++/functors/ptr_fun.h>
 #include <sigc++/sigc++.h>
+#include <sstream>
+#include <string>
+
+#include "gb_core/core.hpp"
+
+#include "util/log.hpp"
 
 #include "binding.hpp"
-#include "gb_core/core.hpp"
-#include "gtk_application.hpp"
 #include "imgui/backends/imgui_impl_opengl3.h"
 #include "imgui_impl_gtkmm.hpp"
 #include "textures.hpp"
-
-#include "util/log.hpp"
 
 static const std::string class_name = "org.zawata.silver";
 
@@ -41,8 +42,7 @@ void _check_gl_error(u32 line) {
 }
 
 GtkApp::GtkApp(int argc, const char *argv[]) :
-        Gtk::Application(class_name),
-        app(new Silver::Application()) {
+    Gtk::Application(class_name), app(new Silver::Application()) {
     app->onInit(argc, argv);
     app->window_cb.openFileDialog = sigc::mem_fun(*this, &GtkApp::openFileDialog);
     app->window_cb.openMessageBox = sigc::mem_fun(*this, &GtkApp::openMessageBox);
@@ -52,19 +52,16 @@ GtkApp::GtkApp(int argc, const char *argv[]) :
 
 // filter format: "Label:ext,ext;Label2:ext;ext"
 void GtkApp::openFileDialog(
-        const std::string &title,
-        const std::string &filters,
-        std::function<void(const std::string &)> cb
-) {
+        const std::string &title, const std::string &filters, std::function<void(const std::string &)> cb) {
     auto file_dialog = Gtk::FileDialog::create();
     file_dialog->set_title(title);
 
-    auto filterList = Gio::ListStore<Gtk::FileFilter>::create();
+    auto              filterList = Gio::ListStore<Gtk::FileFilter>::create();
     std::stringstream ss(filters);
-    std::string filter;
+    std::string       filter;
 
     while(std::getline(ss, filter, ';')) {
-        auto fileFilter = Gtk::FileFilter::create();
+        auto              fileFilter = Gtk::FileFilter::create();
         std::stringstream filter_ss(filter);
 
         if(filter.find(':') != std::string::npos) {
@@ -103,7 +100,7 @@ void GtkApp::openMessageBox(const std::string &title, const std::string &message
 void GtkApp::on_activate() {
     Gtk::Application::on_activate();
 
-    this->window = new Gtk::ApplicationWindow();
+    this->window  = new Gtk::ApplicationWindow();
 
     this->gl_area = new Gtk::GLArea();
     this->gl_area->set_auto_render();
@@ -123,28 +120,22 @@ void GtkApp::on_activate() {
     // is so much boilerplate.
     auto legacyEventController = Gtk::EventControllerLegacy::create();
     legacyEventController->signal_event().connect(
-            [this](const std::shared_ptr<const Gdk::Event> &event) -> bool {
-                return this->handleEvent(event);
-            },
-            false
-    );
+            [this](const std::shared_ptr<const Gdk::Event> &event) -> bool { return this->handleEvent(event); }, false);
     this->window->add_controller(legacyEventController);
 
     // we need to force continuous re-renders of the glArea
-    window->add_tick_callback(
-            [this](const Glib::RefPtr<Gdk::FrameClock> &) -> bool {
-                this->gl_area->queue_render();
-                return true;
-            }
-    );
+    window->add_tick_callback([this](const Glib::RefPtr<Gdk::FrameClock> &) -> bool {
+        this->gl_area->queue_render();
+        return true;
+    });
 
     window->present();
 }
 
 bool GtkApp::handleEvent(const std::shared_ptr<const Gdk::Event> &event) {
-    bool isKeyPressEvent = event->get_event_type() == Gdk::Event::Type::KEY_PRESS;
+    bool isKeyPressEvent    = event->get_event_type() == Gdk::Event::Type::KEY_PRESS;
     bool isKeyReleasedEvent = event->get_event_type() == Gdk::Event::Type::KEY_RELEASE;
-    bool isKeyEvent = isKeyPressEvent || isKeyReleasedEvent;
+    bool isKeyEvent         = isKeyPressEvent || isKeyReleasedEvent;
 
     if(isKeyEvent) {
         if(event->get_keyval() == GDK_KEY_Escape && this->app->binding->isRecording()) {
@@ -153,9 +144,7 @@ bool GtkApp::handleEvent(const std::shared_ptr<const Gdk::Event> &event) {
         }
 
         bool actionIsMapped = this->app->binding->sendInput(
-                Silver::Binding::makeKeyboardInput(event->get_keycode()),
-                isKeyPressEvent
-        );
+                Silver::Binding::makeKeyboardInput(event->get_keycode()), isKeyPressEvent);
 
         if(actionIsMapped) {
             return true;
@@ -184,16 +173,17 @@ void GtkApp::create_menubar() {
     auto menubarTemplate = new Silver::Menu();
     this->app->makeMenuBar(menubarTemplate);
 
-    //deque for a breadth-first tree traversal
+    // deque for a breadth-first tree traversal
     std::deque<std::pair<Glib::RefPtr<Gio::Menu>, Silver::MenuItem *>> d;
 
-    auto menubar = Gio::Menu::create();
-    for(auto &i : menubarTemplate->items)
+    auto                                                               menubar = Gio::Menu::create();
+    for(auto &i : menubarTemplate->items) {
         d.emplace_back(menubar, i.get());
+    }
 
     while(!d.empty()) {
-        Glib::RefPtr<Gio::Menu> gtk_menu = d.front().first;
-        Silver::MenuItem *nuiMenuItem = d.front().second;
+        Glib::RefPtr<Gio::Menu> gtk_menu    = d.front().first;
+        Silver::MenuItem       *nuiMenuItem = d.front().second;
         d.pop_front();
 
         std::string partialActionName = std::to_string(nuiMenuItem->get_id());
@@ -201,7 +191,7 @@ void GtkApp::create_menubar() {
         switch(nuiMenuItem->get_type()) {
         case Silver::MenuItem::SubMenu: {
             auto itemTemplate = dynamic_cast<Silver::SubMenuItem *>(nuiMenuItem);
-            auto sub_menu = Gio::Menu::create();
+            auto sub_menu     = Gio::Menu::create();
             gtk_menu->append_submenu(itemTemplate->label, sub_menu);
             for(auto &i : itemTemplate->menu->items) {
                 d.emplace_back(sub_menu, i.get());
@@ -219,12 +209,12 @@ void GtkApp::create_menubar() {
 
         case Silver::MenuItem::Toggle: {
             auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
-            auto action = Gio::SimpleAction::create_bool(partialActionName);
+            auto action       = Gio::SimpleAction::create_bool(partialActionName);
             action->signal_change_state().connect([nuiMenuItem, action](const Glib::VariantBase &b) -> void {
                 auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
                 action->set_state(b);
 
-                //Damn you variant types
+                // Damn you variant types
                 bool new_state = Glib::VariantBase::cast_dynamic<Glib::Variant<bool>>(b).get();
 
                 (*itemTemplate)(new_state);
@@ -237,7 +227,7 @@ void GtkApp::create_menubar() {
 
         case Silver::MenuItem::Callback: {
             auto itemTemplate = dynamic_cast<Silver::CallbackMenuItem *>(nuiMenuItem);
-            auto action = Gio::SimpleAction::create(partialActionName);
+            auto action       = Gio::SimpleAction::create(partialActionName);
             action->signal_activate().connect(sigc::hide([nuiMenuItem]() -> void {
                 auto itemTemplate = dynamic_cast<Silver::CallbackMenuItem *>(nuiMenuItem);
                 (*itemTemplate)();
@@ -248,10 +238,10 @@ void GtkApp::create_menubar() {
             break;
         }
 
-            // case Silver::MenuItem::Separator:
-            // case Silver::MenuItem::Radio:
+        // case Silver::MenuItem::Separator:
+        // case Silver::MenuItem::Radio:
         case Silver::MenuItem::None:
-        default: {
+        default:                     {
             LogError("GtkApp") << "unrecognized menu item type";
         }
         }
@@ -288,8 +278,8 @@ void GtkApp::unrealize() {
     }
 }
 
-u8 screen_buffer[Silver::Core::native_pixel_count * 4] = {0};
-u8 debug_buffer[256 * 256 * 3] = {0};
+u8   screen_buffer[Silver::Core::native_pixel_count * 4] = {0};
+u8   debug_buffer[256 * 256 * 3]                         = {0};
 
 // serves as our run-loop
 bool GtkApp::render(const Glib::RefPtr<Gdk::GLContext> & /* context */) {

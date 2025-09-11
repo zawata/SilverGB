@@ -2,9 +2,9 @@
 Because it's not quite gold!
 
 ## Summary
-SilverGB is a gameboy emulator I'm writing to apply the knowledge and concepts of my senior-year class regarding CPU execution pipelines, and my general knowledge of embedded development.  
+SilverGB is a Game Boy emulator I'm writing to apply the knowledge and concepts of my senior-year class regarding CPU execution pipelines, and my general knowledge of embedded development.  
 
-I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me when I first tried to start this project(as a sophmore in highschool ha!): minor knowledge of programming but major interest in doing something cool.  
+I'm writing this code(and commenting it with what I learn) to hopefully interest other people who were like me when I first tried to start this project(as a sophomore in high school ha!): minor knowledge of programming but major interest in doing something cool.  
 
 The emulator attempts to remain compilable on all Major Operating Systems(as I'm using SDL and OpenGL for OS interfacing).  
 
@@ -230,16 +230,16 @@ Not tested, should work? Follow linux directions.
 Me
 
 ### What?
-I'm writing a gameboy emulator.
+I'm writing a Game Boy emulator.
 
 ### Where?
 Here.
 
 ### When?
-In my very limited freetime.
+In my very limited free time.
 
 ### Why?
 Because I've always wanted too.
 
 ### How?
-Mostly the Gameboy Programming Manual, and the gbdev wiki.
+Mostly the Game Boy Programming Manual, and the gbdev wiki.

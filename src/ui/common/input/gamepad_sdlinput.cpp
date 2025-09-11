@@ -1,38 +1,37 @@
+#include <SDL2/SDL.h>
 #include <cmath>
 #include <list>
 #include <memory>
 #include <string>
 
-#include <SDL2/SDL.h>
+#include "util/log.hpp"
 
 #include "binding.hpp"
 #include "gamepad.hpp"
 
-#include "util/log.hpp"
-
 Silver::Binding::HatDirection convertSDLDirection(u8 sdlDirection) {
     switch(sdlDirection) {
-    case SDL_HAT_CENTERED: return Silver::Binding::HatDirection::Center;
-    case SDL_HAT_UP: return Silver::Binding::HatDirection::North;
-    case SDL_HAT_RIGHT: return Silver::Binding::HatDirection::East;
-    case SDL_HAT_DOWN: return Silver::Binding::HatDirection::South;
-    case SDL_HAT_LEFT: return Silver::Binding::HatDirection::West;
-    case SDL_HAT_RIGHTUP: return Silver::Binding::HatDirection::NorthEast;
+    case SDL_HAT_CENTERED:  return Silver::Binding::HatDirection::Center;
+    case SDL_HAT_UP:        return Silver::Binding::HatDirection::North;
+    case SDL_HAT_RIGHT:     return Silver::Binding::HatDirection::East;
+    case SDL_HAT_DOWN:      return Silver::Binding::HatDirection::South;
+    case SDL_HAT_LEFT:      return Silver::Binding::HatDirection::West;
+    case SDL_HAT_RIGHTUP:   return Silver::Binding::HatDirection::NorthEast;
     case SDL_HAT_RIGHTDOWN: return Silver::Binding::HatDirection::SouthEast;
-    case SDL_HAT_LEFTUP: return Silver::Binding::HatDirection::NorthWest;
-    case SDL_HAT_LEFTDOWN: return Silver::Binding::HatDirection::SouthWest;
-    default:return Silver::Binding::HatDirection::Invalid;
+    case SDL_HAT_LEFTUP:    return Silver::Binding::HatDirection::NorthWest;
+    case SDL_HAT_LEFTDOWN:  return Silver::Binding::HatDirection::SouthWest;
+    default:                return Silver::Binding::HatDirection::Invalid;
     }
 }
 
 Silver::Binding::AxisDirection convertSDLAxisValue(s16 sdlValue) {
     // TODO: make configurable
-    const u16 axisDeadZone = 13107_u16;// 40%
+    const u16                      axisDeadZone = 13107_u16; // 40%
 
     Silver::Binding::AxisDirection dir;
-    u16 absoluteValue = ::abs(sdlValue);
-    if (absoluteValue > axisDeadZone) {
-        if (sdlValue > 0) {
+    u16                            absoluteValue = ::abs(sdlValue);
+    if(absoluteValue > axisDeadZone) {
+        if(sdlValue > 0) {
             dir = Silver::Binding::AxisDirection::Positive;
         } else {
             dir = Silver::Binding::AxisDirection::Negative;
@@ -44,36 +43,27 @@ Silver::Binding::AxisDirection convertSDLAxisValue(s16 sdlValue) {
     return dir;
 }
 
-struct SDLGamepad : virtual public Silver::Gamepad {
-    explicit SDLGamepad(SDL_Joystick *joy) : dev(joy) {}
+struct SDLGamepad: virtual public Silver::Gamepad {
+    explicit SDLGamepad(SDL_Joystick *joy) :
+        dev(joy) { }
 
-    ~SDLGamepad() {
-        SDL_JoystickClose(this->dev);
-    }
+    ~SDLGamepad() { SDL_JoystickClose(this->dev); }
 
     void getName(std::string &str) override {
         const char *c = SDL_JoystickName(this->dev);
 
-        str = std::string{c};
+        str           = std::string {c};
     }
 
-    u16 getVendorId() override {
-        return SDL_JoystickGetVendor(this->dev);
-    }
+    u16 getVendorId() override { return SDL_JoystickGetVendor(this->dev); }
 
-    u16 getProductId() override {
-        return SDL_JoystickGetProduct(this->dev);
-    }
+    u16 getProductId() override { return SDL_JoystickGetProduct(this->dev); }
 
-    int getUniqueId() override {
-        return SDL_JoystickInstanceID(this->dev);
-    }
+    int getUniqueId() override { return SDL_JoystickInstanceID(this->dev); }
 
-    u8 getButtonCount() override {
-        return SDL_JoystickNumButtons(this->dev);
-    };
+    u8  getButtonCount() override { return SDL_JoystickNumButtons(this->dev); };
 
-    u8 getButton(int idx) override {
+    u8  getButton(int idx) override {
         if(idx >= getButtonCount()) {
             return 0;
         }
@@ -81,9 +71,7 @@ struct SDLGamepad : virtual public Silver::Gamepad {
         return SDL_JoystickGetAxis(this->dev, idx);
     };
 
-    u8 getAxisCount() override {
-        return SDL_JoystickNumAxes(this->dev);
-    };
+    u8  getAxisCount() override { return SDL_JoystickNumAxes(this->dev); };
 
     s16 getAxis(int idx) override {
         if(idx >= getHatCount()) {
@@ -93,9 +81,7 @@ struct SDLGamepad : virtual public Silver::Gamepad {
         return SDL_JoystickGetAxis(this->dev, idx);
     };
 
-    u8 getHatCount() override {
-        return SDL_JoystickNumHats(this->dev);
-    };
+    u8                            getHatCount() override { return SDL_JoystickNumHats(this->dev); };
 
     Silver::Binding::HatDirection getHat(int idx) override {
         if(idx >= getHatCount()) {
@@ -107,10 +93,10 @@ struct SDLGamepad : virtual public Silver::Gamepad {
     };
 
 private:
-    SDL_Joystick *dev;
-    std::vector<bool> buttonStates;
+    SDL_Joystick                              *dev;
+    std::vector<bool>                          buttonStates;
     std::vector<Silver::Binding::HatDirection> hatStates;
-    std::vector<u16> axisStates;
+    std::vector<u16>                           axisStates;
 };
 
 Silver::GamepadManager::GamepadManager() {
@@ -140,7 +126,7 @@ void Silver::GamepadManager::getAvailableGamepads(std::vector<std::shared_ptr<Si
     std::copy(this->devices.begin(), this->devices.end(), vec.begin());
 }
 
-void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Binding::Tracker>& binding) {
+void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Binding::Tracker> &binding) {
     SDL_Event event;
     while(SDL_PollEvent(&event)) {
         switch(event.type) {
@@ -148,10 +134,7 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
             Binding::AxisDirection direction = convertSDLAxisValue(event.jaxis.value);
 
             binding->sendInput(
-                    Silver::Binding::makeGamepadAxisInput(
-                            event.jaxis.which,
-                            event.jaxis.axis,
-                            direction),
+                    Silver::Binding::makeGamepadAxisInput(event.jaxis.which, event.jaxis.axis, direction),
                     direction != Binding::AxisDirection::Center);
             break;
         }
@@ -163,27 +146,20 @@ void Silver::GamepadManager::updateGamepads(const std::shared_ptr<Silver::Bindin
             }
 
             binding->sendInput(
-                    Silver::Binding::makeGamepadHatInput(
-                            event.jhat.which,
-                            event.jhat.hat,
-                            direction),
+                    Silver::Binding::makeGamepadHatInput(event.jhat.which, event.jhat.hat, direction),
                     direction != Binding::HatDirection::Center);
             break;
         }
 
         case SDL_JOYBUTTONDOWN:
-        case SDL_JOYBUTTONUP: {
+        case SDL_JOYBUTTONUP:   {
             binding->sendInput(
-                    Silver::Binding::makeGamepadButtonInput(
-                            event.jbutton.which,
-                            event.jbutton.button),
+                    Silver::Binding::makeGamepadButtonInput(event.jbutton.which, event.jbutton.button),
                     event.jbutton.state == SDL_PRESSED);
             break;
         }
 
-        case SDL_JOYDEVICEADDED:
-            this->addDevice(event.jdevice.which);
-            break;
+        case SDL_JOYDEVICEADDED: this->addDevice(event.jdevice.which); break;
 
         case SDL_JOYDEVICEREMOVED:
             this->removeDevice(event.jdevice.which);
@@ -205,7 +181,7 @@ void Silver::GamepadManager::addDevice(Silver::Gamepad::UniqueId deviceIndex) {
 }
 
 void Silver::GamepadManager::removeDevice(Silver::Gamepad::UniqueId uniqueId) {
-    std::erase_if(this->devices, [uniqueId](const std::shared_ptr<Silver::Gamepad>& gamepad) -> bool {
+    std::erase_if(this->devices, [uniqueId](const std::shared_ptr<Silver::Gamepad> &gamepad) -> bool {
         return gamepad->getUniqueId() == uniqueId;
     });
 }

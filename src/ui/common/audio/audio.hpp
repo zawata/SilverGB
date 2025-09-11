@@ -8,17 +8,18 @@
 
 namespace Silver {
 
-struct AudioManager {
-    ~AudioManager();
+    struct AudioManager {
+        ~AudioManager();
 
-    static AudioManager *init_audio(Silver::Core *core);
+        static AudioManager *init_audio(Silver::Core *core);
 
-    void start_audio();
-    void stop_audio();
-private:
-    AudioManager(void *audio_dev);
+        void                 start_audio();
+        void                 stop_audio();
 
-    void *audio_dev;
-};
+    private:
+        AudioManager(void *audio_dev);
 
-}
+        void *audio_dev;
+    };
+
+} // namespace Silver
