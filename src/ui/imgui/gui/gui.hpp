@@ -1,14 +1,8 @@
 #pragma once
 
-#include "app.hpp"
-#include "binding.hpp"
-#include "imgui/imgui.h"
-// #include "imgui/ImGuiFileBrowser.h"
-
-#include <memory>
-
 #include "gb_core/core.hpp"
 
+#include "app.hpp"
 #include "cfg.hpp"
 
 namespace Silver {
@@ -19,7 +13,6 @@ namespace Silver {
 
 void buildScreenView(Silver::Application *app);
 void buildFpsWindow(float fps);
-void buildOptionsWindow(Silver::Application *app);
 void buildDebugWindow(Silver::Application *app);
 void buildCPURegisterWindow(Silver::Core *core);
 void buildIORegisterWindow(Silver::Core *core);

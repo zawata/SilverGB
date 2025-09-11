@@ -6,8 +6,8 @@
 
 #include "util/log.hpp"
 
-#include "gui.hpp"
-#include "imgui.h"
+#include "gui/gui.hpp"
+#include "gui/settings_window.hpp"
 #include "imgui_internal.h"
 
 /**
@@ -170,7 +170,7 @@ void Silver::Application::onUpdate() {
     buildScreenView(this);
 
     if(this->app_state.ui.show_options) {
-        buildOptionsWindow(this);
+        buildSettingsWindow(this);
     }
 
     if(this->app_state.ui.show_fps) {

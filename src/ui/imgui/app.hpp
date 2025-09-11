@@ -8,7 +8,7 @@
 #include "audio/audio.hpp"
 #include "binding.hpp"
 #include "cfg.hpp"
-#include "gui.hpp"
+#include "gui/gui.hpp"
 #include "input/gamepad.hpp"
 #include "menu.hpp"
 

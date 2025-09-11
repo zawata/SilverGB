@@ -71,58 +71,6 @@ void buildFpsWindow(float fps) {
     im::PopStyleVar(3);
 }
 
-void buildOptionsWindow(Silver::Application *app) {
-    namespace im = ImGui;
-
-    im::SetNextWindowSize(im::GetMainViewport()->Size);
-    im::SetNextWindowPos({0, 0});
-    im::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f);
-    im::Begin(
-            "Options",
-            nullptr,
-            0 | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
-                    | ImGuiWindowFlags_NoCollapse);
-
-    if(im::CollapsingHeader("Input")) {
-        if(im::BeginTable("inputs", 3, ImGuiTableFlags_NoHostExtendX)) {
-            im::TableSetupColumn("Button", ImGuiTableColumnFlags_WidthFixed, 30);
-            im::TableSetupColumn("Input");
-            im::TableSetupColumn("Clear");
-
-            for(int button = (int)Silver::Binding::Button::A; button < (int)Silver::Binding::Button::_End; button++) {
-                im::TableNextRow();
-                // Button Name
-                im::TableSetColumnIndex(0);
-                im::Text("%s", Silver::Binding::getButtonName((Silver::Binding::Button)button));
-
-                // Button mapping
-                im::TableSetColumnIndex(1);
-
-                bool        isRecording = app->binding->isRecordingForButton((Silver::Binding::Button)button);
-
-                auto        maybeAction = app->binding->getInputForButton((Silver::Binding::Button)button);
-                std::string button_label;
-                if(isRecording) {
-                    button_label = "Recording";
-                } else if(maybeAction.has_value()) {
-                    button_label = Silver::Binding::getInputDescription(maybeAction.value());
-                } else {
-                    button_label = "Unmapped";
-                }
-
-                if(im::Button(button_label.c_str())) {
-                    app->binding->startRecording((Silver::Binding::Button)button);
-                }
-            }
-
-            im::EndTable();
-        }
-    }
-
-    im::End();
-    im::PopStyleVar();
-}
-
 void buildDebugWindow(Silver::Application *app) {
     namespace im = ImGui;
 

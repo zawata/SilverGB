@@ -1,6 +1,5 @@
 #pragma once
 
-#include <list>
 #include <string>
 #include <vector>
 
@@ -115,7 +114,7 @@ struct Config_FileSettings: _Config_Section_Base {
     // abs path + filename
     std::vector<std::string> recent_files;
 
-    void                     setDefaults() {
+    void                     setDefaults() override {
         recent_dir = "";
         recent_files.clear();
     }
@@ -123,31 +122,69 @@ struct Config_FileSettings: _Config_Section_Base {
     NOP_STRUCTURE(Config_FileSettings, recent_dir, recent_files);
 };
 
-struct Config_ViewSettings: _Config_Section_Base {
+struct Config_DisplaySettings: _Config_Section_Base {
     // greater than zero
     unsigned int size;
 
-    void         setDefaults() { size = 2; }
+    void         setDefaults() override { size = 2; }
 
-    NOP_STRUCTURE(Config_ViewSettings, size);
+    NOP_STRUCTURE(Config_DisplaySettings, size);
 };
 
 struct Config_EmulationSettings: _Config_Section_Base {
     // abs path + filename
     std::string bios_file;
+    bool        enable_frame_skip = false;
+    int         frame_skip        = 0;
 
-    void        setDefaults() { bios_file = ""; }
+    void        setDefaults() override {
+        bios_file         = "";
+        enable_frame_skip = false;
+        frame_skip        = 0;
+    }
 
-    NOP_STRUCTURE(Config_EmulationSettings, bios_file);
+    NOP_STRUCTURE(Config_EmulationSettings, bios_file, enable_frame_skip, frame_skip);
+};
+
+struct Config_AudioSettings: _Config_Section_Base {
+    bool enable = true;
+    int  volume = 100;
+
+    void setDefaults() override {
+        enable = true;
+        volume = 100;
+    }
+
+    NOP_STRUCTURE(Config_AudioSettings, enable, volume);
+};
+
+struct Config_InputSettings: _Config_Section_Base {
+    // abs path + filename
+    std::string layout_file;
+
+    void        setDefaults() override { layout_file = ""; }
+
+    NOP_STRUCTURE(Config_InputSettings, layout_file);
+};
+
+struct Config_DebugSettings: _Config_Section_Base {
+    bool enable_debug_mode = false;
+
+    void setDefaults() override { enable_debug_mode = false; }
+
+    NOP_STRUCTURE(Config_DebugSettings, enable_debug_mode);
 };
 
 class Config {
     static constexpr const char *filename = "Silver.cfg";
 
 public:
-    Config_FileSettings      fileSettings;
-    Config_ViewSettings      viewSettings;
-    Config_EmulationSettings emulationSettings;
+    Config_FileSettings      file;
+    Config_DisplaySettings   display;
+    Config_EmulationSettings emu;
+    Config_AudioSettings     audio;
+    Config_InputSettings     input;
+    Config_DebugSettings     debug;
 
     Config() { Load(); }
 
@@ -157,27 +194,36 @@ public:
         if(Silver::File::fileExists(filename)) {
             nop::Deserializer<FileReader> deserializer(Silver::File::openFile(filename));
 
-            deserializer.Read(&fileSettings);
-            deserializer.Read(&viewSettings);
-            deserializer.Read(&emulationSettings);
+            deserializer.Read(&file);
+            deserializer.Read(&display);
+            deserializer.Read(&emu);
+            deserializer.Read(&audio);
+            deserializer.Read(&input);
+            deserializer.Read(&debug);
         } else {
-            fileSettings.setDefaults();
-            viewSettings.setDefaults();
-            emulationSettings.setDefaults();
+            file.setDefaults();
+            display.setDefaults();
+            emu.setDefaults();
+            audio.setDefaults();
+            input.setDefaults();
+            debug.setDefaults();
         }
     }
 
-    void Save() {
-        Silver::File *file;
+    void Save() const {
+        Silver::File *settingsFile;
         if(Silver::File::fileExists(filename)) {
-            file = Silver::File::openFile(filename, true, true);
+            settingsFile = Silver::File::openFile(filename, true, true);
         } else {
-            file = Silver::File::createFile(filename);
+            settingsFile = Silver::File::createFile(filename);
         }
-        nop::Serializer<FileWriter> serializer(file);
+        nop::Serializer<FileWriter> serializer(settingsFile);
 
-        serializer.Write(fileSettings);
-        serializer.Write(viewSettings);
-        serializer.Write(emulationSettings);
+        serializer.Write(file);
+        serializer.Write(display);
+        serializer.Write(emu);
+        serializer.Write(audio);
+        serializer.Write(input);
+        serializer.Write(debug);
     }
 };

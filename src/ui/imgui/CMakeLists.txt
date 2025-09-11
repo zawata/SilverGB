@@ -1,7 +1,8 @@
 add_executable(gb_main_imgui)
 target_sources(gb_main_imgui PRIVATE
         "app.cpp"
-        "gui.cpp"
+        "gui/gui.cpp"
+        "gui/settings_window.cpp"
         "../common/binding.cpp"
         "imgui/imgui.cpp"
         "imgui/imgui_demo.cpp"
