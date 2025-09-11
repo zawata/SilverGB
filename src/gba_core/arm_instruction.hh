@@ -243,7 +243,7 @@ namespace Arm {
 
                 // The branch offset is left shifted by 1 then sign-extended.
                 // The offset is 0-10bits + 1 for the shift, making the sign bit 11
-                b.offset    = Bit::sign_extend(Bit::mask<u16>(0xFF, word) << 1, 9);
+                b.offset    = Bit::sign_extend<u16, s32>(Bit::mask<u16>(0xFF, word) << 1, 11);
 
                 return b;
             } else if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0xE) {
@@ -254,7 +254,7 @@ namespace Arm {
 
                 // The branch offset is left shifted by 1 then sign-extended.
                 // The offset is 0-10bits + 1 for the shift, making the sign bit 11
-                b.offset    = Bit::sign_extend(Bit::mask(0xFF_u16, word) << 1, 11);
+                b.offset    = Bit::sign_extend<u16, s32>(Bit::mask(0xFF_u16, word) << 1, 11);
 
                 return b;
             } else if(Bit::range(Bit::Mask::between_inc<u16>(12, 15), word) == 0xF) {
@@ -273,7 +273,7 @@ namespace Arm {
 
                 // The branch offset is left shifted by 1 then sign-extended.
                 // The offset is 0-10bits + 1 for the shift, making the sign bit 11
-                b.offset = Bit::sign_extend(Bit::mask(0xFF_u16, word) << 1, 11);
+                b.offset = Bit::sign_extend<u16, s32>(Bit::mask(0xFF_u16, word) << 1, 11);
 
                 return b;
             }

@@ -32,72 +32,106 @@ namespace Silver {
     };
 
     template<typename T>
-    struct PixelBufferEncoder {
-        template<PixelFormat p>
-        struct WritePixel {
-            static const int pixWidth;
-
-            static void      write(T *dest, const Pixel &pix);
-        };
-
+    class PixelBufferEncoder {
         // fun fact, this is valid in c++17, but not in gcc
         // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=85282
-        template<>
-        struct WritePixel<PixelFormat::BGR> {
-            static const int pixWidth = 3;
+        // I'd love to use this format instead but
+        // template<PixelFormat pixelFormat>
+        // struct WritePixel {
+        //     static const int pixWidth;
 
-            static void      write(T *dest, const Pixel &pixel) {
-                *dest++ = pixel.b;
-                *dest++ = pixel.g;
-                *dest++ = pixel.r;
-            }
-        };
+        //     static void      write(T *dest, const Pixel &pixel);
+        // };
 
-        template<>
-        struct WritePixel<PixelFormat::RGB> {
-            static const int pixWidth = 3;
+        // template<>
+        // struct WritePixel<PixelFormat::BGR> {
+        //     static const int pixWidth = 3;
 
-            static void      write(T *dest, const Pixel &pixel) {
-                *dest++ = pixel.r;
-                *dest++ = pixel.g;
-                *dest++ = pixel.b;
-            }
-        };
+        //     static void      write(T *dest, const Pixel &pixel) {
+        //         *dest++ = pixel.b;
+        //         *dest++ = pixel.g;
+        //         *dest++ = pixel.r;
+        //     }
+        // };
 
-        template<>
-        struct WritePixel<PixelFormat::BGRA> {
-            static const int pixWidth = 4;
+        // template<>
+        // struct WritePixel<PixelFormat::RGB> {
+        //     static const int pixWidth = 3;
 
-            static void      write(T *dest, const Pixel &pixel) {
-                *dest++ = pixel.b;
-                *dest++ = pixel.g;
-                *dest++ = pixel.r;
-                *dest++ = pixel.a;
-            }
-        };
+        //     static void      write(T *dest, const Pixel &pixel) {
+        //         *dest++ = pixel.r;
+        //         *dest++ = pixel.g;
+        //         *dest++ = pixel.b;
+        //     }
+        // };
 
-        template<>
-        struct WritePixel<PixelFormat::RGBA> {
-            static const int pixWidth = 4;
+        // template<>
+        // struct WritePixel<PixelFormat::BGRA> {
+        //     static const int pixWidth = 4;
 
-            static void      write(T *dest, const Pixel &pixel) {
-                *dest++ = pixel.r;
-                *dest++ = pixel.g;
-                *dest++ = pixel.b;
-                *dest++ = pixel.a;
-            }
-        };
+        //     static void      write(T *dest, const Pixel &pixel) {
+        //         *dest++ = pixel.b;
+        //         *dest++ = pixel.g;
+        //         *dest++ = pixel.r;
+        //         *dest++ = pixel.a;
+        //     }
+        // };
+
+        // template<>
+        // struct WritePixel<PixelFormat::RGBA> {
+        //     static const int pixWidth = 4;
+
+        //     static void      write(T *dest, const Pixel &pixel) {
+        //         *dest++ = pixel.r;
+        //         *dest++ = pixel.g;
+        //         *dest++ = pixel.b;
+        //         *dest++ = pixel.a;
+        //     }
+        // };
 
         template<PixelFormat pixelFormat>
-        static void encodePixelBuffer(T *dest, size_t outSize, const std::vector<Pixel> &pixelBuf) {
+        static constexpr int getWidth() {
+            if constexpr(pixelFormat == PixelFormat::RGB || pixelFormat == PixelFormat::BGR) {
+                return 3;
+            } else if constexpr(pixelFormat == PixelFormat::RGBA || pixelFormat == PixelFormat::BGRA) {
+                return 4;
+            }
+        }
+
+        template<PixelFormat pixelFormat>
+        static void writePixel(T *dst, const Pixel &pixel) {
+            if constexpr(pixelFormat == PixelFormat::RGB) {
+                *dst++ = pixel.r;
+                *dst++ = pixel.g;
+                *dst++ = pixel.b;
+            } else if constexpr(pixelFormat == PixelFormat::BGR) {
+                *dst++ = pixel.b;
+                *dst++ = pixel.g;
+                *dst++ = pixel.r;
+            } else if constexpr(pixelFormat == PixelFormat::RGBA) {
+                *dst++ = pixel.r;
+                *dst++ = pixel.g;
+                *dst++ = pixel.b;
+                *dst++ = pixel.a;
+            } else if constexpr(pixelFormat == PixelFormat::BGRA) {
+                *dst++ = pixel.b;
+                *dst++ = pixel.g;
+                *dst++ = pixel.r;
+                *dst++ = pixel.a;
+            }
+        }
+
+    public:
+        template<PixelFormat pixelFormat>
+        static void encodePixelBuffer(T *destBuf, size_t outSize, const std::vector<Pixel> &pixelBuf) {
             size_t bytesWritten = 0;
-            auto   width        = WritePixel<pixelFormat>::pixWidth;
+            auto   width        = getWidth<pixelFormat>();
             for(const Pixel &pixel : pixelBuf) {
                 if((outSize - bytesWritten) < width) {
                     return;
                 }
 
-                WritePixel<pixelFormat>::write(&dest[bytesWritten], pixel);
+                writePixel<pixelFormat>(&destBuf[bytesWritten], pixel);
                 bytesWritten += width;
             }
         }
