@@ -14,7 +14,6 @@
 #include <gtkmm/messagedialog.h>
 #include <iostream>
 #include <memory>
-#include <regex>
 #include <sigc++/adaptors/retype_return.h>
 #include <sigc++/functors/ptr_fun.h>
 #include <sigc++/sigc++.h>
@@ -160,7 +159,7 @@ void GtkApp::on_startup() {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
-    this->create_menubar();
+    this->createMenuBar();
 }
 
 void GtkApp::on_shutdown() {
@@ -168,7 +167,16 @@ void GtkApp::on_shutdown() {
     ImGui::DestroyContext();
 }
 
-void GtkApp::create_menubar() {
+void GtkApp::createMenuBar() {
+    LogDebug("GtkApp") << "Creating menu bar";
+
+    static bool buildingMenuBar = false;
+    if(buildingMenuBar) {
+        assert(!buildingMenuBar);
+    }
+
+    buildingMenuBar      = true;
+
     // call back to get menu
     auto menubarTemplate = new Silver::Menu();
     this->app->makeMenuBar(menubarTemplate);
@@ -182,8 +190,8 @@ void GtkApp::create_menubar() {
     }
 
     while(!d.empty()) {
-        Glib::RefPtr<Gio::Menu> gtk_menu    = d.front().first;
-        Silver::MenuItem       *nuiMenuItem = d.front().second;
+        auto              gtk_menu    = d.front().first;
+        Silver::MenuItem *nuiMenuItem = d.front().second;
         d.pop_front();
 
         std::string partialActionName = std::to_string(nuiMenuItem->get_id());
@@ -193,8 +201,17 @@ void GtkApp::create_menubar() {
             auto itemTemplate = dynamic_cast<Silver::SubMenuItem *>(nuiMenuItem);
             auto sub_menu     = Gio::Menu::create();
             gtk_menu->append_submenu(itemTemplate->label, sub_menu);
-            for(auto &i : itemTemplate->menu->items) {
-                d.emplace_back(sub_menu, i.get());
+
+            Glib::RefPtr<Gio::Menu> section_menu = Gio::Menu::create();
+            sub_menu->append_section(section_menu);
+
+            for(auto &item : itemTemplate->menu->items) {
+                if(item->get_type() == Silver::MenuItem::Separator) {
+                    section_menu = Gio::Menu::create();
+                    sub_menu->append_section(section_menu);
+                } else {
+                    d.emplace_back(section_menu, item.get());
+                }
             }
             break;
         }
@@ -210,8 +227,7 @@ void GtkApp::create_menubar() {
         case Silver::MenuItem::Toggle: {
             auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
             auto action       = Gio::SimpleAction::create_bool(partialActionName);
-            action->signal_change_state().connect([nuiMenuItem, action](const Glib::VariantBase &b) -> void {
-                auto itemTemplate = dynamic_cast<Silver::ToggleMenuItem *>(nuiMenuItem);
+            action->signal_change_state().connect([itemTemplate, action](const Glib::VariantBase &b) -> void {
                 action->set_state(b);
 
                 // Damn you variant types
@@ -228,10 +244,7 @@ void GtkApp::create_menubar() {
         case Silver::MenuItem::Callback: {
             auto itemTemplate = dynamic_cast<Silver::CallbackMenuItem *>(nuiMenuItem);
             auto action       = Gio::SimpleAction::create(partialActionName);
-            action->signal_activate().connect(sigc::hide([nuiMenuItem]() -> void {
-                auto itemTemplate = dynamic_cast<Silver::CallbackMenuItem *>(nuiMenuItem);
-                (*itemTemplate)();
-            }));
+            action->signal_activate().connect(sigc::hide([itemTemplate]() -> void { (*itemTemplate)(); }));
 
             gtk_menu->append(itemTemplate->label, "app." + partialActionName);
             this->add_action(action);
@@ -248,6 +261,7 @@ void GtkApp::create_menubar() {
     }
 
     Gtk::Application::set_menubar(menubar);
+    buildingMenuBar = false;
 }
 
 void GtkApp::realize() {

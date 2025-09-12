@@ -32,7 +32,7 @@ public:
     void                    unrealize();
     bool                    render(const Glib::RefPtr<Gdk::GLContext>                    &/* context */);
 
-    void                    create_menubar();
+    void                    createMenuBar();
 
     Gtk::ApplicationWindow *window;
     Gtk::GLArea            *gl_area;
