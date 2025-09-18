@@ -2,13 +2,11 @@
 
 #include <cassert>
 #include <gtkmm/application.h>
-#include <gtkmm/applicationwindow.h>
 #include <gtkmm/glarea.h>
-#include <iostream>
+#include <gtkmm/popovermenubar.h>
+#include <gtkmm/window.h>
 
 #include "app.hpp"
-#include "binding.hpp"
-#include "menu.hpp"
 
 struct GenericTexture;
 
@@ -23,23 +21,23 @@ public:
 
     void
     openFileDialog(const std::string &title, const std::string &filters, std::function<void(const std::string &)> cb);
+    void                 openMessageBox(const std::string &title, const std::string &message);
 
-    void                    openMessageBox(const std::string &title, const std::string &message);
+    bool                 handleEvent(const std::shared_ptr<const Gdk::Event> &event);
 
-    bool                    handleEvent(const std::shared_ptr<const Gdk::Event> &event);
+    void                 realize();
+    void                 unrealize();
+    bool                 render(const Glib::RefPtr<Gdk::GLContext>                 &/* context */);
 
-    void                    realize();
-    void                    unrealize();
-    bool                    render(const Glib::RefPtr<Gdk::GLContext>                    &/* context */);
+    void                 createMenuBar();
 
-    void                    createMenuBar();
-
-    Gtk::ApplicationWindow *window;
-    Gtk::GLArea            *gl_area;
-    Silver::Application    *app;
+    Gtk::PopoverMenuBar *menuBar;
+    Gtk::Window         *window;
+    Gtk::GLArea         *gl_area;
+    Silver::Application *app;
 
     // textures
-    GenericTexture         *screenTex;
-    GenericTexture         *backgroundDebugTex;
-    GenericTexture         *vramDebugTex[6];
+    GenericTexture      *screenTex;
+    GenericTexture      *backgroundDebugTex;
+    GenericTexture      *vramDebugTex[6];
 };

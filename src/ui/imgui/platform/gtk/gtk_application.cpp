@@ -99,7 +99,7 @@ void GtkApp::openMessageBox(const std::string &title, const std::string &message
 void GtkApp::on_activate() {
     Gtk::Application::on_activate();
 
-    this->window  = new Gtk::ApplicationWindow();
+    this->window  = new Gtk::Window();
 
     this->gl_area = new Gtk::GLArea();
     this->gl_area->set_auto_render();
@@ -110,8 +110,14 @@ void GtkApp::on_activate() {
     this->gl_area->signal_unrealize().connect(sigc::mem_fun(*this, &GtkApp::unrealize), false);
     this->gl_area->signal_render().connect(sigc::mem_fun(*this, &GtkApp::render), false);
 
-    this->window->set_child(*this->gl_area);
-    this->window->set_show_menubar();
+    auto menuModel = Gio::Menu::create();
+    this->menuBar  = new Gtk::PopoverMenuBar(menuModel);
+    this->createMenuBar();
+
+    auto verticalLayout = Gtk::Box(Gtk::Orientation::VERTICAL);
+    verticalLayout.append(*this->menuBar);
+    verticalLayout.append(*this->gl_area);
+    this->window->set_child(verticalLayout);
     this->add_window(*window);
 
     // we can't get generic "button press" events through gesture event controllers
@@ -158,8 +164,6 @@ void GtkApp::on_startup() {
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-
-    this->createMenuBar();
 }
 
 void GtkApp::on_shutdown() {
@@ -172,7 +176,7 @@ void GtkApp::createMenuBar() {
 
     static bool buildingMenuBar = false;
     if(buildingMenuBar) {
-        assert(!buildingMenuBar);
+        assert(false);
     }
 
     buildingMenuBar      = true;
@@ -184,7 +188,8 @@ void GtkApp::createMenuBar() {
     // deque for a breadth-first tree traversal
     std::deque<std::pair<Glib::RefPtr<Gio::Menu>, Silver::MenuItem *>> d;
 
-    auto                                                               menubar = Gio::Menu::create();
+    auto                                                               menubar      = Gio::Menu::create();
+    auto                                                               action_group = Gio::SimpleActionGroup::create();
     for(auto &i : menubarTemplate->items) {
         d.emplace_back(menubar, i.get());
     }
@@ -237,7 +242,7 @@ void GtkApp::createMenuBar() {
             });
 
             gtk_menu->append(itemTemplate->label, "app." + partialActionName);
-            this->add_action(action);
+            action_group->add_action(action);
             break;
         }
 
@@ -247,7 +252,7 @@ void GtkApp::createMenuBar() {
             action->signal_activate().connect(sigc::hide([itemTemplate]() -> void { (*itemTemplate)(); }));
 
             gtk_menu->append(itemTemplate->label, "app." + partialActionName);
-            this->add_action(action);
+            action_group->add_action(action);
             break;
         }
 
@@ -260,7 +265,9 @@ void GtkApp::createMenuBar() {
         }
     }
 
-    Gtk::Application::set_menubar(menubar);
+    this->menuBar->remove_action_group("app");
+    this->menuBar->insert_action_group("app", action_group);
+    this->menuBar->set_menu_model(menubar);
     buildingMenuBar = false;
 }
 

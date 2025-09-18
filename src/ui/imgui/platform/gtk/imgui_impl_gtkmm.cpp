@@ -1,7 +1,6 @@
 #include "imgui_impl_gtkmm.hpp"
 
 #include <chrono>
-#include <cstring>
 #include <gdkmm/enums.h>
 #include <gdkmm/event.h>
 #include <gtkmm/applicationwindow.h>
@@ -14,7 +13,7 @@
 #include "imgui.h"
 
 struct ImGui_ImplGtkmm_Data {
-    Gtk::ApplicationWindow                        *window;
+    Gtk::Window                                   *window;
     Gtk::GLArea                                   *glArea;
     std::chrono::high_resolution_clock::time_point last_frame_time;
 };
@@ -51,7 +50,7 @@ static void ImGui_ImplGtkmm_SetPlatformImeData(ImGuiViewport *, ImGuiPlatformIme
     }
 }
 
-bool ImGui_ImplGtkmm_Init(Gtk::ApplicationWindow *window, Gtk::GLArea *glArea) {
+bool ImGui_ImplGtkmm_Init(Gtk::Window *window, Gtk::GLArea *glArea) {
     ImGuiIO &io = ImGui::GetIO();
     IM_ASSERT(io.BackendPlatformUserData == nullptr && "Already initialized a platform backend!");
 
@@ -119,107 +118,105 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
         }
 
         ImGuiKey key;
-#define case_set_key(_GDK_KEY, _ImGuiKey) \
-    case _GDK_KEY: key = _ImGuiKey; break
         switch(keyval) {
-            case_set_key(GDK_KEY_Tab, ImGuiKey_Tab);
-            case_set_key(GDK_KEY_Left, ImGuiKey_LeftArrow);
-            case_set_key(GDK_KEY_Right, ImGuiKey_RightArrow);
-            case_set_key(GDK_KEY_Up, ImGuiKey_UpArrow);
-            case_set_key(GDK_KEY_Down, ImGuiKey_DownArrow);
-            case_set_key(GDK_KEY_Page_Up, ImGuiKey_PageUp);
-            case_set_key(GDK_KEY_Page_Down, ImGuiKey_PageDown);
-            case_set_key(GDK_KEY_Home, ImGuiKey_Home);
-            case_set_key(GDK_KEY_End, ImGuiKey_End);
-            case_set_key(GDK_KEY_Insert, ImGuiKey_Insert);
-            case_set_key(GDK_KEY_Delete, ImGuiKey_Delete);
-            case_set_key(GDK_KEY_BackSpace, ImGuiKey_Backspace);
-            case_set_key(GDK_KEY_space, ImGuiKey_Space);
-            case_set_key(GDK_KEY_Return, ImGuiKey_Enter);
-            case_set_key(GDK_KEY_Escape, ImGuiKey_Escape);
+        case GDK_KEY_Tab:         key = ImGuiKey_Tab;
+        case GDK_KEY_Left:        key = ImGuiKey_LeftArrow;
+        case GDK_KEY_Right:       key = ImGuiKey_RightArrow;
+        case GDK_KEY_Up:          key = ImGuiKey_UpArrow;
+        case GDK_KEY_Down:        key = ImGuiKey_DownArrow;
+        case GDK_KEY_Page_Up:     key = ImGuiKey_PageUp;
+        case GDK_KEY_Page_Down:   key = ImGuiKey_PageDown;
+        case GDK_KEY_Home:        key = ImGuiKey_Home;
+        case GDK_KEY_End:         key = ImGuiKey_End;
+        case GDK_KEY_Insert:      key = ImGuiKey_Insert;
+        case GDK_KEY_Delete:      key = ImGuiKey_Delete;
+        case GDK_KEY_BackSpace:   key = ImGuiKey_Backspace;
+        case GDK_KEY_space:       key = ImGuiKey_Space;
+        case GDK_KEY_Return:      key = ImGuiKey_Enter;
+        case GDK_KEY_Escape:      key = ImGuiKey_Escape;
 
-            case_set_key(GDK_KEY_0, ImGuiKey_0);
-            case_set_key(GDK_KEY_1, ImGuiKey_1);
-            case_set_key(GDK_KEY_2, ImGuiKey_2);
-            case_set_key(GDK_KEY_3, ImGuiKey_3);
-            case_set_key(GDK_KEY_4, ImGuiKey_4);
-            case_set_key(GDK_KEY_5, ImGuiKey_5);
-            case_set_key(GDK_KEY_6, ImGuiKey_6);
-            case_set_key(GDK_KEY_7, ImGuiKey_7);
-            case_set_key(GDK_KEY_8, ImGuiKey_8);
-            case_set_key(GDK_KEY_9, ImGuiKey_9);
+        case GDK_KEY_0:           key = ImGuiKey_0;
+        case GDK_KEY_1:           key = ImGuiKey_1;
+        case GDK_KEY_2:           key = ImGuiKey_2;
+        case GDK_KEY_3:           key = ImGuiKey_3;
+        case GDK_KEY_4:           key = ImGuiKey_4;
+        case GDK_KEY_5:           key = ImGuiKey_5;
+        case GDK_KEY_6:           key = ImGuiKey_6;
+        case GDK_KEY_7:           key = ImGuiKey_7;
+        case GDK_KEY_8:           key = ImGuiKey_8;
+        case GDK_KEY_9:           key = ImGuiKey_9;
 
-            case_set_key(GDK_KEY_A, ImGuiKey_A);
-            case_set_key(GDK_KEY_B, ImGuiKey_B);
-            case_set_key(GDK_KEY_C, ImGuiKey_C);
-            case_set_key(GDK_KEY_D, ImGuiKey_D);
-            case_set_key(GDK_KEY_E, ImGuiKey_E);
-            case_set_key(GDK_KEY_F, ImGuiKey_F);
-            case_set_key(GDK_KEY_G, ImGuiKey_G);
-            case_set_key(GDK_KEY_H, ImGuiKey_H);
-            case_set_key(GDK_KEY_I, ImGuiKey_I);
-            case_set_key(GDK_KEY_J, ImGuiKey_J);
-            case_set_key(GDK_KEY_K, ImGuiKey_K);
-            case_set_key(GDK_KEY_L, ImGuiKey_L);
-            case_set_key(GDK_KEY_M, ImGuiKey_M);
-            case_set_key(GDK_KEY_N, ImGuiKey_N);
-            case_set_key(GDK_KEY_O, ImGuiKey_O);
-            case_set_key(GDK_KEY_P, ImGuiKey_P);
-            case_set_key(GDK_KEY_Q, ImGuiKey_Q);
-            case_set_key(GDK_KEY_R, ImGuiKey_R);
-            case_set_key(GDK_KEY_S, ImGuiKey_S);
-            case_set_key(GDK_KEY_T, ImGuiKey_T);
-            case_set_key(GDK_KEY_U, ImGuiKey_U);
-            case_set_key(GDK_KEY_V, ImGuiKey_V);
-            case_set_key(GDK_KEY_W, ImGuiKey_W);
-            case_set_key(GDK_KEY_X, ImGuiKey_X);
-            case_set_key(GDK_KEY_Y, ImGuiKey_Y);
-            case_set_key(GDK_KEY_Z, ImGuiKey_Z);
+        case GDK_KEY_A:           key = ImGuiKey_A;
+        case GDK_KEY_B:           key = ImGuiKey_B;
+        case GDK_KEY_C:           key = ImGuiKey_C;
+        case GDK_KEY_D:           key = ImGuiKey_D;
+        case GDK_KEY_E:           key = ImGuiKey_E;
+        case GDK_KEY_F:           key = ImGuiKey_F;
+        case GDK_KEY_G:           key = ImGuiKey_G;
+        case GDK_KEY_H:           key = ImGuiKey_H;
+        case GDK_KEY_I:           key = ImGuiKey_I;
+        case GDK_KEY_J:           key = ImGuiKey_J;
+        case GDK_KEY_K:           key = ImGuiKey_K;
+        case GDK_KEY_L:           key = ImGuiKey_L;
+        case GDK_KEY_M:           key = ImGuiKey_M;
+        case GDK_KEY_N:           key = ImGuiKey_N;
+        case GDK_KEY_O:           key = ImGuiKey_O;
+        case GDK_KEY_P:           key = ImGuiKey_P;
+        case GDK_KEY_Q:           key = ImGuiKey_Q;
+        case GDK_KEY_R:           key = ImGuiKey_R;
+        case GDK_KEY_S:           key = ImGuiKey_S;
+        case GDK_KEY_T:           key = ImGuiKey_T;
+        case GDK_KEY_U:           key = ImGuiKey_U;
+        case GDK_KEY_V:           key = ImGuiKey_V;
+        case GDK_KEY_W:           key = ImGuiKey_W;
+        case GDK_KEY_X:           key = ImGuiKey_X;
+        case GDK_KEY_Y:           key = ImGuiKey_Y;
+        case GDK_KEY_Z:           key = ImGuiKey_Z;
 
-            case_set_key(GDK_KEY_F1, ImGuiKey_F1);
-            case_set_key(GDK_KEY_F2, ImGuiKey_F2);
-            case_set_key(GDK_KEY_F3, ImGuiKey_F3);
-            case_set_key(GDK_KEY_F4, ImGuiKey_F4);
-            case_set_key(GDK_KEY_F5, ImGuiKey_F5);
-            case_set_key(GDK_KEY_F6, ImGuiKey_F6);
-            case_set_key(GDK_KEY_F7, ImGuiKey_F7);
-            case_set_key(GDK_KEY_F8, ImGuiKey_F8);
-            case_set_key(GDK_KEY_F9, ImGuiKey_F9);
-            case_set_key(GDK_KEY_F10, ImGuiKey_F10);
-            case_set_key(GDK_KEY_F11, ImGuiKey_F11);
-            case_set_key(GDK_KEY_F12, ImGuiKey_F12);
+        case GDK_KEY_F1:          key = ImGuiKey_F1;
+        case GDK_KEY_F2:          key = ImGuiKey_F2;
+        case GDK_KEY_F3:          key = ImGuiKey_F3;
+        case GDK_KEY_F4:          key = ImGuiKey_F4;
+        case GDK_KEY_F5:          key = ImGuiKey_F5;
+        case GDK_KEY_F6:          key = ImGuiKey_F6;
+        case GDK_KEY_F7:          key = ImGuiKey_F7;
+        case GDK_KEY_F8:          key = ImGuiKey_F8;
+        case GDK_KEY_F9:          key = ImGuiKey_F9;
+        case GDK_KEY_F10:         key = ImGuiKey_F10;
+        case GDK_KEY_F11:         key = ImGuiKey_F11;
+        case GDK_KEY_F12:         key = ImGuiKey_F12;
 
-            case_set_key(GDK_KEY_apostrophe, ImGuiKey_Apostrophe);
-            case_set_key(GDK_KEY_comma, ImGuiKey_Comma);
-            case_set_key(GDK_KEY_minus, ImGuiKey_Minus);
-            case_set_key(GDK_KEY_period, ImGuiKey_Period);
-            case_set_key(GDK_KEY_slash, ImGuiKey_Slash);
-            case_set_key(GDK_KEY_semicolon, ImGuiKey_Semicolon);
-            case_set_key(GDK_KEY_equal, ImGuiKey_Equal);
-            case_set_key(GDK_KEY_braceleft, ImGuiKey_LeftBracket);
-            case_set_key(GDK_KEY_backslash, ImGuiKey_Backslash);
-            case_set_key(GDK_KEY_braceright, ImGuiKey_RightBracket);
-            case_set_key(GDK_KEY_grave, ImGuiKey_GraveAccent);
+        case GDK_KEY_apostrophe:  key = ImGuiKey_Apostrophe;
+        case GDK_KEY_comma:       key = ImGuiKey_Comma;
+        case GDK_KEY_minus:       key = ImGuiKey_Minus;
+        case GDK_KEY_period:      key = ImGuiKey_Period;
+        case GDK_KEY_slash:       key = ImGuiKey_Slash;
+        case GDK_KEY_semicolon:   key = ImGuiKey_Semicolon;
+        case GDK_KEY_equal:       key = ImGuiKey_Equal;
+        case GDK_KEY_braceleft:   key = ImGuiKey_LeftBracket;
+        case GDK_KEY_backslash:   key = ImGuiKey_Backslash;
+        case GDK_KEY_braceright:  key = ImGuiKey_RightBracket;
+        case GDK_KEY_grave:       key = ImGuiKey_GraveAccent;
 
-            case_set_key(GDK_KEY_KP_0, ImGuiKey_Keypad0);
-            case_set_key(GDK_KEY_KP_1, ImGuiKey_Keypad1);
-            case_set_key(GDK_KEY_KP_2, ImGuiKey_Keypad2);
-            case_set_key(GDK_KEY_KP_3, ImGuiKey_Keypad3);
-            case_set_key(GDK_KEY_KP_4, ImGuiKey_Keypad4);
-            case_set_key(GDK_KEY_KP_5, ImGuiKey_Keypad5);
-            case_set_key(GDK_KEY_KP_6, ImGuiKey_Keypad6);
-            case_set_key(GDK_KEY_KP_7, ImGuiKey_Keypad7);
-            case_set_key(GDK_KEY_KP_8, ImGuiKey_Keypad8);
-            case_set_key(GDK_KEY_KP_9, ImGuiKey_Keypad9);
-            case_set_key(GDK_KEY_KP_Decimal, ImGuiKey_KeypadDecimal);
-            case_set_key(GDK_KEY_KP_Divide, ImGuiKey_KeypadDivide);
-            case_set_key(GDK_KEY_KP_Multiply, ImGuiKey_KeypadMultiply);
-            case_set_key(GDK_KEY_KP_Subtract, ImGuiKey_KeypadSubtract);
-            case_set_key(GDK_KEY_KP_Add, ImGuiKey_KeypadAdd);
-            case_set_key(GDK_KEY_KP_Enter, ImGuiKey_KeypadEnter);
-            case_set_key(GDK_KEY_KP_Equal, ImGuiKey_KeypadEqual);
+        case GDK_KEY_KP_0:        key = ImGuiKey_Keypad0;
+        case GDK_KEY_KP_1:        key = ImGuiKey_Keypad1;
+        case GDK_KEY_KP_2:        key = ImGuiKey_Keypad2;
+        case GDK_KEY_KP_3:        key = ImGuiKey_Keypad3;
+        case GDK_KEY_KP_4:        key = ImGuiKey_Keypad4;
+        case GDK_KEY_KP_5:        key = ImGuiKey_Keypad5;
+        case GDK_KEY_KP_6:        key = ImGuiKey_Keypad6;
+        case GDK_KEY_KP_7:        key = ImGuiKey_Keypad7;
+        case GDK_KEY_KP_8:        key = ImGuiKey_Keypad8;
+        case GDK_KEY_KP_9:        key = ImGuiKey_Keypad9;
+        case GDK_KEY_KP_Decimal:  key = ImGuiKey_KeypadDecimal;
+        case GDK_KEY_KP_Divide:   key = ImGuiKey_KeypadDivide;
+        case GDK_KEY_KP_Multiply: key = ImGuiKey_KeypadMultiply;
+        case GDK_KEY_KP_Subtract: key = ImGuiKey_KeypadSubtract;
+        case GDK_KEY_KP_Add:      key = ImGuiKey_KeypadAdd;
+        case GDK_KEY_KP_Enter:    key = ImGuiKey_KeypadEnter;
+        case GDK_KEY_KP_Equal:    key = ImGuiKey_KeypadEqual;
+        default:                  key = ImGuiKey_None;
         }
-#undef case_set_key
 
         // TODO: convert these to key events
         io.KeyCtrl  = static_cast<bool>(state | Gdk::ModifierType::CONTROL_MASK);
@@ -241,13 +238,16 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
         event->get_position(x, y);
 
         double transX, transY;
-        // TODO: this is deprecated in a future version of gtkmm
-        bool   translated = bd->window->translate_coordinates(*bd->glArea, x, y, transX, transY);
-        if(!translated && transX >= 0 && transY >= 0) {
+        auto   maybe_point = bd->window->compute_point(*bd->glArea, Gdk::Graphene::Point(x, y));
+
+        if(!maybe_point.has_value()) {
             return false;
         }
 
-        io.AddMousePosEvent(transX, transY);
+        transX = maybe_point.value().get_x();
+        transY = maybe_point.value().get_y();
+
+        io.AddMousePosEvent((float)transX, (float)transY);
         return true;
     }
 
@@ -276,7 +276,7 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
             y *= -1;
             break;
         }
-        io.AddMouseWheelEvent(x, y);
+        io.AddMouseWheelEvent((float)x, (float)y);
 
         return true;
     }
@@ -288,7 +288,7 @@ bool ImGui_ImplGtkmm_ProcessEvent(const Gdk::Event *event) {
         }
 
         bool pressed = event->get_event_type() == Gdk::Event::Type::BUTTON_PRESS;
-        int  button  = event->get_button();
+        uint button  = event->get_button();
 
         switch(button) {
         case 1:  io.AddMouseButtonEvent(ImGuiMouseButton_Left, pressed); break;
