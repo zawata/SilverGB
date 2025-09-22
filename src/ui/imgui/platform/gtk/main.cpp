@@ -2,7 +2,9 @@
 
 #include "gtk_application.hpp"
 
-int main(int argc, const char *argv[]) {
-    auto application = new GtkApp(argc, argv);
-    return application->run();
+GtkApp *global_gtkApp;
+
+int     main(int argc, const char *argv[]) {
+    global_gtkApp = new GtkApp(argc, argv);
+    return global_gtkApp->run();
 }

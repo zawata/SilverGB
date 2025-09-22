@@ -5,8 +5,7 @@
 #include <gdkmm/event.h>
 #include <gtkmm/applicationwindow.h>
 #include <gtkmm/glarea.h>
-#include <iostream>
-#include <mutex>
+#include <util/log.hpp>
 
 #include "util/util.hpp"
 

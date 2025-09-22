@@ -1,7 +1,6 @@
 #pragma once
 
 #include <argparse/argparse.hpp>
-#include <functional>
 
 #include "gb_core/core.hpp"
 
@@ -40,13 +39,6 @@ namespace Silver {
                 bool drawToBackground = true;
             } debug;
         } app_state;
-
-        struct {
-            std::function<void(
-                    const std::string &title, const std::string &filters, std::function<void(const std::string &)> cb)>
-                                                                                      openFileDialog;
-            std::function<void(const std::string &title, const std::string &message)> openMessageBox;
-        } window_cb;
 
         void          onInit(int argc, const char **argv);
         void          makeMenuBar(Silver::Menu *menubar);

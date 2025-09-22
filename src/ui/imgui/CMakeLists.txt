@@ -62,6 +62,7 @@ elseif (UNIX)
             "../common/input/gamepad_sdlinput.cpp"
             "platform/gtk/main.cpp"
             "platform/gtk/gtk_application.cpp"
+            "platform/gtk/gtk_platform.cpp"
             "platform/gtk/imgui_impl_gtkmm.cpp"
             "platform/gtk/textures.cpp"
             "imgui/backends/imgui_impl_opengl3.cpp"

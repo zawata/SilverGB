@@ -43,8 +43,6 @@ void _check_gl_error(u32 line) {
 GtkApp::GtkApp(int argc, const char *argv[]) :
     Gtk::Application(class_name), app(new Silver::Application()) {
     app->onInit(argc, argv);
-    app->window_cb.openFileDialog = sigc::mem_fun(*this, &GtkApp::openFileDialog);
-    app->window_cb.openMessageBox = sigc::mem_fun(*this, &GtkApp::openMessageBox);
 
     // keyboardBindings->printKeyMap();
 }
