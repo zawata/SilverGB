@@ -79,7 +79,9 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
             "Reset",
             [this](const CallbackMenuItem &, void *) {
                 // TODO: not sure this is safe
-                this->core = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
+                this->core = std::make_shared<Silver::Core>(
+                        this->rom_file,
+                        this->bootrom_file == nullptr ? std::nullopt : std::make_optional(this->bootrom_file));
             },
             nullptr);
     emulationMenu.addItem<ToggleMenuItem>(
@@ -112,6 +114,21 @@ void Silver::Application::onLoadRomFile(const std::string &filePath) {
 
     this->rom_file               = Silver::File::openFile(filePath);
     this->core                   = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
+    if(this->rom_file != nullptr) {
+        this->app_state.game.running = false;
+        this->core.reset();
+        this->rom_file.reset();
+    }
+
+    auto file = Silver::File::openFile(filePath);
+    if(file == nullptr) {
+        LogError("App") << "Failed to open file: " << filePath;
+        return;
+    }
+
+    this->rom_file = std::shared_ptr<Silver::File> {file};
+    this->core     = std::make_shared<Silver::Core>(
+            this->rom_file, this->bootrom_file == nullptr ? std::nullopt : std::make_optional(this->bootrom_file));
     this->app_state.game.running = true;
 }
 

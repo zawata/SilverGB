@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "util/file.hpp"
@@ -270,7 +271,7 @@ protected:
 
 class Cartridge {
 public:
-    explicit Cartridge(Silver::File *f);
+    explicit Cartridge(const std::shared_ptr<Silver::File> &f);
     ~Cartridge();
 
     bool                             loadRAMFile(const std::string &ram_file_name, std::vector<u8> &ram_buffer);
@@ -301,13 +302,13 @@ public:
     bool                             checkHeaderChecksum() const;
     bool                             checkGlobalChecksum() const;
 
-    u8                               read(u16 loc);
-    void                             write(u16 loc, u8 data);
+    u8                               read(u16 offset);
+    void                             write(u16 offset, u8 data);
 
 private:
-    Silver::File                    *rom_file;
+    std::shared_ptr<Silver::File>         rom_file;
 
-    MemoryBankController            *controller;
+    std::shared_ptr<MemoryBankController> controller;
 
-    Cartridge_Constants::cart_type_t cart_type;
+    Cartridge_Constants::cart_type_t      cart_type;
 };

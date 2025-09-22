@@ -21,6 +21,8 @@ namespace Silver {
         std::shared_ptr<AudioManager>     audio;
         std::shared_ptr<Binding::Tracker> binding;
         std::shared_ptr<GamepadManager>   gamepadManager;
+        std::shared_ptr<Silver::File>     rom_file, bootrom_file;
+
 
         void                             *screen_texture_id;
         void                             *debug_bg_texture_id;
@@ -40,14 +42,12 @@ namespace Silver {
             } debug;
         } app_state;
 
-        void          onInit(int argc, const char **argv);
-        void          makeMenuBar(Silver::Menu *menubar);
-        void          onLoadRomFile(const std::string &filePath);
-        void          onLoadBootRomFile(const std::string &filePath);
-        void          onUpdate();
-        void          onClose();
-
-        Silver::File *rom_file, *bootrom_file;
+        void onInit(int argc, const char **argv);
+        void makeMenuBar(Silver::Menu *menubar);
+        void onLoadRomFile(const std::string &filePath);
+        void onLoadBootRomFile(const std::string &filePath);
+        void onUpdate();
+        void onClose();
     };
 
     Application *getApp();

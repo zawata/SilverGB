@@ -17,9 +17,9 @@
 
 IO_Bus::IO_Bus(
         Memory *mem, APU *apu, PPU *ppu, Joypad *joy, Cartridge *cart, gb_device_t device,
-        Silver::File *bios_file = nullptr) :
-    mem(mem), apu(apu), ppu(ppu), joy(joy), cart(cart), device(device), bootrom_mode(bios_file != nullptr) {
-    if(bios_file == nullptr) {
+        const std::optional<std::shared_ptr<Silver::File>> &bootrom) :
+    mem(mem), apu(apu), ppu(ppu), joy(joy), cart(cart), device(device), bootrom_mode(bootrom.has_value()) {
+    if(!bootrom.has_value()) {
         reg(P1)             = default_reg_values[0][get_default_idx(device)];
         reg(SB)             = default_reg_values[1][get_default_idx(device)];
         reg(SC)             = default_reg_values[2][get_default_idx(device)];
@@ -76,7 +76,8 @@ IO_Bus::IO_Bus(
         reg(SVBK)           = default_reg_values[53][get_default_idx(device)];
         reg(IE)             = default_reg_values[54][get_default_idx(device)];
     } else {
-        bios_file->toVector(bootrom_buffer);
+        LogWarn("IO_Bus") << "Bootrom enabled";
+        bootrom->get()->toVector(bootrom_buffer);
     }
 }
 

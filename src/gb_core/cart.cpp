@@ -4,7 +4,6 @@
 #include <numeric>
 #include <vector>
 
-#include "util/bit.hpp"
 #include "util/log.hpp"
 #include "util/util.hpp"
 
@@ -13,7 +12,6 @@
 #include "carts/mbc3.hpp"
 #include "carts/mbc5.hpp"
 #include "carts/rom.hpp"
-#include "flags.hpp"
 
 /**
  * Cartridge Data
@@ -72,7 +70,7 @@ bool Cartridge::saveRAMFile(const std::string &ram_file_name, std::vector<u8> co
     return true;
 }
 
-Cartridge::Cartridge(Silver::File *f) :
+Cartridge::Cartridge(const std::shared_ptr<Silver::File> &f) :
     rom_file(f),
     cart_type(Cartridge_Constants::cart_type_t::getCartType(rom_file->getByte(Cartridge_Constants::CART_TYPE_OFFSET))) {
     std::vector<u8> rom;
@@ -91,16 +89,16 @@ Cartridge::Cartridge(Silver::File *f) :
     }
 
     if(cart_type.ROM) {
-        controller = new ROM_Controller(cart_type, rom, ram);
+        controller = std::make_shared<ROM_Controller>(cart_type, rom, ram);
     } else if(cart_type.MBC1) {
-        controller = new MBC1_Controller(cart_type, rom, ram);
+        controller = std::make_shared<MBC1_Controller>(cart_type, rom, ram);
     } else if(cart_type.MBC2) {
         LogFatal("Cartridge") << "MBC2 not supported, emulator will now crash";
         // controller = new MBC2_Controller(cart_type, rom, ram);
     } else if(cart_type.MBC3) {
-        controller = new MBC3_Controller(cart_type, rom, ram);
+        controller = std::make_shared<MBC3_Controller>(cart_type, rom, ram);
     } else if(cart_type.MBC5) {
-        controller = new MBC5_Controller(cart_type, rom, ram);
+        controller = std::make_shared<MBC5_Controller>(cart_type, rom, ram);
     } else if(cart_type.MBC6) {
         LogFatal("Cartridge") << "MBC6 not supported, emulator will now crash";
     } else if(cart_type.MBC7) {
@@ -117,17 +115,12 @@ Cartridge::Cartridge(Silver::File *f) :
     }
 
     // debug info
-    LogInfo("Cartridge") << "loaded cartridge: " << getCartTitle();
-    LogInfo("Cartridge") << "cart:      " << getCartTitle();
+    LogInfo("Cartridge") << "loaded cartridge: " << rom_file->getFilename();
+    LogInfo("Cartridge") << "cart title: " << getCartTitle();
     LogInfo("Cartridge") << "cart type: " << (std::string)getCartType();
     LogInfo("Cartridge") << "cart rom:  " << getROMSize();
     if(cart_type.RAM) {
-        LogInfo("Cartridge") << "cart ram:  " << getRAMSize();
-        if(cart_type.BATTERY) {
-            LogInfo("Cartridge") << ", Battery-Backed";
-        } else {
-            LogInfo("Cartridge");
-        }
+        LogInfo("Cartridge") << "cart ram:  " << getRAMSize() << (cart_type.BATTERY ? " (battery-backed)" : "");
     }
 }
 
@@ -135,8 +128,6 @@ Cartridge::~Cartridge() {
     if(cart_type.BATTERY) {
         saveRAMFile(get_ram_file_name(rom_file->getFilename()), controller->ram_data);
     }
-
-    delete controller;
 };
 
 bool Cartridge::checkMagicNumber() const {

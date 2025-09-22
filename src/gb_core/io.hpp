@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #include "util/types/primitives.hpp"
@@ -24,7 +25,8 @@ class IO_Bus {
     friend CPU;
 
 public:
-    IO_Bus(Memory *mem, APU *apu, PPU *ppu, Joypad *joy, Cartridge *cart, gb_device_t device, Silver::File *bios_file);
+    IO_Bus(Memory *mem, APU *apu, PPU *ppu, Joypad *joy, Cartridge *cart, gb_device_t device,
+           const std::optional<std::shared_ptr<Silver::File>> &bootrom = std::nullopt);
     ~IO_Bus();
 
     u8   read(u16 offset, bool bypass = false);

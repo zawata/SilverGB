@@ -21,15 +21,18 @@ namespace Silver {
         static constexpr u32 native_height      = PPU::native_height;
         static constexpr u32 native_pixel_count = PPU::native_pixel_count;
 
-        explicit Core(Silver::File *rom, Silver::File *bootrom = nullptr, gb_device_t device = device_GBC);
+        explicit Core(
+                const std::shared_ptr<Silver::File>                &rom,
+                const std::optional<std::shared_ptr<Silver::File>> &bootrom = std::nullopt,
+                gb_device_t                                         device  = device_GBC);
         ~Core();
 
-        void                              init_thread(bool paused = true);
-        void                              pause_thread();
-        bool                              thread_paused();
-        void                              resume_thread();
-        void                              stop_thread();
-        void                              run_thread();
+        // void                              init_thread(bool paused = true);
+        // void                              pause_thread();
+        // bool                              thread_paused();
+        // void                              resume_thread();
+        // void                              stop_thread();
+        // void                              run_thread();
 
         void                              tick_once();
         void                              tick_instr();

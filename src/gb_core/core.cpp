@@ -16,7 +16,9 @@
 using namespace jnk0le;
 
 namespace Silver {
-    Core::Core(Silver::File *rom, Silver::File *bootrom, gb_device_t device) :
+    Core::Core(
+            const std::shared_ptr<Silver::File> &rom, const std::optional<std::shared_ptr<Silver::File>> &bootrom,
+            gb_device_t device) :
         device(device) {
         // the Audio buffering system is threaded because it's simpler
         // luckily we have a single audio producer(main thread) and a single consumer(audio thread)
@@ -48,15 +50,16 @@ namespace Silver {
         //    +----------+-------------------+-> | MEM |
         //                                       +-----+
 
+        // TOOD: switch to smart pointers
         cart = new Cartridge(rom);
-        mem  = new Memory(device, bootrom != nullptr);
+        mem  = new Memory(device, bootrom.has_value());
 
-        apu  = new APU(bootrom != nullptr);
-        ppu  = new PPU(cart, mem, device, bootrom != nullptr);
+        apu  = new APU(bootrom.has_value());
+        ppu  = new PPU(cart, mem, device, bootrom.has_value());
         joy  = new Joypad(mem);
 
         io   = new IO_Bus(mem, apu, ppu, joy, cart, device, bootrom);
-        cpu  = new CPU(mem, io, device, bootrom != nullptr);
+        cpu  = new CPU(mem, io, device, bootrom.has_value());
     }
 
     Core::~Core() {
