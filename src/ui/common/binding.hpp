@@ -104,7 +104,7 @@ namespace Silver::Binding {
     }
 
     struct Tracker {
-        Tracker() { button_state.reserve((int)Button::_End); }
+        Tracker() { button_state.resize((int)Button::_End); }
 
         void clear() { std::fill(button_state.begin(), button_state.end(), false); }
 
