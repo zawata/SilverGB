@@ -4,6 +4,8 @@ target_sources(gb_main_imgui PRIVATE
         "gui/gui.cpp"
         "gui/settings_window.cpp"
         "../common/binding.cpp"
+        "../common/audio/audio_sdlaudio.cpp"
+        # "../common/audio/audio_portaudio.cpp"
         "imgui/imgui.cpp"
         "imgui/imgui_demo.cpp"
         "imgui/imgui_draw.cpp"
@@ -18,7 +20,6 @@ target_include_directories(gb_main_imgui PRIVATE
 
 # TODO: I don't know if this will work on windows
 find_package(PkgConfig)
-find_package(portaudio CONFIG REQUIRED)
 find_path(LIBNOP_INCLUDE_DIRS "nop/base/array.h")
 
 target_include_directories(gb_main_imgui

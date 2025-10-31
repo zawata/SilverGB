@@ -1,49 +1,20 @@
 {
-  "name": "silver-gb",
-  "version": "0.2.1",
-  "dependencies": [
-    "argparse",
-    "zlib",
-    "libnop",
-    "nowide",
-    "argparse",
-    "portaudio",
-    {
-      "name":"magnum",
-      "default-features": false,
-      "features": ["shaders"]
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["glxcontext"],
-      "platform": "linux"
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["cglcontext"],
-      "platform": "osx"
-    },
-    {
-      "name": "magnum",
-      "default-features": false,
-      "features": ["wglcontext"],
-      "platform": "windows"
-    },
-    {
-      "name": "sdl2",
-      "default-features": false,
-      "features": ["x11"],
-      "platform": "linux"
-    },
-    {
-      "name": "gtkmm",
-      "platform": "linux"
-    },
-    {
-      "name": "libepoxy",
-      "platform": "linux"
-    }
-  ]
+    "name": "silver-gb",
+    "version": "0.2.1",
+    "dependencies": [
+        "argparse",
+        "zlib",
+        "libnop",
+        "nowide",
+        "argparse",
+        "sdl3",
+        {
+            "name": "gtkmm",
+            "platform": "linux"
+        },
+        {
+            "name": "libepoxy",
+            "platform": "linux"
+        }
+    ]
 }
