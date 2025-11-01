@@ -3,12 +3,14 @@
 #include <argparse/argparse.hpp>
 #include <chrono>
 #include <memory>
+#include <optional>
 
 #include "util/log.hpp"
 
 #include "gui/gui.hpp"
 #include "gui/settings_window.hpp"
 #include "imgui_internal.h"
+#include "platform.hpp"
 
 /**
  * Called as early as possible when the app starts
