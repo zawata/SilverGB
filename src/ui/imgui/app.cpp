@@ -69,6 +69,21 @@ void Silver::Application::makeMenuBar(Silver::Menu *menubar) {
                 "Supported Roms:gb,gbc,bin;Gameboy ROM:gb;Gameboy Color ROM:gbc;bin",
                 [this](const std::string &filepath) { this->onLoadRomFile(filepath); });
     });
+
+    auto                           recentFilesMenu = Menu();
+    CallbackMenuItem::CallbackType cb
+            = [this](const CallbackMenuItem &item, void *) { this->onLoadRomFile(item.label); };
+    for(auto const &file : this->recent_files) {
+        LogDebug("Menu") << "Adding recent file menu item: " << file;
+        recentFilesMenu.addItem<CallbackMenuItem>(file.c_str(), cb);
+    }
+
+    recentFilesMenu.addSeparator();
+    recentFilesMenu.addItem<CallbackMenuItem>(
+            "Clear Recent Files", [this](const CallbackMenuItem &item, void *) { this->recent_files.clear(); });
+
+    fileMenu.addItem<SubMenuItem>("Recent Files", recentFilesMenu);
+
     fileMenu.addSeparator();
     fileMenu.addItem<CallbackMenuItem>("Exit", [this](const CallbackMenuItem &, void *) { this->onClose(); });
     menubar->addItem<SubMenuItem>("File", fileMenu);
@@ -114,8 +129,10 @@ void Silver::Application::onLoadRomFile(const std::string &filePath) {
         return;
     }
 
-    this->rom_file               = Silver::File::openFile(filePath);
-    this->core                   = std::make_shared<Silver::Core>(this->rom_file, this->bootrom_file);
+    this->recent_files.insert(filePath);
+    this->config->file.recent_files.assign(this->recent_files.begin(), this->recent_files.end());
+    Platform::createMenuBar();
+
     if(this->rom_file != nullptr) {
         this->app_state.game.running = false;
         this->core.reset();
@@ -139,7 +156,13 @@ void Silver::Application::onLoadBootRomFile(const std::string &filePath) {
         return;
     }
 
-    this->bootrom_file = Silver::File::openFile(filePath);
+    auto file = Silver::File::openFile(filePath);
+    if(file == nullptr) {
+        LogError("App") << "Failed to open file: " << filePath;
+        return;
+    }
+
+    this->bootrom_file = std::shared_ptr<Silver::File> {file};
 }
 
 float get_calc_fps() {
@@ -199,10 +222,7 @@ void Silver::Application::onUpdate() {
     }
 }
 
-void Silver::Application::onClose() {
-    // TODO
-    exit(0);
-}
+void                 Silver::Application::onClose() { exit(0); }
 
 Silver::Application *Silver::getApp() {
     static Silver::Application app {};

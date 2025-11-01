@@ -10,6 +10,7 @@
 #include "gui/gui.hpp"
 #include "input/gamepad.hpp"
 #include "menu.hpp"
+#include "recent_files.hpp"
 
 namespace Silver {
     // TODO: rename or namespace Silver::Core
@@ -23,6 +24,7 @@ namespace Silver {
         std::shared_ptr<GamepadManager>   gamepadManager;
         std::shared_ptr<Silver::File>     rom_file, bootrom_file;
 
+        RecentFiles                       recent_files;
 
         void                             *screen_texture_id;
         void                             *debug_bg_texture_id;
