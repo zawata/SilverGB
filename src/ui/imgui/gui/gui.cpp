@@ -81,22 +81,26 @@ void buildDebugWindow(Silver::Application *app) {
 
     if(im::BeginTabBar("##TabBar")) {
         if(im::BeginTabItem("Background")) {
-            im::Image(app->debug_bg_texture_id, {256, 256});
+            auto maxWidth    = im::GetContentRegionMax();
+            auto itemSpacing = im::GetStyle().ItemSpacing.y;
+            auto edgeSize    = (maxWidth.x - (itemSpacing * 2));
+            im::Image(app->debug_bg_texture_id, {edgeSize, edgeSize});
             im::EndTabItem();
         }
 
         if(im::BeginTabItem("Tiles")) {
-            if(ImGui::BeginTable("table1", 3)) {
-                for(int i = 0; i < 3; i++) {
-                    ImGui::TableNextRow();
+            auto maxWidth    = im::GetContentRegionMax();
+            auto itemSpacing = im::GetStyle().ItemSpacing.y;
+            for(int i = 0; i < 3; i++) {
+                int  row    = i << 1;
 
-                    int row = i << 1;
-                    ImGui::TableSetColumnIndex(0);
-                    im::Image(app->vram_debug_texture_ids[row], {128, 64});
-                    ImGui::TableSetColumnIndex(1);
-                    im::Image(app->vram_debug_texture_ids[row + 1], {128, 64});
-                }
-                ImGui::EndTable();
+                // I think the *3 here is +2 from the outside of the images, and +1 from between them, but I'm not sure
+                auto width  = (maxWidth.x - (itemSpacing * 3)) / 2;
+                auto height = width / 2;
+
+                im::Image(app->vram_debug_texture_ids[row], {width, height});
+                im::SameLine(0, itemSpacing);
+                im::Image(app->vram_debug_texture_ids[row + 1], {width, height});
             }
             im::EndTabItem();
         }
